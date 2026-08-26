@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/totus_incoming_bg_secondary">
+
+    <LinearLayout
+        android:id="@+id/incoming_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/totus_incoming_header_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:id="@+id/incoming_header_hint"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="start|center_vertical"
+            android:maxLines="2"
+            android:text="@string/totus_incoming_connection_hint"
+            android:textColor="@color/totus_incoming_text_tertiary"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/incoming_header_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/totus_incoming_title"
+            android:textColor="@color/totus_incoming_text"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/incoming_btn_close"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="end|center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="✕"
+            android:textColor="@color/totus_incoming_text_tertiary"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/totus_incoming_card_white"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:background="@drawable/totus_incoming_section_gray"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingTop="40dp"
+                android:paddingBottom="32dp">
+
+                <FrameLayout
+                    android:layout_width="164dp"
+                    android:layout_height="164dp"
+                    android:layout_gravity="center_horizontal">
+
+                    <View
+                        android:layout_width="156dp"
+                        android:layout_height="156dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/totus_incoming_avatar_bg" />
+
+                    <TextView
+                        android:id="@+id/incoming_avatar_initial"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="?"
+                        android:textColor="@color/totus_incoming_text"
+                        android:textSize="64sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/incoming_caller_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="36dp"
+                    android:gravity="center"
+                    android:textColor="@color/totus_incoming_text"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/incoming_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:gravity="center"
+                    android:text="@string/totus_incoming_subtitle"
+                    android:textColor="@color/totus_incoming_success"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/incoming_actions_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="36dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <FrameLayout
+                            android:id="@+id/incoming_btn_reject"
+                            android:layout_width="64dp"
+                            android:layout_height="64dp"
+                            android:background="@drawable/totus_btn_circle_reject"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@string/totus_incoming_reject"
+                                android:src="@drawable/ic_totus_phone_white_24" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/incoming_reject_caption"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:letterSpacing="0.02"
+                            android:text="@string/totus_incoming_reject_label"
+                            android:textAllCaps="true"
+                            android:textColor="@color/totus_incoming_text_tertiary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="88dp"
+                        android:layout_marginStart="40dp"
+                        android:layout_marginEnd="40dp"
+                        android:background="@color/totus_incoming_divider" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <FrameLayout
+                            android:id="@+id/incoming_btn_answer"
+                            android:layout_width="64dp"
+                            android:layout_height="64dp"
+                            android:background="@drawable/totus_btn_circle_answer"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@string/totus_incoming_answer"
+                                android:rotation="180"
+                                android:src="@drawable/ic_totus_phone_white_24" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/incoming_answer_caption"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:letterSpacing="0.02"
+                            android:text="@string/totus_incoming_answer_label"
+                            android:textAllCaps="true"
+                            android:textColor="@color/totus_incoming_text_tertiary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/connecting_actions_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="36dp"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/connecting_col_mute"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
+
+                        <FrameLayout
+                            android:id="@+id/connecting_btn_mute"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="@drawable/totus_connecting_circle_neutral"
+                            android:clickable="true"
+                            android:elevation="4dp"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:id="@+id/connecting_icon_mute"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="mute"
+                                android:src="@drawable/ic_totus_mic_white_24"
+                                android:tint="@color/totus_incoming_text" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/connecting_mute_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="MUTE"
+                            android:textAllCaps="true"
+                            android:textColor="@color/totus_incoming_text"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="72dp"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="16dp"
+                        android:background="@color/totus_incoming_divider" />
+
+                    <LinearLayout
+                        android:id="@+id/connecting_col_speaker"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
+
+                        <FrameLayout
+                            android:id="@+id/connecting_btn_speaker"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="@drawable/totus_connecting_circle_neutral"
+                            android:clickable="true"
+                            android:elevation="4dp"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:id="@+id/connecting_icon_speaker"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="speaker"
+                                android:src="@drawable/ic_totus_speaker_white_24"
+                                android:tint="@color/totus_incoming_text" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/connecting_speaker_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="SPEAKER"
+                            android:textAllCaps="true"
+                            android:textColor="@color/totus_incoming_text"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="72dp"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="16dp"
+                        android:background="@color/totus_incoming_divider" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <FrameLayout
+                            android:id="@+id/connecting_btn_end"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="@drawable/totus_btn_circle_reject"
+                            android:clickable="true"
+                            android:elevation="4dp"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@string/totus_incoming_reject"
+                                android:src="@drawable/ic_totus_phone_white_24" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="СБРОСИТЬ"
+                            android:textAllCaps="true"
+                            android:textColor="@color/totus_incoming_text_tertiary"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

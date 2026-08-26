@@ -1,0 +1,139 @@
+# =============================================================================
+# totusClubApp — React Native 0.79 (bare workflow)
+# =============================================================================
+
+# --- Dependencies ---
+node_modules/
+
+# --- Environment & secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.mobileprovision
+*.keystore
+!debug.keystore
+*.jks
+# Firebase client configs (GoogleService-Info.plist, google-services.json) are
+# usually committed — they are public client IDs. Uncomment to keep out of git:
+# google-services.json
+# GoogleService-Info.plist
+**/secrets/
+**/credentials/
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# --- Windows ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Linux ---
+*~
+
+# --- Logs & debug ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.metro-health-check*
+
+# --- Metro / React Native ---
+.expo/
+.expo-shared/
+
+# --- Testing ---
+coverage/
+.nyc_output/
+junit.xml
+
+# --- TypeScript ---
+*.tsbuildinfo
+
+# --- IDE / editors ---
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.iml
+*.ipr
+*.iws
+
+# --- Watchman ---
+.watchmanconfig.local
+
+# --- CocoaPods (iOS) ---
+ios/Pods/
+ios/build/
+ios/DerivedData/
+ios/**/*.xcuserstate
+ios/**/*.xcuserdata
+ios/.xcode.env.local
+ios/Podfile.lock.bak
+ios/**/*.moved-aside
+ios/**/*.hmap
+ios/**/*.ipa
+ios/**/*.dSYM.zip
+ios/**/*.dSYM
+
+# Local CocoaPods caches (this project)
+.cocoapods-cdn-mirror/
+.cocoapods-home/
+.pod-src/
+
+# --- Android / Gradle ---
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.cxx/
+android/captures/
+android/app/release/
+android/app/debug/
+android/keystores/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# --- Fastlane ---
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots/
+**/fastlane/test_output/
+**/fastlane/readme.md
+
+# --- Bundles ---
+*.jsbundle
+*.hbc
+
+# --- Temporary / backup files (local dev) ---
+*.bak
+*.bak-*
+*.tmp
+*.temp
+*.orig
+*.rej
+
+# --- Misc tooling caches ---
+.eslintcache
+.cache/
+.turbo/
+tmp/
+temp/

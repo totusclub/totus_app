@@ -1,0 +1,63 @@
+# Resolve react_native_pods.rb with node to allow for hoisting
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+$FirebaseSDKVersion = '12.10.0'
+# Avoid FBLPromises shadowed-module errors with RNFB
+$RNFirebaseAsStaticFramework = true
+
+# React Native 0.79's New Architecture crashes in Hermes during startup on
+# iOS 26. Use the stable bridge until React Native is upgraded.
+ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+# Static frameworks required for React Native Firebase Swift pods
+linkage = ENV['USE_FRAMEWORKS'] || 'static'
+Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+use_frameworks! :linkage => linkage.to_sym
+
+target 'totusClubApp' do
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'GoogleDataTransport', :modular_headers => true
+  pod 'nanopb', :modular_headers => true
+
+  # Prefer local WebRTC if present (avoids re-downloading ~199MB)
+  jitsi_local = File.expand_path('../.pod-src/JitsiWebRTC-pod', __dir__)
+  if File.directory?(File.join(jitsi_local, 'WebRTC.xcframework'))
+    pod 'JitsiWebRTC', :path => jitsi_local
+  end
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+    )
+
+    # Static umbrella Pods_*.framework is linked as -lPods-* (looks for .a) and fails.
+    # Individual pods are already linked via OTHER_LDFLAGS in the Pods xcconfig.
+    installer.aggregate_targets.each do |aggregate_target|
+      aggregate_target.user_project.native_targets.each do |native_target|
+        native_target.frameworks_build_phase.files.to_a.each do |build_file|
+          name = build_file.display_name
+          next unless name&.end_with?('.framework') && name.start_with?('Pods_')
+          native_target.frameworks_build_phase.remove_file_reference(build_file.file_ref)
+        end
+      end
+      aggregate_target.user_project.save
+    end
+  end
+end
