@@ -8,6 +8,8 @@ import messaging, {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
 import {VOIP_BASE_URL} from '../../config/server';
+// JWT для voip (SECURITY_JWT_PLAN_RU.md, волна 5): Bearer в HTTP и токен в handshake Socket.io.
+import {voipFetch, voipSocketAuth, setVoipAccessToken} from '../api/voipAuth';
 import {
   startAndroidCallForegroundService,
   stopAndroidCallForegroundService,
@@ -538,7 +540,7 @@ async function registerDeviceWithBackend(token: string, loyaltyId: string | null
   // console.log('   loyaltyId:', loyaltyId);
   
   try {
-    const response = await fetch(`${BASE_URL}/api/register-device`, {
+    const response = await voipFetch(`${BASE_URL}/api/register-device`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -583,7 +585,7 @@ async function registerDeviceWithBackend(token: string, loyaltyId: string | null
 async function unregisterDeviceWithBackend(loyaltyId: string): Promise<void> {
   if (!loyaltyId) return;
   try {
-    const response = await fetch(`${BASE_URL}/api/unregister-device`, {
+    const response = await voipFetch(`${BASE_URL}/api/unregister-device`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({loyaltyId}),
@@ -899,6 +901,8 @@ function ensureSocketConnected() {
     }
   }
   socket = io(BASE_URL, {
+    // agent/user-JWT в handshake: сервер (calling_api_v2 socketGate) берёт личность из токена
+    auth: voipSocketAuth,
     transports: ['websocket'],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -1288,7 +1292,7 @@ async function fetchRemoteOfferWithRetry(
   let lastStatus: number | null = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const resp = await fetch(`${BASE_URL}/api/calls/${callUUID}`);
+      const resp = await voipFetch(`${BASE_URL}/api/calls/${callUUID}`);
       lastStatus = resp.status;
       if (resp.ok) {
         const data = await resp.json();
@@ -2085,7 +2089,7 @@ async function waitForAnswerHTTP(callId: string): Promise<void> {
     }
 
     try {
-      const resp = await fetch(`${BASE_URL}/api/calls/${callId}`);
+      const resp = await voipFetch(`${BASE_URL}/api/calls/${callId}`);
       if (resp.ok) {
         const data = await resp.json();
         if (data.answer && data.answer.sdp) {
@@ -2191,7 +2195,7 @@ async function sendAnswerToBackend(callId: string) {
   let callerDeviceId: string | null = null;
   try {
     console.log('📤 sendAnswerToBackend: Fetching call info from backend...');
-    const callResp = await fetch(`${BASE_URL}/api/calls/${callId}`);
+    const callResp = await voipFetch(`${BASE_URL}/api/calls/${callId}`);
     if (callResp.ok) {
       const callData = await callResp.json();
       callerDeviceId = callData.fromDeviceId || null;
@@ -2243,7 +2247,7 @@ async function sendAnswerToBackend(callId: string) {
   for (let attempt = 1; attempt <= 8; attempt++) {
     try {
       console.log(`📤 sendAnswerToBackend: HTTP answer attempt ${attempt}/8`);
-      const resp = await fetch(`${BASE_URL}/api/calls/${callId}/answer`, {
+      const resp = await voipFetch(`${BASE_URL}/api/calls/${callId}/answer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2292,7 +2296,7 @@ async function sendIceCandidate(
   if (socket && socket.connected) {
     try {
       // Get call info to find peer device ID
-      const callResp = await fetch(`${BASE_URL}/api/calls/${callId}`).catch(() => null);
+      const callResp = await voipFetch(`${BASE_URL}/api/calls/${callId}`).catch(() => null);
       if (callResp && callResp.ok) {
         const callData = await callResp.json();
         const toDeviceId = from === 'caller' ? callData.toDeviceId : callData.fromDeviceId;
@@ -2315,7 +2319,7 @@ async function sendIceCandidate(
 
   // Always send via HTTP too - backend will forward via socket if peer is connected
   try {
-    await fetch(`${BASE_URL}/api/calls/${callId}/candidate`, {
+    await voipFetch(`${BASE_URL}/api/calls/${callId}/candidate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2349,7 +2353,7 @@ async function pollRemoteCandidates(
 
   try {
     const querySide = side === 'caller' ? 'caller' : 'callee';
-    const resp = await fetch(
+    const resp = await voipFetch(
       `${BASE_URL}/api/calls/${callId}/candidates?for=${querySide}`,
     );
     if (resp.ok) {
@@ -2513,7 +2517,7 @@ export async function startOutgoingVoiceCall(
     //    - deliver the SDP offer via your signaling channel
     //
     try {
-      await fetch(`${BASE_URL}/api/calls`, {
+      await voipFetch(`${BASE_URL}/api/calls`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3433,7 +3437,7 @@ export function initVoipAndCallKeep(loyaltyId?: string) {
 
     // Inform backend so the other user can end their CallKeep UI as well
     if (currentDeviceId) {
-      fetch(`${BASE_URL}/api/calls/${callUUID}/end`, {
+      voipFetch(`${BASE_URL}/api/calls/${callUUID}/end`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3690,7 +3694,7 @@ export async function startOutgoingVoiceCallByLoyaltyId(
         offerSdpLength: localDesc.sdp.length,
       });
 
-      const response = await fetch(`${BASE_URL}/api/calls`, {
+      const response = await voipFetch(`${BASE_URL}/api/calls`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3831,9 +3835,12 @@ export async function cleanupVoipOnLogout(): Promise<void> {
   const loyaltyIdToUnregister = currentLoyaltyId;
 
   // 1. Unregister device from backend FIRST - stops VoIP pushes for this user
+  //    (ещё с токеном текущего пользователя — voip проверяет владельца loyaltyId)
   if (loyaltyIdToUnregister) {
     await unregisterDeviceWithBackend(loyaltyIdToUnregister);
   }
+  // Токен предыдущего пользователя больше не должен уходить на voip
+  setVoipAccessToken(null);
 
   // 2. End any active call in CallKeep and reset call state
   if (activeCallUUID) {
@@ -4949,7 +4956,7 @@ export function rejectCall(callUUID: string): void {
     
     // Inform backend that call was rejected (not just ended)
     if (currentDeviceId) {
-      fetch(`${BASE_URL}/api/calls/${callUUID}/reject`, {
+      voipFetch(`${BASE_URL}/api/calls/${callUUID}/reject`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({deviceId: currentDeviceId}),
@@ -5115,7 +5122,7 @@ export function endCall(): void {
       
       // Inform backend
       if (currentDeviceId && callId) {
-        fetch(`${BASE_URL}/api/calls/${callId}/end`, {
+        voipFetch(`${BASE_URL}/api/calls/${callId}/end`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({deviceId: currentDeviceId}),
