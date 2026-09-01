@@ -66,7 +66,8 @@ export const Verification: React.FC = () => {
           const user = jwtDecode(data.authToken);
 
           dispatch(setAuth({
-            token: data.authToken,
+            token: data.accessToken || data.authToken,
+            refreshToken: data.refreshToken ?? null,
             user,
           }));
           void maybePromptAndroidVoipPowerSetup('first_login');

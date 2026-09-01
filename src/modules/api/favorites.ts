@@ -2,6 +2,7 @@
 // backed by voip server `/api/favorites` routes.
 
 import { VOIP_BASE_URL } from '../../config/server';
+import { voipFetch } from './voipAuth';
 
 const BASE_URL = VOIP_BASE_URL;
 
@@ -24,7 +25,7 @@ export async function addFavorite(
   hotelData: any,
 ): Promise<Favorite> {
   try {
-    const response = await fetch(`${BASE_URL}/api/favorites`, {
+    const response = await voipFetch(`${BASE_URL}/api/favorites`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,7 +61,7 @@ export async function removeFavorite(
   hotelId: number,
 ): Promise<boolean> {
   try {
-    const response = await fetch(`${BASE_URL}/api/favorites`, {
+    const response = await voipFetch(`${BASE_URL}/api/favorites`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -92,7 +93,7 @@ export async function removeFavorite(
 // Get user's favorites
 export async function getUserFavorites(userId: number): Promise<Favorite[]> {
   try {
-    const response = await fetch(`${BASE_URL}/api/favorites/${userId}`);
+    const response = await voipFetch(`${BASE_URL}/api/favorites/${userId}`);
     if (!response.ok) {
       // If 404, return empty array (no favorites yet)
       if (response.status === 404) {
@@ -120,7 +121,7 @@ export async function isFavorite(
   hotelId: number,
 ): Promise<boolean> {
   try {
-    const response = await fetch(
+    const response = await voipFetch(
       `${BASE_URL}/api/favorites/${userId}/${hotelId}`,
     );
     if (!response.ok) {

@@ -1,6 +1,7 @@
 // API service for managing contacts
 
 import {VOIP_BASE_URL} from '../../config/server';
+import {voipFetch} from './voipAuth';
 
 const BASE_URL = VOIP_BASE_URL;
 
@@ -22,7 +23,7 @@ export interface Contact {
 // Add a contact
 export async function addContact(userId: number, contactLoyaltyId: string): Promise<Contact> {
   try {
-    const response = await fetch(`${BASE_URL}/api/contacts`, {
+    const response = await voipFetch(`${BASE_URL}/api/contacts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -49,7 +50,7 @@ export async function addContact(userId: number, contactLoyaltyId: string): Prom
 // Get user's contacts
 export async function getUserContacts(userId: number): Promise<Contact[]> {
   try {
-    const response = await fetch(`${BASE_URL}/api/contacts/${userId}`);
+    const response = await voipFetch(`${BASE_URL}/api/contacts/${userId}`);
     if (!response.ok) {
       // If 404, return empty array (no contacts yet)
       if (response.status === 404) {
@@ -70,7 +71,7 @@ export async function getUserContacts(userId: number): Promise<Contact[]> {
 // Search user by loyalty ID
 export async function searchUserByLoyaltyId(loyaltyId: string) {
   try {
-    const response = await fetch(`${BASE_URL}/api/users/search/${loyaltyId}`);
+    const response = await voipFetch(`${BASE_URL}/api/users/search/${loyaltyId}`);
     if (!response.ok) {
       if (response.status === 404) {
         return null;
@@ -88,7 +89,7 @@ export async function searchUserByLoyaltyId(loyaltyId: string) {
 // Check if contact already exists
 export async function contactExists(userId: number, contactLoyaltyId: string): Promise<boolean> {
   try {
-    const response = await fetch(`${BASE_URL}/api/contacts/check/${userId}/${contactLoyaltyId}`);
+    const response = await voipFetch(`${BASE_URL}/api/contacts/check/${userId}/${contactLoyaltyId}`);
     if (!response.ok) {
       if (response.status === 404) {
         return false;
