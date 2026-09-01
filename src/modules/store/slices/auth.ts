@@ -27,6 +27,7 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.user = action.payload.user;
       state.accessToken = action.payload.token; // Keep for compatibility
+      state.refreshToken = action.payload.refreshToken ?? state.refreshToken ?? null; // SECURITY_JWT_PLAN_RU.md, волна 5
       state.userId = action.payload.user?.id || null;
       state.fullAuth = true;
     },

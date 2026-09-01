@@ -14,10 +14,16 @@ import {
   type OpenHotelInfo,
 } from '@tosmedia/ai-assistant-native';
 import { openHotelFromAiAssistantInfo, openHotelFromAiAssistantUrl } from './src/utils/aiAssistantOpenHotel';
+import { setVoipAccessToken } from './src/modules/api/voipAuth';
 
 function AiAssistantBridge({ children }: { children: React.ReactNode }): React.JSX.Element {
   const { isDark } = useThemeContext();
   const accessToken = useSelector((state: RootState) => state.auth.accessToken);
+
+  // Тот же JWT — телефонии (voip.totus.club): Bearer в HTTP и токен в Socket.io
+  useEffect(() => {
+    setVoipAccessToken(accessToken || null);
+  }, [accessToken]);
 
   const onOpenHotel = useCallback((info: OpenHotelInfo) => {
     return openHotelFromAiAssistantInfo(info);

@@ -1,6 +1,7 @@
 // API service for fetching users from VoIP backend
 
 import {VOIP_BASE_URL} from '../../config/server';
+import {voipFetch} from './voipAuth';
 
 const BASE_URL = VOIP_BASE_URL;
 
@@ -22,7 +23,7 @@ export interface User {
 // Get all users from database
 export async function getAllUsers(): Promise<User[]> {
   try {
-    const response = await fetch(`${BASE_URL}/api/users`);
+    const response = await voipFetch(`${BASE_URL}/api/users`);
     if (!response.ok) {
       throw new Error(`Failed to fetch users: ${response.status}`);
     }
@@ -37,7 +38,7 @@ export async function getAllUsers(): Promise<User[]> {
 // Get user by loyalty_id
 export async function getUserByLoyaltyId(loyaltyId: string): Promise<User | null> {
   try {
-    const response = await fetch(`${BASE_URL}/api/users/${loyaltyId}`);
+    const response = await voipFetch(`${BASE_URL}/api/users/${loyaltyId}`);
     if (!response.ok) {
       if (response.status === 404) {
         return null;
@@ -55,7 +56,7 @@ export async function getUserByLoyaltyId(loyaltyId: string): Promise<User | null
 // Get user by ID
 export async function getUserById(userId: number): Promise<User | null> {
   try {
-    const response = await fetch(`${BASE_URL}/api/users/by-id/${userId}`);
+    const response = await voipFetch(`${BASE_URL}/api/users/by-id/${userId}`);
     if (!response.ok) {
       if (response.status === 404) {
         return null;
