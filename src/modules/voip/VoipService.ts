@@ -1509,6 +1509,45 @@ function applyStoredSpeakerRouting(context: string): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// ICE-серверы с бэкенда (Б.1, SECURITY_AUDIT_SECRETS_RU.md #29):
+// TURN-логин/пароль больше не зашиты в бандл — их выдаёт calling_api_v2
+// (GET /api/ice-servers, JWT через voipFetch). Ответ кэшируется до expiresAt
+// минус запас. Если запрос не удался — фолбэк STUN-only (без relay).
+// ---------------------------------------------------------------------------
+const FALLBACK_ICE_SERVERS = [
+  {urls: 'stun:stun1.totus.club:3478'},
+  {urls: 'stun:stun2.totus.club:3478'},
+];
+
+let cachedIceServers: any[] | null = null;
+let cachedIceExpiresAt = 0; // unix-секунды
+
+async function fetchIceServers(): Promise<any[]> {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedIceServers && now < cachedIceExpiresAt - 300) {
+    return cachedIceServers;
+  }
+  try {
+    const res = await voipFetch(`${BASE_URL}/api/ice-servers`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+        cachedIceServers = data.iceServers;
+        cachedIceExpiresAt = Number(data.expiresAt) || now + 3600;
+        if (data.mode === 'stun-only') {
+          console.warn('[voip] backend вернул только STUN (TURN не настроен) — relay недоступен');
+        }
+        return cachedIceServers;
+      }
+    }
+    console.warn('[voip] /api/ice-servers ответил', res.status, '— фолбэк STUN-only');
+  } catch (e) {
+    console.warn('[voip] не удалось получить /api/ice-servers — фолбэк STUN-only', e);
+  }
+  return cachedIceServers || FALLBACK_ICE_SERVERS;
+}
+
 async function startVoiceCall(
   callUUID: string,
   remoteOffer: {sdp: string; type: string} | undefined,
@@ -1529,54 +1568,20 @@ async function startVoiceCall(
     iceFailureTimeout = null;
   }
   
-  // 1. Create peer connection with comprehensive STUN/TURN servers for maximum stability
-    const peer: any = new RTCPeerConnection({
-        iceServers: [
-            // STUN սերվերներ՝ ուղղակի կապի համար
-            { urls: "stun:stun1.totus.club:3478" },
-            { urls: "stun:stun2.totus.club:3478" },
+  // 1. Создание peer connection: ICE-серверы приходят с бэкенда (см. fetchIceServers выше)
+  const iceServers = await fetchIceServers();
 
-            // TURN սերվերներ՝ NAT/ֆայերվոլի դեպքում փոխանցման համար
-            {
-                urls: "turn:turn1.totus.club:3478?transport=udp",
-                username: "test",
-                credential: "TotusSecretKey2026",
-            },
-            {
-                urls: "turn:turn1.totus.club:3478?transport=tcp",
-                username: "test",
-                credential: "TotusSecretKey2026",
-            },
-            {
-                urls: "turns:turn1.totus.club:5349?transport=tcp",
-                username: "test",
-                credential: "TotusSecretKey2026",
-            },
-            {
-                urls: "turn:turn2.totus.club:3478?transport=udp",
-                username: "test",
-                credential: "TotusSecretKey2026",
-            },
-            {
-                urls: "turn:turn2.totus.club:3478?transport=tcp",
-                username: "test",
-                credential: "TotusSecretKey2026",
-            },
-            {
-                urls: "turns:turn2.totus.club:5349?transport=tcp",
-                username: "test",
-                credential: "TotusSecretKey2026",
-            },
-        ],
+  const peer: any = new RTCPeerConnection({
+    iceServers,
 
-        // Նախօրոք հավաքել ICE թեկնածուներ արագ կապի համար
-        iceCandidatePoolSize: 10,
+    // Նախօրոք հավաքել ICE թեկնածուներ արագ կապի համար
+    iceCandidatePoolSize: 10,
 
-        // Պրոֆեսիոնալ WebRTC պարամետրեր
-        iceTransportPolicy: "all",     // օգտագործել ինչպես ուղղակի (STUN), այնպես էլ ռելեյ (TURN)
-        bundlePolicy: "max-bundle",    // RTP/RTCP–ը նույն պորտով հավաքել՝ NAT–ի արդյունավետության համար
-        rtcpMuxPolicy: "require",      // պահանջել RTP/RTCP համակցումը՝ նույն պորտով
-    });
+    // Պրոֆեսիոնալ WebRTC պարամետրեր
+    iceTransportPolicy: 'all', // օգտագործել ինչպես ուղղակի (STUN), այնպես էլ ռելեյ (TURN)
+    bundlePolicy: 'max-bundle', // RTP/RTCP–ը նույն պորտով հավաքել՝ NAT–ի արդյունավետության համար
+    rtcpMuxPolicy: 'require', // պահանջել RTP/RTCP համակցումը՝ նույն պորտով
+  });
 
   pc = peer;
   androidTelemetry('peer_created');
