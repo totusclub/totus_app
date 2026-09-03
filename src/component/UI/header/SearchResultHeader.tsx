@@ -8,6 +8,10 @@ import { RootState } from '../../../modules/store'
 import { useTheme } from '../../../hooks/useTheme'
 import { useFiltersOpen } from '../../searchResult/FiltersOpenContext'
 import { formatTouristsText } from '../../home/searchSection/utils/searchHelpers'
+import { countActiveFilters } from '../../searchResult/filterChips'
+
+const FILTERS_BADGE_COLOR = '#CF3030';
+const FILTERS_BADGE_TEXT_COLOR = '#FFFFFF';
 
 // Format date from YYYY-MM-DD to "17 мая" format
 const formatDateToRussian = (dateStr: string | undefined): string => {
@@ -46,9 +50,12 @@ export default function SearchResultHeader() {
   const navigation = useNavigation();
   const { open: openFilters, bodyReady } = useFiltersOpen();
 
-  const { headerName, searchParams } = useSelector(
+  const { headerName, searchParams, hotels } = useSelector(
     (state: RootState) => state.search,
   );
+
+  // Number of applied list filters — shown as a badge on the filters icon
+  const activeFiltersCount = useMemo(() => countActiveFilters(hotels), [hotels]);
 
   // Format the date text
   const dateText = useMemo(() => {
@@ -118,6 +125,13 @@ export default function SearchResultHeader() {
         ) : (
           <ActivityIndicator size="small" color={theme.brand} />
         )}
+        {bodyReady && activeFiltersCount > 0 ? (
+          <View style={styles.filtersBadge} pointerEvents="none">
+            <AppText style={styles.filtersBadgeText}>
+              {activeFiltersCount > 99 ? '99+' : String(activeFiltersCount)}
+            </AppText>
+          </View>
+        ) : null}
       </TouchableOpacity>
     </View>
   )
@@ -157,5 +171,24 @@ const styles = StyleSheet.create({
   },
   filterButtonDisabled: {
     opacity: 0.55,
+  },
+  filtersBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: FILTERS_BADGE_COLOR,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filtersBadgeText: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: '500',
+    color: FILTERS_BADGE_TEXT_COLOR,
+    letterSpacing: 0,
   },
 });
