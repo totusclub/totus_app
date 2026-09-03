@@ -239,19 +239,17 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
 
     const handleEndCall = () => {
         endCall();
-        if (onClose) {
-            onClose();
-        }
+        onClose?.();
     };
 
     const handleRejectCall = () => {
-        const currentState = getCallState();
-        if (currentState.callUUID) {
-            rejectCall(currentState.callUUID);
+        const current = getCallState();
+        if (current.callUUID) {
+            rejectCall(current.callUUID);
+        } else {
+            endCall();
         }
-        if (onClose) {
-            onClose();
-        }
+        onClose?.();
     };
 
     // Always read fresh state for visibility check (don't rely on stale internal state)
@@ -551,7 +549,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                             )}
 
                             {/* Incoming Call Buttons - Side by Side */}
-                            {isIncoming && effectiveState.callUUID && !isEnded && (
+                            {isIncoming && !isEnded && (
                                 <View style={styles.incomingCallButtonsContainer}>
                                     {/* Reject Button (Left) */}
                                     <View style={styles.incomingCallButtonWrapper}>

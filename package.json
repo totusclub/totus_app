@@ -29,7 +29,7 @@
     "@react-navigation/native": "^7.1.19",
     "@react-navigation/native-stack": "^7.6.2",
     "@reduxjs/toolkit": "^2.10.1",
-    "@tosmedia/ai-assistant-native": "github:tosmedia/totus_ai_v2#pkg/ai-assistant-native",
+    "@tosmedia/ai-assistant-native": "file:../totus_ai_v2/packages/ai-assistant-native/tosmedia-ai-assistant-native-1.2.2.tgz",
     "axios": "^1.13.2",
     "jwt-decode": "^4.0.0",
     "lottie-react-native": "^7.3.4",

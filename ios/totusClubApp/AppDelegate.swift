@@ -160,36 +160,39 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
         userInfo: dictionaryPayload
       )
       
-      // Report to CallKeep if we have the necessary information
-      if let callId = callId, let handle = handle, let callerName = callerName {
-        print("   📞 Reporting incoming call to CallKeep...")
-        CallKeepHelper.reportIncomingCall(
-          callId,
-          handle: handle,
-          callerName: callerName,
-          hasVideo: hasVideo,
-          payload: dictionaryPayload
-        ) {
-          print("   ✅ CallKeep reported successfully")
-          // Call completion after CallKeep is set up
-          completion()
-        }
-      } else {
-        print("   ⚠️ Missing call information, forwarding to library only")
-        // Forward to library via Objective-C helper
-        VoipPushHelper.didReceiveIncomingPush(with: payload, forType: type, completion: completion)
+      // Always report CallKit before PushKit completion — even if payload keys are missing.
+      // Missing report + completion() = iOS terminates the app (killed-state VoIP crash).
+      let reportCallId = callId ?? UUID().uuidString
+      let reportHandle = handle ?? reportCallId
+      let reportName = callerName ?? "Incoming call"
+      print("   📞 Reporting incoming call to CallKeep...")
+      CallKeepHelper.reportIncomingCall(
+        reportCallId,
+        handle: reportHandle,
+        callerName: reportName,
+        hasVideo: hasVideo,
+        payload: dictionaryPayload
+      ) {
+        print("   ✅ CallKeep reported successfully")
+        completion()
       }
     } else {
-      print("   ⚠️ Invalid payload format, forwarding to library only")
-      // Post notification for VoIPPushModule
+      print("   ⚠️ Invalid payload format — still report CallKit so iOS does not kill the process")
       NotificationCenter.default.post(
         name: NSNotification.Name("VoIPPushReceived"),
         object: nil,
         userInfo: [:]
       )
-      
-      // Forward to library via Objective-C helper
-      VoipPushHelper.didReceiveIncomingPush(with: payload, forType: type, completion: completion)
+      let fallbackId = UUID().uuidString
+      CallKeepHelper.reportIncomingCall(
+        fallbackId,
+        handle: fallbackId,
+        callerName: "Incoming call",
+        hasVideo: false,
+        payload: [:]
+      ) {
+        completion()
+      }
     }
   }
   

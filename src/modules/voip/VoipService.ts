@@ -5100,53 +5100,49 @@ export function directSoundTest(): void {
 }
 
 export function endCall(): void {
-  if (activeCallUUID || incomingCallUUID) {
-    try {
-      const callId = activeCallUUID || incomingCallUUID;
-      if (callId) {
-        RNCallKeep.endCall(callId);
-      }
-      currentCallState = 'ended';
-      
-      // Reset all call states
-      activeCallUUID = null;
-      incomingCallUUID = null;
-      activeCallStartedAt = null;
-      callerName = null;
-      
-      // Reset microphone and speaker states (endVoiceCall will also do this, but explicit here for clarity)
-      isMuted = false;
-      isSpeakerEnabled = false;
-      currentSpeakerMode = 'earpiece';
-      console.log('endCall: ✅ Reset microphone (unmuted) and speaker states');
-      
-      // Clean up all media tracks and resources
-      endVoiceCall();
-      stopRingback();
-      stopIncomingRingtone();
-      
-      // Inform backend
-      if (currentDeviceId && callId) {
-        voipFetch(`${BASE_URL}/api/calls/${callId}/end`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({deviceId: currentDeviceId}),
-        }).catch(e => console.warn('Failed to notify backend about call end', e));
-      }
-      
-      console.log('Call ended');
-      
-      // Reset call state to idle after delay (so modal can show "ended" state briefly)
-      setTimeout(() => {
-        if (currentCallState === 'ended') {
-          currentCallState = 'idle';
-          stopNativeConnectionStatusSync();
-        }
-      }, 3000);
-    } catch (e) {
-      console.error('Failed to end call', e);
+  const callId = activeCallUUID || incomingCallUUID;
+  currentCallState = 'ended';
+  activeCallUUID = null;
+  incomingCallUUID = null;
+  activeCallStartedAt = null;
+  callerName = null;
+  isMuted = false;
+  isSpeakerEnabled = false;
+  currentSpeakerMode = 'earpiece';
+  pendingAnswerCallUUID = null;
+
+  try {
+    if (callId) {
+      RNCallKeep.endCall(callId);
     }
+  } catch (e) {
+    console.warn('endCall: CallKeep endCall failed', e);
   }
+
+  try {
+    endVoiceCall();
+    stopRingback();
+    stopIncomingRingtone();
+  } catch (e) {
+    console.warn('endCall: media cleanup failed', e);
+  }
+
+  if (currentDeviceId && callId) {
+    voipFetch(`${BASE_URL}/api/calls/${callId}/end`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({deviceId: currentDeviceId}),
+    }).catch(e => console.warn('Failed to notify backend about call end', e));
+  }
+
+  console.log('Call ended', callId || '(no uuid)');
+
+  setTimeout(() => {
+    if (currentCallState === 'ended') {
+      currentCallState = 'idle';
+      stopNativeConnectionStatusSync();
+    }
+  }, 400);
 }
 
 // Temporary manual telecom test for Android incoming UI without FCM.

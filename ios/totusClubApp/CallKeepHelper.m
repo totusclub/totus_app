@@ -108,62 +108,38 @@ static RCTBridge *storedBridge = nil;
     NSLog(@"   callId: %@", callId);
     NSLog(@"   handle: %@", handle);
     NSLog(@"   callerName: %@", callerName);
-    
-    // Get bridge
-    RCTBridge *bridge = [self getBridge];
-    
-    if (!bridge) {
-        NSLog(@"⚠️ No bridge available, trying direct RNCallKeep access...");
-        // Try to use RNCallKeep directly (it might have a singleton)
-        // This is a fallback for when bridge is not yet available
-        if (completion) {
-            completion();
-        }
-        return;
-    }
-    
-    // Get RNCallKeep module
-    RNCallKeep *callKeep = [bridge moduleForName:@"RNCallKeep"];
-    
-    if (!callKeep) {
-        NSLog(@"⚠️ RNCallKeep module not found in bridge");
-        // Try to get it as a class method
-        Class callKeepClass = NSClassFromString(@"RNCallKeep");
-        if (callKeepClass) {
-            NSLog(@"   Found RNCallKeep class, but module not available");
-        }
-        if (completion) {
-            completion();
-        }
-        return;
-    }
-    
-    NSLog(@"✅ Found RNCallKeep module, reporting call...");
-    
-    // Report the incoming call using the correct class method signature
-    // Note: reportNewIncomingCall is a CLASS method (+), not an instance method
-    // Method signature: reportNewIncomingCall:handle:handleType:hasVideo:localizedCallerName:supportsHolding:supportsDTMF:supportsGrouping:supportsUngrouping:fromPushKit:payload:withCompletionHandler:
+
+    // iOS kills the process if PushKit completion runs without CXProvider.reportNewIncomingCall.
+    // reportNewIncomingCall is a CLASS method — do not wait for RCTBridge (killed-app path has no bridge yet).
+    NSString *safeCallId = (callId.length > 0) ? callId : [[NSUUID UUID] UUIDString];
+    NSString *safeHandle = (handle.length > 0) ? handle : @"totus";
+    NSString *safeName = (callerName.length > 0) ? callerName : @"Incoming call";
+
+    NSMutableDictionary *safePayload = payload ? [payload mutableCopy] : [NSMutableDictionary dictionary];
+    [safePayload removeObjectForKey:@"offer"];
+
     SEL reportSelector = @selector(reportNewIncomingCall:handle:handleType:hasVideo:localizedCallerName:supportsHolding:supportsDTMF:supportsGrouping:supportsUngrouping:fromPushKit:payload:withCompletionHandler:);
-    
+
     if ([RNCallKeep respondsToSelector:reportSelector]) {
-        [RNCallKeep reportNewIncomingCall:callId
-                                    handle:handle
+        [RNCallKeep reportNewIncomingCall:safeCallId
+                                    handle:safeHandle
                                 handleType:@"generic"
                                   hasVideo:hasVideo
-                       localizedCallerName:callerName
+                       localizedCallerName:safeName
                            supportsHolding:NO
                               supportsDTMF:NO
                           supportsGrouping:NO
                         supportsUngrouping:NO
                              fromPushKit:YES
-                                 payload:payload
+                                 payload:safePayload
                    withCompletionHandler:completion];
-        NSLog(@"✅ Successfully reported incoming call to CallKeep: %@", callId);
-    } else {
-        NSLog(@"⚠️ RNCallKeep doesn't respond to reportNewIncomingCall selector");
-        if (completion) {
-            completion();
-        }
+        NSLog(@"✅ Reported incoming call to CallKeep (bridge=%@): %@", [self getBridge] ? @"yes" : @"no", safeCallId);
+        return;
+    }
+
+    NSLog(@"⚠️ RNCallKeep.reportNewIncomingCall unavailable");
+    if (completion) {
+        completion();
     }
 }
 
