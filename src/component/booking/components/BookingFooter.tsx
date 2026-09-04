@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { AppText, AppButton } from '../../UI';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../hooks/useTheme';
+import { TabletCentered } from '../../UI/tablet';
 import {
   formatMoneyRub,
   getBookingPriceBreakdown,
@@ -136,6 +137,7 @@ export const BookingFooter: React.FC<BookingFooterProps> = ({
         },
       ]}
     >
+      <TabletCentered>
       <AppButton
         title="Отправить запрос"
         onPress={onSubmit}
@@ -143,6 +145,7 @@ export const BookingFooter: React.FC<BookingFooterProps> = ({
         isProcessing={loading}
         size="large"
       />
+      </TabletCentered>
     </View>
   );
 };

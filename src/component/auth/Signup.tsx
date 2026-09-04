@@ -6,6 +6,7 @@ import { AppText, AppButton, AppInput, AppPhoneInput } from '../UI';
 import { signupUser } from '../../modules/store/actions/auth';
 import { ELoginDataType } from '../../types/auth';
 import { useTheme } from '../../hooks/useTheme';
+import { TabletCentered } from '../UI/tablet';
 
 type SignupRouteParams = {
   returnTo?: string;
@@ -147,6 +148,7 @@ export const Signup: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
+          <TabletCentered>
           <View style={styles.header}>
             <AppText style={[styles.title, { color: theme.text }]}>Регистрация</AppText>
             <AppText style={[styles.subtitle, { color: theme.textTertiary }]}>
@@ -227,6 +229,7 @@ export const Signup: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
+          </TabletCentered>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

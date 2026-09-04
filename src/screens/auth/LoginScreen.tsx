@@ -21,6 +21,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { loginUser } from '../../modules/store/actions/auth';
 import { ELoginDataType } from '../../types/auth';
 import { AppDispatch } from '../../modules/store';
+import { TabletCentered } from '../../component/UI/tablet';
 
 const LoginScreen = () => {
   const { theme } = useTheme();
@@ -120,6 +121,7 @@ const LoginScreen = () => {
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
+        <TabletCentered>
         <View style={styles.header}>
           <AppText style={[styles.title, { color: theme.text }]}>Вход</AppText>
           <AppText style={[styles.subtitle, { color: theme.textTertiary }]}>
@@ -167,6 +169,7 @@ const LoginScreen = () => {
             isProcessing={loading}
           />
         </View>
+        </TabletCentered>
       </ScrollView>
     </KeyboardAvoidingView>
   );

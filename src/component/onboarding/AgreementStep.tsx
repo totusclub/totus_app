@@ -5,6 +5,7 @@ import { StatusBar } from 'react-native';
 import { AppText } from '../UI';
 import { useTheme } from '../../hooks/useTheme';
 import { agreementText, totalSteps } from './constants';
+import { TabletCentered } from '../UI/tablet';
 
 type AgreementStepProps = {
     currentStep: number;
@@ -36,6 +37,7 @@ const AgreementStep: React.FC<AgreementStepProps> = ({ currentStep, onAgree }) =
                         paddingBottom: Math.max(insets.bottom, 16),
                     },
                 ]}>
+                <TabletCentered>
                 {/* Title */}
                 <View style={styles.agreementTitleContainer}>
                     <AppText style={[styles.agreementTitle, { color: titleColor }]}>
@@ -56,17 +58,21 @@ const AgreementStep: React.FC<AgreementStepProps> = ({ currentStep, onAgree }) =
                         ПОЛЬЗОВАТЕЛЬСКОЕ СОГЛАШЕНИЕ
                     </AppText>
                 </View>
+                </TabletCentered>
 
                 {/* Scrollable Agreement Text */}
                 <ScrollView
                     style={styles.agreementScrollContainer}
                     contentContainerStyle={styles.agreementScrollContent}
                     showsVerticalScrollIndicator={true}>
+                    <TabletCentered>
                     <AppText style={[styles.agreementText, { color: titleColor }]}>
                         {agreementText}
                     </AppText>
+                    </TabletCentered>
                 </ScrollView>
 
+                <TabletCentered>
                 {/* Agree Button */}
                 <View style={[styles.agreementButtonContainer, { borderTopColor: borderColor }]}>
                     <TouchableOpacity
@@ -97,6 +103,7 @@ const AgreementStep: React.FC<AgreementStepProps> = ({ currentStep, onAgree }) =
                         />
                     ))}
                 </View>
+                </TabletCentered>
             </View>
         </SafeAreaView>
     );
