@@ -7,6 +7,8 @@ import { useNavigation } from "@react-navigation/native";
 import { runFullSearchFlow, setHeaderName, setSearchParams } from "../../../modules/store/slices/search.ts";
 import { useDispatch } from "react-redux";
 import { useTheme } from '../../../hooks/useTheme';
+import { useLayout } from '../../../hooks/useLayout';
+import { TabletGrid } from '../../UI/tablet';
 
 type PopularDestinationsListProps = {
   popularDestinations?: any[] | null;
@@ -14,6 +16,7 @@ type PopularDestinationsListProps = {
 
 export const PopularDestinationsList: React.FC<PopularDestinationsListProps> = ({ popularDestinations }) => {
   const { theme } = useTheme();
+  const { isTablet, layoutClass } = useLayout();
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const date = useMemo(() => {
@@ -62,9 +65,30 @@ export const PopularDestinationsList: React.FC<PopularDestinationsListProps> = (
   }
 
 
+  // iPad only: grid (3 columns portrait / 4 landscape) instead of the horizontal strip.
+  const tabletColumns = layoutClass === 'expanded' ? 4 : 3;
+
   return (
     <View style={styles.wrapper}>
-      <AppText style={[styles.title, { color: theme.text }]}>Популярные направления</AppText>
+      <AppText style={[styles.title, isTablet && styles.titleTablet, { color: theme.text }]}>Популярные направления</AppText>
+      {isTablet ? (
+        <View style={styles.gridTablet}>
+          <TabletGrid
+            items={popularDestinations ?? []}
+            columns={tabletColumns}
+            gap={16}
+            rowStyle={styles.gridRowTablet}
+            keyExtractor={(_destination: any, index: number) => String(index)}
+            renderItem={(destination: any) => (
+              <PopularDestinationCard
+                destination={destination}
+                style={styles.cardTablet}
+                handlePressHotel={handlePressHotel}
+              />
+            )}
+          />
+        </View>
+      ) : (
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -84,6 +108,7 @@ export const PopularDestinationsList: React.FC<PopularDestinationsListProps> = (
           ))}
         </View>
       </ScrollView>
+      )}
     </View>
   );
 };
@@ -111,5 +136,18 @@ const styles = StyleSheet.create({
   },
   lastCard: {
     marginRight: 0,
+  },
+  // --- iPad only (never applied on phone) ---
+  titleTablet: {
+    marginLeft: 24,
+  },
+  gridTablet: {
+    paddingHorizontal: 24,
+  },
+  gridRowTablet: {
+    marginBottom: 16,
+  },
+  cardTablet: {
+    width: '100%',
   },
 });

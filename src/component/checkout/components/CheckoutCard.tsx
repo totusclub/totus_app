@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Order } from '../../../types/orders';
 import { useTheme } from '../../../hooks/useTheme';
 import { getOrderPayAmount } from '../../../utils/orderPayment';
+import { TabletCentered } from '../../UI/tablet';
 
 interface CheckoutCardProps {
   order: Order | null;
@@ -34,6 +35,7 @@ export const CheckoutCard: React.FC<CheckoutCardProps> = ({
 
   return (
     <View style={[styles.footer, { paddingBottom: insets.bottom, backgroundColor: theme.cardBackground, borderTopColor: theme.borderLight }]}>
+      <TabletCentered>
       <View style={styles.totalPriceContent}>
         <AppText style={[styles.totalLabel, { color: theme.text }]}>Всего за тур</AppText>
         <AppText style={[styles.totalPrice, { color: theme.text }]}>
@@ -46,6 +48,7 @@ export const CheckoutCard: React.FC<CheckoutCardProps> = ({
         loading={loading}
         disabled={loading}
       />
+      </TabletCentered>
     </View>
   );
 };
