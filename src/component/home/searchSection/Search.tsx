@@ -36,6 +36,7 @@ import {
 } from './utils/searchHelpers';
 import {buildApiSearchParams, withSearchTypeFilters} from '../../../utils/searchParamsUtils';
 import { useTheme } from '../../../hooks/useTheme';
+import { useLayout } from '../../../hooks/useLayout';
 import { BlurView } from '@react-native-community/blur';
 
 interface SearchProps {
@@ -68,6 +69,7 @@ const addDays = (date: Date, days: number): Date => {
 
 export const Search: React.FC<SearchProps> = ({ title }) => {
   const { theme, isDark } = useTheme();
+  const { isTablet, layoutClass } = useLayout();
   const navigation = useNavigation<any>();
 
   const dispatch = useDispatch<AppDispatch>();
@@ -360,6 +362,52 @@ export const Search: React.FC<SearchProps> = ({ title }) => {
     searchMode,
     headerName,
   ]);
+
+  // iPad only: fields laid out in rows (landscape/expanded — one row; portrait — two rows).
+  const tabletExpanded = isTablet && layoutClass === 'expanded';
+  const tabletTripFields = isTablet ? (
+    <>
+      <DateField
+        value={departureDate}
+        onChange={handleDepartureDateChange}
+        style={[
+          styles.fieldTablet,
+          !tabletExpanded && styles.fieldTabletFirst,
+          { borderRightColor: theme.border },
+        ]}
+        label={searchMode === 'hotel' ? 'Дата заезда' : 'Дата вылета'}
+      />
+      <DateField
+        value={returnDate}
+        onChange={setReturnDate}
+        style={[styles.fieldTablet, { borderRightColor: theme.border }]}
+        label="Дата возвращения"
+      />
+      <NightsField
+        value={nightsDisplay}
+        onChange={handleNightsChange}
+        style={[styles.fieldTablet, { borderRightColor: theme.border }]}
+      />
+      <TouristsField
+        value={touristsText}
+        onChange={() => { }} // No-op: touristsText is derived from adults/kids
+        onTouristsChange={handleTouristsDetailsChange}
+        initialAdults={adults}
+        initialChildren={kids}
+        initialKidsAges={kidsAges}
+        style={[styles.fieldTablet, styles.fieldTabletLast]}
+      />
+      <View style={styles.searchButtonTablet}>
+        <AppButton
+          title="Найти"
+          onPress={handleSearch}
+          size="large"
+          icon="search"
+        />
+      </View>
+    </>
+  ) : null;
+
   return (
     <ImageBackground
       source={require('../../../assets/images/searchBg.jpg')}
@@ -370,10 +418,15 @@ export const Search: React.FC<SearchProps> = ({ title }) => {
         blurType={isDark ? 'dark' : 'light'}
         blurAmount={4}
       />
-      <View style={styles.container}>
-        <AppText style={styles.title}>{title}</AppText>
+      <View style={[styles.container, isTablet && styles.containerTablet]}>
+        <AppText style={[styles.title, isTablet && styles.titleTablet]}>{title}</AppText>
 
-        <View style={[styles.searchCard, { backgroundColor: theme.backgroundSecondary }]}>
+        <View
+          style={[
+            styles.searchCard,
+            isTablet && styles.searchCardTablet,
+            { backgroundColor: theme.backgroundSecondary },
+          ]}>
           <View style={styles.searchModeTabs}>
             <TouchableOpacity
               style={[
@@ -415,6 +468,45 @@ export const Search: React.FC<SearchProps> = ({ title }) => {
             </TouchableOpacity>
           </View>
 
+          {isTablet ? (
+          <>
+          <View
+            style={[
+              styles.rowContainer,
+              styles.rowTablet,
+              !tabletExpanded && [styles.rowTabletTop, { borderBottomColor: theme.border }],
+            ]}>
+            {searchMode === 'package' && (
+              <OriginField
+                value={origin}
+                onChange={setOrigin}
+                style={[
+                  styles.fieldTablet,
+                  styles.fieldTabletFirst,
+                  { borderRightColor: theme.border },
+                ]}
+              />
+            )}
+            <DestinationField
+              value={destination}
+              onChange={handleDestinationChange}
+              style={[
+                styles.fieldTablet,
+                searchMode !== 'package' && styles.fieldTabletFirst,
+                !tabletExpanded && styles.fieldTabletLast,
+                { borderRightColor: theme.border },
+              ]}
+              fromCity={origin?.name_en || origin?.name_ru || 'Moscow'}
+              searchType={searchMode}
+            />
+            {tabletExpanded ? tabletTripFields : null}
+          </View>
+          {!tabletExpanded ? (
+            <View style={[styles.rowContainer, styles.rowTablet]}>{tabletTripFields}</View>
+          ) : null}
+          </>
+          ) : (
+          <>
           <DestinationField
             value={destination}
             onChange={handleDestinationChange}
@@ -478,15 +570,19 @@ export const Search: React.FC<SearchProps> = ({ title }) => {
               ]}
             />
           </View>
+          </>
+          )}
         </View>
 
-        {/* Search Button - Outside the white card */}
+        {/* Search Button - Outside the white card (on iPad the button lives inside the card row) */}
+        {isTablet ? null : (
         <AppButton
           title="Найти"
           onPress={handleSearch}
           size="large"
           icon="search"
         />
+        )}
       </View>
     </ImageBackground>
   );
@@ -606,5 +702,45 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: 28,
     height: 52,
+  },
+  // --- iPad only (never applied on phone) ---
+  containerTablet: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  titleTablet: {
+    fontSize: 24,
+    lineHeight: 28,
+    marginBottom: 20,
+  },
+  searchCardTablet: {
+    paddingLeft: 24,
+    paddingRight: 24,
+    paddingBottom: 12,
+    marginBottom: 0,
+  },
+  rowTablet: {
+    alignItems: 'center',
+  },
+  rowTabletTop: {
+    borderBottomWidth: 1,
+  },
+  fieldTablet: {
+    flex: 1,
+    minWidth: 0,
+    borderRightWidth: 1,
+    paddingLeft: 12,
+    paddingRight: 12,
+    marginBottom: 0,
+  },
+  fieldTabletFirst: {
+    paddingLeft: 0,
+  },
+  fieldTabletLast: {
+    borderRightWidth: 0,
+  },
+  searchButtonTablet: {
+    justifyContent: 'center',
+    paddingLeft: 12,
   },
 });

@@ -25,6 +25,7 @@ import {
 import BookingSkeleton from './BookingSkeleton';
 import { useTheme } from '../../hooks/useTheme';
 import { isHotelOnlySearch } from '../../utils/bookingFlowUtils';
+import { TabletCentered } from '../UI/tablet';
 
 type BookingRoute = RouteProp<{ booking: BookingRouteParams }, 'booking'>;
 
@@ -455,6 +456,7 @@ export const Booking: React.FC = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <TabletCentered>
         <ContactSection
           email={email}
           phone={phone}
@@ -484,6 +486,7 @@ export const Booking: React.FC = () => {
           selectedFlight={route.params?.flightData}
         />
         <BookingLegalInfo />
+        </TabletCentered>
       </ScrollView>
 
       <BookingFooter
