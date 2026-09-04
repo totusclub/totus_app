@@ -21,6 +21,7 @@ import SelectedTourCard from './SelectedTourCard';
 import { useTicketsFilters } from './TicketsFiltersContext';
 import { AppHeader } from '../UI';
 import { useTheme } from '../../hooks/useTheme';
+import { useLayout } from '../../hooks/useLayout';
 import { useHasBottomTabBar } from '../../hooks/useHasBottomTabBar';
 import { getFlightOfferTotal, toMoney } from '../../utils/packagePrice';
 import FlightsFiltersModal from './FlightsFiltersModal';
@@ -54,6 +55,15 @@ const sortOptions = [
 
 const Tickets: React.FC = () => {
   const { theme } = useTheme();
+  // iPad only: flight cards in a 2/3-column grid, selected tour card full width above.
+  // On phone `isTablet` is false and every helper below is a transparent passthrough.
+  const { isTablet, columns } = useLayout();
+  const tabletCellStyle = [styles.cellTablet, { maxWidth: `${100 / columns}%` as `${number}%` }];
+  const wrapTablet = (node: React.ReactElement, style: any = tabletCellStyle) =>
+    isTablet ? <View style={style}>{node}</View> : node;
+  const tabletListProps = isTablet
+    ? { numColumns: columns, columnWrapperStyle: styles.rowTablet }
+    : {};
   const insets = useSafeAreaInsets();
   const hasBottomTabBar = useHasBottomTabBar();
   const route = useRoute<TicketsRoute>();
@@ -240,7 +250,7 @@ const Tickets: React.FC = () => {
   // Memoized ListHeaderComponent to prevent unnecessary re-renders
   const ListHeaderContent = useMemo(
     () => (
-      <View>
+      <View {...(isTablet ? { style: styles.headerTablet } : {})}>
         <SelectedTourCard packageInfo={packageInfo} flights={allFlights} />
         <TicketsListHeader
           loading={loading}
@@ -259,6 +269,7 @@ const Tickets: React.FC = () => {
       selectedSortLabel,
       resultCount,
       handleSortPress,
+      isTablet,
     ],
   );
 
@@ -273,7 +284,11 @@ const Tickets: React.FC = () => {
     );
   }, [showEmptyOrError, hasActiveFilters, handleResetFilters, refetch]);
 
-  const ListHeaderSkeleton = useMemo(() => <TicketsListHeaderSkeleton />, []);
+  const ListHeaderSkeleton = useMemo(
+    () => wrapTablet(<TicketsListHeaderSkeleton />, styles.headerTablet),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isTablet],
+  );
 
   const showSkeleton = loading && sortedFlights.length === 0;
 
@@ -285,8 +300,8 @@ const Tickets: React.FC = () => {
   }, [hasBottomTabBar, insets.bottom]);
 
   const listContentStyle = useMemo(
-    () => [styles.content, { paddingBottom: listBottomPadding }],
-    [listBottomPadding],
+    () => [styles.content, isTablet && styles.contentTablet, { paddingBottom: listBottomPadding }],
+    [listBottomPadding, isTablet],
   );
 
   const ListFooter = useMemo(
@@ -320,16 +335,20 @@ const Tickets: React.FC = () => {
 
       {showSkeleton ? (
         <FlatList
-          data={Array.from({ length: 5 })}
+          key={isTablet ? `skeleton-cols-${columns}` : undefined}
+          {...tabletListProps}
+          data={Array.from({ length: isTablet ? columns * 3 : 5 })}
           keyExtractor={(_, index) => `skeleton-${index}`}
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={ListHeaderSkeleton}
-          renderItem={() => <FlightCardSkeleton />}
+          renderItem={() => wrapTablet(<FlightCardSkeleton />)}
           ListFooterComponent={ListFooter}
         />
       ) : (
         <FlatList
+          key={isTablet ? `cols-${columns}` : undefined}
+          {...tabletListProps}
           data={sortedFlights}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={[
@@ -341,7 +360,7 @@ const Tickets: React.FC = () => {
           ListEmptyComponent={ListEmpty}
           renderItem={({ item: flight }) => {
             const breakdown = getFlightPriceBreakdown(flight, flightPriceMap, packagePrice);
-            return (
+            return wrapTablet(
               <FlightCardView
                 flight={flight}
                 priceLabel={breakdown.totalLabel}
@@ -393,6 +412,20 @@ const styles = StyleSheet.create({
   loaderMore: {
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  // iPad grid: 24 screen padding = 16 (list) + 8 (cell); 16 gap between columns = 8 + 8.
+  contentTablet: {
+    paddingHorizontal: 16,
+  },
+  headerTablet: {
+    paddingHorizontal: 8,
+  },
+  rowTablet: {
+    alignItems: 'flex-start',
+  },
+  cellTablet: {
+    flex: 1,
+    paddingHorizontal: 8,
   },
 });
 
