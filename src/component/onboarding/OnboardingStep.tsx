@@ -12,6 +12,7 @@ import { AppText } from '../UI';
 import { useTheme } from '../../hooks/useTheme';
 import SplashIcon from '../UI/icons/splachIcon';
 import { totalSteps, type OnboardingStep as OnboardingStepType } from './constants';
+import { TabletCentered } from '../UI/tablet';
 
 type OnboardingStepProps = {
   currentStep: number;
@@ -91,6 +92,7 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces={false}>
+          <TabletCentered>
           <View style={styles.titleContainer}>
             {stepData.title.map((line, index) => (
               <AppText
@@ -117,9 +119,11 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
               </AppText>
             ))}
           </View>
+          </TabletCentered>
         </ScrollView>
 
         <View style={styles.footer}>
+          <TabletCentered style={styles.footerColumnTablet}>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: buttonBgColor }]}
             onPress={onNext}
@@ -145,6 +149,7 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({
               />
             ))}
           </View>
+          </TabletCentered>
         </View>
       </View>
     </SafeAreaView>
@@ -211,6 +216,10 @@ const styles = StyleSheet.create({
   footer: {
     gap: 20,
     paddingTop: 8,
+  },
+  // iPad only: keeps the footer gap inside the centered column
+  footerColumnTablet: {
+    gap: 20,
   },
   button: {
     borderRadius: 12,

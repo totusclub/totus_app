@@ -17,6 +17,7 @@ import {
   getPackageBasePrice,
   toMoney,
 } from '../../../utils/packagePrice';
+import { TabletCentered } from '../../UI/tablet';
 
 type TicketDetailsRoute = RouteProp<
   {
@@ -145,6 +146,7 @@ const TicketDetails: React.FC = () => {
           { paddingBottom: footerHeight + 16 },
         ]}
         showsVerticalScrollIndicator={false}>
+        <TabletCentered>
         <View style={[styles.flightSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
           {/* Outbound flight */}
           {flightDetails.to && <FlightSegmentView segment={flightDetails.to} title="Перелёт туда" />}
@@ -196,6 +198,7 @@ const TicketDetails: React.FC = () => {
 
         {/* Tour section */}
         {tourDetails && <TourSection tourDetails={tourDetails} />}
+        </TabletCentered>
       </ScrollView>
 
       <View
@@ -209,6 +212,7 @@ const TicketDetails: React.FC = () => {
           },
         ]}
       >
+        <TabletCentered style={styles.footerColumnTablet}>
         <View style={styles.priceRow}>
           <View style={styles.priceTextBlock}>
             <AppText style={[styles.totalPriceTitle, { color: theme.textTertiary }]}>
@@ -236,6 +240,7 @@ const TicketDetails: React.FC = () => {
           size="large"
           style={styles.ctaButton}
         />
+        </TabletCentered>
       </View>
     </View>
   );
@@ -280,6 +285,10 @@ const styles = StyleSheet.create({
   },
   ctaButton: {
     width: '100%',
+  },
+  // iPad only: keeps the footer's vertical gap inside the centered column
+  footerColumnTablet: {
+    gap: 12,
   },
   scrollView: {
     flex: 1,

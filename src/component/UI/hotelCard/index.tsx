@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { AppIcon, AppText, AppButton, AiPickBadge } from '../index';
 import { useTheme } from '../../../hooks/useTheme';
+import { useLayout } from '../../../hooks/useLayout';
 import type { AiPriceChange } from '../../../utils/hotelUtils/aiRoomPick';
 import { getAiPriceChangeLabel } from '../../../utils/hotelUtils/aiRoomPick';
 
@@ -61,14 +62,18 @@ const HotelCard: React.FC<HotelCardProps> = ({
     aiPriceChange = null,
 }) => {
     const { theme } = useTheme();
+    // iPad: the card sits in a grid cell / column, so the module-scope screen width is wrong
+    // before the first onLayout — estimate one grid cell from the live window width instead.
+    const { isTablet, width: windowWidth, columns } = useLayout();
+    const tabletFallbackWidth = Math.floor((windowWidth - 48 - 16 * (columns - 1)) / columns) - 32;
     const isRoomCard = type === 'room';
     const [imageSectionWidth, setImageSectionWidth] = useState(0);
     const resolvedImageWidth =
         imageSectionWidth > 0
             ? imageSectionWidth
             : isRoomCard
-              ? SCREEN_WIDTH - 16
-              : SCREEN_WIDTH - 48;
+              ? (isTablet ? tabletFallbackWidth : SCREEN_WIDTH - 16)
+              : (isTablet ? tabletFallbackWidth : SCREEN_WIDTH - 48);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
     const images = hotel.images && hotel.images.length > 0

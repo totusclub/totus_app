@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { AppButton, AppText } from '../UI';
 import { useTheme } from '../../hooks/useTheme';
 import type { HotelRoom, Offer } from '../../types/hotel';
@@ -26,6 +27,8 @@ type HotelDetailsPriceCardProps = {
   aiRoomPick?: AiRoomPick | null;
   onChooseRoom: () => void;
   embedded?: boolean;
+  /** Extra card style (iPad side column); not passed on phone. */
+  style?: StyleProp<ViewStyle>;
 };
 
 const MEAL_LABELS: Record<string, string> = {
@@ -95,6 +98,7 @@ const HotelDetailsPriceCard: React.FC<HotelDetailsPriceCardProps> = ({
   aiRoomPick,
   onChooseRoom,
   embedded = false,
+  style,
 }) => {
   const { theme } = useTheme();
 
@@ -216,6 +220,7 @@ const HotelDetailsPriceCard: React.FC<HotelDetailsPriceCardProps> = ({
             backgroundColor: theme.cardBackground,
             borderColor: theme.border,
           },
+          style,
         ]}>
         <ActivityIndicator color={theme.brand} style={styles.loader} />
       </View>
@@ -232,6 +237,7 @@ const HotelDetailsPriceCard: React.FC<HotelDetailsPriceCardProps> = ({
           borderColor: theme.border,
           shadowColor: theme.shadow,
         },
+        style,
       ]}>
       <View style={embedded ? styles.compactRow : styles.regularLayout}>
         <View style={[styles.priceBlock, embedded && styles.compactPriceBlock]}>

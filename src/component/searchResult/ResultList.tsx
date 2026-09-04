@@ -15,6 +15,7 @@ import EmptyState from './EmptyState';
 import { searchFilters, setAllMyHotels } from '../../modules/store/slices/search';
 import { AppDispatch, RootState } from '../../modules/store';
 import { useTheme } from '../../hooks/useTheme';
+import { useLayout } from '../../hooks/useLayout';
 import { parseNightsValue } from '../home/searchSection/utils/searchHelpers';
 import { withSearchTypeFilters } from '../../utils/searchParamsUtils';
 import {
@@ -138,6 +139,15 @@ const transformHotel = (hotel: any): HotelInfo => {
 
 const ResultList: React.FC = () => {
   const { theme } = useTheme();
+  // iPad only: hotel cards in a 2/3-column grid. On phone `isTablet` is false and
+  // every helper below is a transparent passthrough (no extra views, no extra props).
+  const { isTablet, columns } = useLayout();
+  const tabletCellStyle = [styles.cellTablet, { maxWidth: `${100 / columns}%` as `${number}%` }];
+  const wrapTablet = (node: React.ReactElement, style: any = tabletCellStyle) =>
+    isTablet ? <View style={style}>{node}</View> : node;
+  const tabletListProps = isTablet
+    ? { numColumns: columns, columnWrapperStyle: styles.rowTablet }
+    : {};
   const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<any>();
   const [sortModalVisible, setSortModalVisible] = useState(false);
@@ -386,17 +396,19 @@ const ResultList: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
       {showSkeleton ? (
         <FlatList
-          data={Array.from({ length: 5 })} // Show 5 skeleton cards
-          contentContainerStyle={styles.listContent}
+          key={isTablet ? `skeleton-cols-${columns}` : undefined}
+          {...tabletListProps}
+          data={Array.from({ length: isTablet ? columns * 3 : 5 })} // Show 5 skeleton cards
+          contentContainerStyle={[styles.listContent, isTablet && styles.listContentTablet]}
           ListHeaderComponent={() => (
             <SkeletonGroup>
-              <View style={styles.headerSkeleton}>
+              <View style={[styles.headerSkeleton, isTablet && styles.headerTablet]}>
                 <SkeletonBox width={150} height={38} radius={18} />
                 <SkeletonBox width={126} height={16} />
               </View>
             </SkeletonGroup>
           )}
-          renderItem={() => <HotelCardSkeleton />}
+          renderItem={() => wrapTablet(<HotelCardSkeleton />)}
           keyExtractor={(_, index) => `skeleton-${index}`}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           showsVerticalScrollIndicator={false}
@@ -406,15 +418,17 @@ const ResultList: React.FC = () => {
         <EmptyState onResetFilters={handleResetFilters} emptyType={hotels?.emptyType} />
       ) : (
         <FlatList
+          key={isTablet ? `cols-${columns}` : undefined}
+          {...tabletListProps}
           data={transformedHotels}
-          ListHeaderComponent={() => (
+          ListHeaderComponent={() => wrapTablet(
             <ListHeader
               selectedSortLabel={selectedOption.label}
               resultCount={hotels?.hotels_count || transformedHotels.length}
               onSortPress={() => setSortModalVisible(true)}
             />
-          )}
-          renderItem={({ item, index }) => (
+          , styles.headerTablet)}
+          renderItem={({ item, index }) => wrapTablet(
             <HotelCard
               hotel={item}
               imageHeight={200}
@@ -476,15 +490,23 @@ const ResultList: React.FC = () => {
             />
           )}
           keyExtractor={(item, index) => `${item.id}-${index}`}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, isTablet && styles.listContentTablet]}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           showsVerticalScrollIndicator={false}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
             loadingMore ? (
-              <View style={styles.footerLoading}>
-                <HotelCardSkeleton />
+              <View style={[styles.footerLoading, isTablet && styles.footerLoadingTablet]}>
+                {isTablet ? (
+                  Array.from({ length: columns }).map((_, i) => (
+                    <View key={`footer-skeleton-${i}`} style={tabletCellStyle}>
+                      <HotelCardSkeleton />
+                    </View>
+                  ))
+                ) : (
+                  <HotelCardSkeleton />
+                )}
               </View>
             ) : (
               <View style={styles.footerSpacing} />
@@ -529,5 +551,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  // iPad grid: 24 screen padding = 16 (list) + 8 (cell); 16 gap between columns = 8 + 8.
+  listContentTablet: {
+    paddingHorizontal: 16,
+  },
+  headerTablet: {
+    paddingHorizontal: 8,
+  },
+  rowTablet: {
+    alignItems: 'flex-start',
+  },
+  cellTablet: {
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  footerLoadingTablet: {
+    flexDirection: 'row',
+    paddingHorizontal: 0,
   },
 });

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { SkeletonBox, SkeletonGroup } from '../UI/skeleton';
 import { useTheme } from '../../hooks/useTheme';
+import { useLayout } from '../../hooks/useLayout';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -17,8 +18,10 @@ const HotelCardSkeleton: React.FC<HotelCardSkeletonProps> = ({
   imageHeight = 200,
 }) => {
   const { theme } = useTheme();
+  const { isTablet } = useLayout();
   const isDetail = variant === 'detail';
-  const imageWidth = SCREEN_WIDTH - 48;
+  // iPad: the card lives in a grid cell / side column, so the image must follow the card width.
+  const imageWidth = isTablet ? '100%' : SCREEN_WIDTH - 48;
 
   return (
     <SkeletonGroup>

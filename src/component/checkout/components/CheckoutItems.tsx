@@ -6,6 +6,7 @@ import type { Order } from '../../../types/orders';
 import FlightDetailsModal from './FlightDetailsModal';
 import { getPackageData, formatPeriod } from '../../../utils/ordersUtils';
 import { useTheme } from '../../../hooks/useTheme';
+import { TabletCentered } from '../../UI/tablet';
 
 interface CheckoutItemsProps {
   order: Order | null;
@@ -35,6 +36,7 @@ export const CheckoutItems: React.FC<CheckoutItemsProps> = ({ order }) => {
         style={styles.scrollView}
         contentContainerStyle={{ paddingBottom: insets.bottom }}
         showsVerticalScrollIndicator={false}>
+        <TabletCentered>
 
         {/* <View style={[styles.topInfoBanner, { backgroundColor: theme.cardBackground, borderColor: theme.border, borderBottomColor: theme.brand, shadowColor: theme.shadow }]}>
           <AppIcon name="warning" size={24} color={theme.brand} />
@@ -224,6 +226,7 @@ export const CheckoutItems: React.FC<CheckoutItemsProps> = ({ order }) => {
             </View>
           )}
         </View>
+        </TabletCentered>
       </ScrollView>
 
       <FlightDetailsModal

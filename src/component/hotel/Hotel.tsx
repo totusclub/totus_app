@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { HotelSkeleton } from '../UI';
@@ -18,6 +18,8 @@ import HotelSearchSection from './HotelSearchSection';
 import HotelDetailsPriceCard from './HotelDetailsPriceCard';
 import ScreenLayout from './components/ScreenLayout';
 import { useHasBottomTabBar } from '../../hooks/useHasBottomTabBar';
+import { useLayout } from '../../hooks/useLayout';
+import { TabletColumns } from '../UI/tablet';
 import type { HotelRoom, HotelSearchSnapshot } from '../../types/hotel';
 import type { SearchParams } from '../../types/search';
 import { normalizeSearchType } from '../../utils/bookingFlowUtils';
@@ -218,6 +220,7 @@ export const Hotel: React.FC = () => {
   const aiRoomPick = routeParams?.aiRoomPick;
   const isFromAiAssistant = route.name === 'hotelFromAi' || Boolean(aiRoomPick);
   const hasBottomTabBar = useHasBottomTabBar();
+  const { isTablet } = useLayout();
   const safeApiHotelData = apiHotelData ?? undefined;
   const scrollRef = useRef<ScrollView>(null);
   const roomsSectionOffsetRef = useRef(0);
@@ -311,26 +314,51 @@ export const Hotel: React.FC = () => {
   return (
     <>
       <ScreenLayout ref={scrollRef} hasBottomTabBar={hasBottomTabBar}>
-        <HotelCard
-          hotel={displayHotel}
-          imageHeight={200}
-          showAddress
-          showTags={false}
-          showSlider
-          onReviewsPress={() => setReviewsModalOpen(true)}
-          footer={
-            <HotelDetailsPriceCard
-              rooms={rooms}
-              loading={roomsSectionLoading}
-              searchAttempted={roomsSearchAttempted}
-              searchType={hotelSearchType}
-              searchSnapshot={searchSnapshot}
-              aiRoomPick={aiRoomPick}
-              onChooseRoom={() => scrollToRoomsSection(true)}
-              embedded
+        {isTablet ? (
+          <TabletColumns
+            side={
+              <HotelDetailsPriceCard
+                rooms={rooms}
+                loading={roomsSectionLoading}
+                searchAttempted={roomsSearchAttempted}
+                searchType={hotelSearchType}
+                searchSnapshot={searchSnapshot}
+                aiRoomPick={aiRoomPick}
+                onChooseRoom={() => scrollToRoomsSection(true)}
+                style={styles.priceCardTablet}
+              />
+            }>
+            <HotelCard
+              hotel={displayHotel}
+              imageHeight={320}
+              showAddress
+              showTags={false}
+              showSlider
+              onReviewsPress={() => setReviewsModalOpen(true)}
             />
-          }
-        />
+          </TabletColumns>
+        ) : (
+          <HotelCard
+            hotel={displayHotel}
+            imageHeight={200}
+            showAddress
+            showTags={false}
+            showSlider
+            onReviewsPress={() => setReviewsModalOpen(true)}
+            footer={
+              <HotelDetailsPriceCard
+                rooms={rooms}
+                loading={roomsSectionLoading}
+                searchAttempted={roomsSearchAttempted}
+                searchType={hotelSearchType}
+                searchSnapshot={searchSnapshot}
+                aiRoomPick={aiRoomPick}
+                onChooseRoom={() => scrollToRoomsSection(true)}
+                embedded
+              />
+            }
+          />
+        )}
 
         <HotelSearchSection
           hotelId={hotelId}
@@ -428,3 +456,11 @@ export const Hotel: React.FC = () => {
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  /** iPad: price card sits flush with the hotel card in the right column. */
+  priceCardTablet: {
+    marginHorizontal: 0,
+    marginTop: 0,
+  },
+});

@@ -18,6 +18,7 @@ import {
   SBP_PENDING_EXPIRE_MINUTES,
   storeSbpQrcId,
 } from '../../utils/sbpPayment';
+import { TabletCentered } from '../UI/tablet';
 
 type CheckoutRouteParams = {
   order_id: number | string;
@@ -172,6 +173,7 @@ export const Checkout: React.FC = () => {
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         <AppHeader />
         <View style={styles.errorContainer}>
+          <TabletCentered style={styles.errorColumnTablet}>
           <AppText style={[styles.errorText, { color: theme.textTertiary }]}>
             {loadError || 'Заказ не найден.'}
           </AppText>
@@ -184,6 +186,7 @@ export const Checkout: React.FC = () => {
               navigation.navigate('OrdersStackScreen', { screen: 'orders' })
             }
           />
+          </TabletCentered>
         </View>
       </View>
     );
@@ -217,5 +220,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 8,
+  },
+  // iPad only: keeps the same gap inside the centered column
+  errorColumnTablet: {
+    gap: 12,
   },
 });

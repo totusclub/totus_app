@@ -19,6 +19,7 @@ import {
   SBP_PENDING_EXPIRE_MINUTES,
   storeSbpQrcId,
 } from '../../utils/sbpPayment';
+import { TabletCentered } from '../UI/tablet';
 
 type PendingPaymentParams = {
   order_id: number | string;
@@ -207,6 +208,7 @@ export const PendingPayment: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <AppHeader />
       <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
+        <TabletCentered style={styles.contentColumnTablet}>
         {status === 'pending' && (
           <>
             <ActivityIndicator size="large" color={theme.brand} />
@@ -301,6 +303,7 @@ export const PendingPayment: React.FC = () => {
             />
           </>
         )}
+        </TabletCentered>
       </View>
     </View>
   );
@@ -333,5 +336,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
+  },
+  // iPad only: mirrors `content` alignment inside the centered column
+  contentColumnTablet: {
+    alignItems: 'center',
+    gap: 16,
   },
 });

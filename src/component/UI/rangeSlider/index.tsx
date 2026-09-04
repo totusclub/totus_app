@@ -1,8 +1,16 @@
-import React from 'react';
-import { StyleSheet, View, TextInput } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, TextInput, LayoutChangeEvent } from 'react-native';
 import MultiSlider from '@ptomasroos/react-native-multi-slider';
 import AppText from '../text';
 import { useTheme } from '../../../hooks/useTheme';
+import { useLayout } from '../../../hooks/useLayout';
+
+/** Phone track width (fixed, unchanged). */
+const PHONE_TRACK_WIDTH = 311;
+/** Slider marker diameter — the track must leave room for it on both ends. */
+const MARKER_SIZE = 24;
+/** Fallback before the first layout on iPad: window width minus sheet paddings (16 + 16) and marker room. */
+const TABLET_TRACK_INSET = 64;
 
 type RangeSliderProps = {
   label: string;
@@ -28,6 +36,25 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
   maxPlaceholder = '387648',
 }) => {
   const { theme } = useTheme();
+  const { isTablet, width: windowWidth } = useLayout();
+  // iPad only: the track fills the available width (measured; window-based fallback before layout).
+  const [tabletContainerWidth, setTabletContainerWidth] = useState<number | null>(null);
+  const trackWidth = isTablet
+    ? Math.max(
+        PHONE_TRACK_WIDTH,
+        tabletContainerWidth !== null
+          ? tabletContainerWidth - MARKER_SIZE
+          : windowWidth - TABLET_TRACK_INSET,
+      )
+    : PHONE_TRACK_WIDTH;
+  const tabletSliderContainerProps = isTablet
+    ? {
+        onLayout: (e: LayoutChangeEvent) => {
+          setTabletContainerWidth(Math.round(e.nativeEvent.layout.width));
+        },
+      }
+    : {};
+  const tabletSliderProps = isTablet ? { sliderLength: trackWidth } : {};
   return (
     <View style={[styles.section, { borderBottomColor: theme.borderLight }]}>
       <AppText style={[styles.sectionTitle, { color: theme.text }]}>{label}</AppText>
@@ -78,8 +105,9 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
           placeholderTextColor={theme.inputPlaceholder}
         />
       </View>
-      <View style={styles.sliderContainer}>
+      <View style={styles.sliderContainer} {...tabletSliderContainerProps}>
         <MultiSlider
+          {...tabletSliderProps}
           values={[min, max]}
           onValuesChange={(values) => {
             onMinChange(values[0]);
@@ -93,7 +121,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
           selectedStyle={[styles.multiSliderSelected, { backgroundColor: theme.brand }]}
           unselectedStyle={[styles.multiSliderUnselected, { backgroundColor: theme.borderSecondary }]}
           containerStyle={styles.multiSliderContainer}
-          trackStyle={styles.multiSliderTrack}
+          trackStyle={isTablet ? [styles.multiSliderTrack, { width: trackWidth }] : styles.multiSliderTrack}
           markerStyle={[
             styles.multiSliderMarker,
             {

@@ -14,6 +14,7 @@ import { RootState } from '../../modules/store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, AppIcon, HotelCard } from '../../component/UI';
 import { useTheme } from '../../hooks/useTheme';
+import { useLayout } from '../../hooks/useLayout';
 import { getUserFavorites, removeFavorite, type Favorite } from '../../modules/api/favorites';
 import { HotelInfo } from '../../types/hotel/hotelCard';
 import { buildRecommendedHotelRouteParams } from '../../utils/hotelUtils/recommendedHotelNavigation';
@@ -22,6 +23,9 @@ const FavoritesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  // iPad only: hotel cards in a 2/3-column wrap grid; on phone `false` in style arrays is a no-op.
+  const { isTablet, columns } = useLayout();
+  const tabletCellStyle = isTablet && [styles.favoriteItemTablet, { width: `${100 / columns}%` as `${number}%` }];
   const { user: loggedInUser } = useSelector((state: RootState) => state.auth);
   
   const [favorites, setFavorites] = useState<Favorite[]>([]);
@@ -107,7 +111,7 @@ const FavoritesScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundSecondary, paddingTop: insets.top }]}>
-      <AppText allowFontScaling={false} style={[styles.title, { color: theme.text }]}>
+      <AppText allowFontScaling={false} style={[styles.title, isTablet && styles.titleTablet, { color: theme.text }]}>
         Избранное
       </AppText>
 
@@ -142,7 +146,7 @@ const FavoritesScreen: React.FC = () => {
             </AppText>
           </View>
         ) : (
-          <View style={styles.favoritesList}>
+          <View style={[styles.favoritesList, isTablet && styles.favoritesListTablet]}>
             {favorites.map((favorite) => {
               const hotelData = favorite.hotelData;
               // Ensure hotel has required HotelInfo structure
@@ -159,7 +163,7 @@ const FavoritesScreen: React.FC = () => {
                 address: hotelData.address || hotelData.city_name || '',
               };
               return (
-                <View key={favorite.id} style={styles.favoriteItem}>
+                <View key={favorite.id} style={[styles.favoriteItem, tabletCellStyle]}>
                   <TouchableOpacity
                     activeOpacity={0.9}
                     onPress={() => handleHotelPress(hotel)}
@@ -175,6 +179,7 @@ const FavoritesScreen: React.FC = () => {
                   <TouchableOpacity
                     style={[
                       styles.removeButton,
+                      isTablet && styles.removeButtonTablet,
                       { backgroundColor: theme.mode === 'dark' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.9)' },
                     ]}
                     onPress={() => handleRemoveFavorite(favorite.hotelId)}
@@ -264,6 +269,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  // iPad grid: 24 screen padding = 16 (list) + 8 (cell); 16 gap between columns = 8 + 8, rows keep gap 16.
+  titleTablet: {
+    paddingHorizontal: 24,
+  },
+  favoritesListTablet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    columnGap: 0,
+    paddingHorizontal: 16,
+  },
+  favoriteItemTablet: {
+    paddingHorizontal: 8,
+  },
+  removeButtonTablet: {
+    right: 28,
   },
 });
 

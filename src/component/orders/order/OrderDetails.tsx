@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../hooks/useTheme';
 import { getOrder, getOrderDocuments } from '../../../modules/api/levelTravelApi';
 import { RootState } from '../../../modules/store';
+import { TabletCentered } from '../../UI/tablet';
 
 const OrderDetailsScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -132,6 +133,7 @@ const OrderDetailsScreen: React.FC = () => {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom }]}>
+          <TabletCentered>
           <View style={[styles.card, { backgroundColor: theme.cardBackground, shadowColor: theme.shadow, borderColor: theme.border }]}>
             <View style={styles.cardHeader}>
               <AppText style={[styles.cardTitle, { color: theme.text, flex: 1 }]}>Тур № {orderId}</AppText>
@@ -191,6 +193,7 @@ const OrderDetailsScreen: React.FC = () => {
             order={order}
             apiDocuments={apiDocuments}
           />
+          </TabletCentered>
         </ScrollView>
         )}
       </View>

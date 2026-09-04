@@ -10,6 +10,7 @@ import { setAuth } from '../../modules/store/slices/auth';
 import { jwtDecode } from 'jwt-decode';
 import { useTheme } from '../../hooks/useTheme';
 import { maybePromptAndroidVoipPowerSetup } from '../../modules/voip/AndroidPowerManager';
+import { TabletCentered } from '../UI/tablet';
 
 type VerificationRouteParams = {
   email: string;
@@ -154,6 +155,7 @@ export const Verification: React.FC = () => {
       style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.content}>
+        <TabletCentered>
         <View style={styles.header}>
           <AppText style={[styles.title, { color: theme.text }]}>Подтверждение</AppText>
           <AppText style={[styles.subtitle, { color: theme.textTertiary }]}>
@@ -190,6 +192,7 @@ export const Verification: React.FC = () => {
             )}
           </View>
         </View>
+        </TabletCentered>
       </View>
     </KeyboardAvoidingView>
   );

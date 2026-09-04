@@ -29,6 +29,8 @@ import {
 } from '../../modules/voip/VoipService';
 import { CallModal } from '../../component/UI/callModal';
 import { getUserById } from '../../modules/api/users';
+import { useLayout } from '../../hooks/useLayout';
+import { TabletColumns } from '../../component/UI/tablet';
 
 // Support team loyalty ID — change this to your actual support account loyalty_id
 const SUPPORT_LOYALTY_ID = '0978 6356 3712 8057';
@@ -335,6 +337,7 @@ const AccountScreen = () => {
   const [callModalVisible, setCallModalVisible] = useState(false);
   const [showCallingSupport, setShowCallingSupport] = React.useState(true);
   const { theme, isDark, toggleTheme } = useTheme();
+  const { isTablet } = useLayout();
 
   // Monitor call state to auto-close CallModal when call ends
   useEffect(() => {
@@ -489,64 +492,9 @@ const AccountScreen = () => {
     return null;
   }
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
-      {/* <StatusBar barStyle={theme.statusBar} backgroundColor={theme.statusBarBackground} /> */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + 20 },
-        ]}
-        showsVerticalScrollIndicator={false}>
-        {/* Loyalty Card */}
-        <View
-          style={styles.loyaltyCardContainer}
-          onLayout={(event) => {
-            const { height } = event.nativeEvent.layout;
-            if (height > 0) {
-              setCardHeight(height);
-            }
-          }}>
-          <View style={styles.loyaltyCardBackground}>
-            <LoyaltyCardBackground width="100%" height="100%" containerHeight={cardHeight} />
-          </View>
-          <View style={styles.loyaltyCard}>
-            <View style={styles.loyaltyCardHeader}>
-              <AppText style={styles.loyaltyCardTitle}>Карта лояльности</AppText>
-              <AppIcon name="bird" size={64} color="#FFFFFF" />
-            </View>
-
-            <View style={styles.loyaltyCardInfo}>
-              <TouchableOpacity
-                style={styles.loyaltyCardNumberContainer}
-                onPress={handleCopyLoyaltyId}
-                activeOpacity={0.7}>
-                <AppText style={styles.loyaltyCardNumber}  numberOfLines={1}>
-                  {formatLoyaltyCard(loyaltyId)}
-                </AppText>
-                <View style={styles.copyIconContainer}>
-                  <AppIcon name="copy" size={18} color="#FFFFFF" />
-                </View>
-              </TouchableOpacity>
-              <View style={styles.loyaltyCardInfoRow}>
-                <AppIcon name="info" size={18} color="#FFFFFF" />
-                <AppText style={styles.loyaltyCardInfoText}>
-                  Ваш персональный номер
-                </AppText>
-              </View>
-            </View>
-
-            <View style={styles.loyaltyCardFooter}>
-              <AppText style={styles.loyaltyCardName}>{userName}</AppText>
-              <View style={styles.userCardIcon}>
-                <AppIcon name="user" size={16} color="#FFFFFF" />
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Settings — compact grouped cards */}
+  // Settings groups: right column on iPad (TabletColumns `side`), stacked under the card on phone.
+  const settingsBlocks = (
+        /* Settings — compact grouped cards */
         <View style={styles.settingsBlocks}>
           <View
             style={[
@@ -697,6 +645,67 @@ const AccountScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
+      {/* <StatusBar barStyle={theme.statusBar} backgroundColor={theme.statusBarBackground} /> */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isTablet && styles.scrollContentTablet,
+          { paddingBottom: insets.bottom + 20 },
+        ]}
+        showsVerticalScrollIndicator={false}>
+        <TabletColumns sideWidth={380} side={settingsBlocks}>
+        {/* Loyalty Card */}
+        <View
+          style={[styles.loyaltyCardContainer, isTablet && styles.loyaltyCardContainerTablet]}
+          onLayout={(event) => {
+            const { height } = event.nativeEvent.layout;
+            if (height > 0) {
+              setCardHeight(height);
+            }
+          }}>
+          <View style={styles.loyaltyCardBackground}>
+            <LoyaltyCardBackground width="100%" height="100%" containerHeight={cardHeight} />
+          </View>
+          <View style={[styles.loyaltyCard, isTablet && styles.loyaltyCardTablet]}>
+            <View style={styles.loyaltyCardHeader}>
+              <AppText style={styles.loyaltyCardTitle}>Карта лояльности</AppText>
+              <AppIcon name="bird" size={64} color="#FFFFFF" />
+            </View>
+
+            <View style={styles.loyaltyCardInfo}>
+              <TouchableOpacity
+                style={styles.loyaltyCardNumberContainer}
+                onPress={handleCopyLoyaltyId}
+                activeOpacity={0.7}>
+                <AppText style={styles.loyaltyCardNumber}  numberOfLines={1}>
+                  {formatLoyaltyCard(loyaltyId)}
+                </AppText>
+                <View style={styles.copyIconContainer}>
+                  <AppIcon name="copy" size={18} color="#FFFFFF" />
+                </View>
+              </TouchableOpacity>
+              <View style={styles.loyaltyCardInfoRow}>
+                <AppIcon name="info" size={18} color="#FFFFFF" />
+                <AppText style={styles.loyaltyCardInfoText}>
+                  Ваш персональный номер
+                </AppText>
+              </View>
+            </View>
+
+            <View style={styles.loyaltyCardFooter}>
+              <AppText style={styles.loyaltyCardName}>{userName}</AppText>
+              <View style={styles.userCardIcon}>
+                <AppIcon name="user" size={16} color="#FFFFFF" />
+              </View>
+            </View>
+          </View>
+        </View>
+        </TabletColumns>
       </ScrollView>
 
       <ConfirmModal
@@ -892,6 +901,16 @@ const styles = StyleSheet.create({
     transform: Platform.OS === 'ios'
       ? [{ scaleX: 0.82 }, { scaleY: 0.78 }]
       : [{ scaleX: 0.85 }, { scaleY: 0.85 }],
+  },
+  // iPad only
+  scrollContentTablet: {
+    padding: 24,
+  },
+  loyaltyCardContainerTablet: {
+    minHeight: 280,
+  },
+  loyaltyCardTablet: {
+    minHeight: 280,
   },
 });
 
