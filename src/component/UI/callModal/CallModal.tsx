@@ -29,6 +29,8 @@ import { AppIcon } from '../index';
 import MuteIcon from '../icons/mute';
 import SpeakerIcon from '../icons/speaker';
 import { useTheme } from '../../../hooks/useTheme';
+import { useLayout } from '../../../hooks/useLayout';
+import { TabletCentered } from '../tablet';
 
 type CallModalProps = {
     visible: boolean;
@@ -38,6 +40,7 @@ type CallModalProps = {
 
 export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimize }) => {
     const { theme, isDark } = useTheme();
+    const { isTablet } = useLayout();
     const [callState, setCallState] = useState(getCallState());
     const [callInfo, setCallInfo] = useState(getActiveCallInfo());
     const [connectionStatus, setConnectionStatus] = useState(getConnectionStatus());
@@ -328,7 +331,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
             transparent={true}>
     
             <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
-                <View style={[styles.cardHeader, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
+                <View style={[styles.cardHeader, isTablet && styles.cardHeaderTablet, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
                     {/* Internet Status - Left side of header */}
                     <View style={styles.headerInternetStatus}>
                         <Text allowFontScaling={false} style={[
@@ -370,6 +373,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
 
 
                     {/* Avatar Section with Background */}
+                    <TabletCentered>
                     <View style={[styles.contentWrapper, { backgroundColor: theme.background }]}>
 
                         <View style={[styles.avatarSection, { backgroundColor: theme.backgroundSecondary }]}>
@@ -677,6 +681,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                             )}
                         </View>
                     </View>
+                    </TabletCentered>
 
                 </View>
             </View>
@@ -713,6 +718,10 @@ const styles = StyleSheet.create({
         paddingBottom: 16,
         marginBottom: 4, // 4px distance below header
         borderBottomWidth: 1,
+    },
+    // iPad only: no notch — safe-area-sized top padding instead of 80
+    cardHeaderTablet: {
+        paddingTop: 24,
     },
     contentWrapper: {
         width: '100%',
