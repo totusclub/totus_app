@@ -9,6 +9,7 @@ import { useTheme } from '../../../hooks/useTheme'
 import { useFiltersOpen } from '../../searchResult/FiltersOpenContext'
 import { formatTouristsText } from '../../home/searchSection/utils/searchHelpers'
 import { countActiveFilters } from '../../searchResult/filterChips'
+import { useLayout } from '../../../hooks/useLayout'
 
 const FILTERS_BADGE_COLOR = '#CF3030';
 const FILTERS_BADGE_TEXT_COLOR = '#FFFFFF';
@@ -49,6 +50,9 @@ export default function SearchResultHeader() {
   const { theme } = useTheme();
   const navigation = useNavigation();
   const { open: openFilters, bodyReady } = useFiltersOpen();
+  // iPad landscape shows a persistent filters sidebar — no filter button in the header.
+  const { isTablet, isLandscape } = useLayout();
+  const hideFilterButton = isTablet && isLandscape;
 
   const { headerName, searchParams, hotels } = useSelector(
     (state: RootState) => state.search,
@@ -114,6 +118,9 @@ export default function SearchResultHeader() {
           <AppText style={[styles.dateText, { color: theme.textTertiary }]}>{dateText}</AppText>
         ) : null}
       </View>
+      {hideFilterButton ? (
+        <View style={styles.filterButton} />
+      ) : (
       <TouchableOpacity
         activeOpacity={0.6}
         onPress={openFilters}
@@ -133,6 +140,7 @@ export default function SearchResultHeader() {
           </View>
         ) : null}
       </TouchableOpacity>
+      )}
     </View>
   )
 }
