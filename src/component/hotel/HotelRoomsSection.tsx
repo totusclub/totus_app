@@ -22,6 +22,8 @@ import DateSelectorBar from './components/DateSelectorBar';
 import RoomFilters from './components/RoomFilters';
 import { EmptyState } from './components/EmptyState';
 import { useTheme } from '../../hooks/useTheme';
+import { useLayout } from '../../hooks/useLayout';
+import { TabletGrid } from '../UI/tablet';
 
 type HotelRoomsSectionProps = {
   rooms: HotelRoom[];
@@ -53,6 +55,8 @@ const HotelRoomsSection: React.FC<HotelRoomsSectionProps> = ({
   aiRoomPick = null,
 }) => {
   const { theme } = useTheme();
+  // iPad: room cards in 2 (portrait) / 3 (landscape) columns; phone keeps the plain list.
+  const { isTablet, columns } = useLayout();
 
   const initialEnrichedAiPick = useMemo(
     () => enrichAiRoomPickFromRooms(aiRoomPick, rooms, initialSelectedDate ?? null),
@@ -163,7 +167,40 @@ const HotelRoomsSection: React.FC<HotelRoomsSectionProps> = ({
         <EmptyState title="На выбранную дату нет номеров по этим фильтрам" />
       ) : (
         <View style={styles.roomsContainer}>
-          {displayRooms.map((room) => {
+          {isTablet ? (
+            <TabletGrid
+              items={displayRooms}
+              columns={columns}
+              keyExtractor={(room) => String(room.ID)}
+              renderItem={(room) => {
+                const isAiFoundRoom = isSameHotelRoom(room, selectedAiRoom);
+                const offers = isAiFoundRoom
+                  ? getOffersForAiPickRoom(room, selectedDate, enrichedAiRoomPick, searchNights)
+                  : getOffersForDate(room, selectedDate, searchNights);
+                const aiPriceChange = isAiFoundRoom
+                  ? resolveAiPriceChange(
+                      enrichedAiRoomPick,
+                      offers[0] ?? resolveAiSelectedOffer(room, enrichedAiRoomPick, selectedDate)?.offer,
+                    )
+                  : null;
+                const hotelInfo = transformRoomToHotelInfo(room, selectedDate, offers);
+                const roomFeatures = getRoomFeatures(room, offers);
+                return (
+                  <HotelCard
+                    hotel={hotelInfo}
+                    type="room"
+                    imageHeight={200}
+                    showSlider={true}
+                    roomFeatures={roomFeatures}
+                    showAiBadge={isAiFoundRoom}
+                    aiPriceChange={aiPriceChange}
+                    onViewAllOptions={() => onViewAllOptions(room, selectedDate)}
+                    onMoreDetails={() => onMoreDetails(room)}
+                  />
+                );
+              }}
+            />
+          ) : displayRooms.map((room) => {
             const isAiFoundRoom = isSameHotelRoom(room, selectedAiRoom);
             const offers = isAiFoundRoom
               ? getOffersForAiPickRoom(room, selectedDate, enrichedAiRoomPick, searchNights)

@@ -17,6 +17,7 @@ import HotelRoomsSection from './HotelRoomsSection';
 import HotelSearchSection from './HotelSearchSection';
 import HotelDetailsPriceCard from './HotelDetailsPriceCard';
 import ScreenLayout from './components/ScreenLayout';
+import HotelAddressCardTablet from './components/HotelAddressCardTablet';
 import { useHasBottomTabBar } from '../../hooks/useHasBottomTabBar';
 import { useLayout } from '../../hooks/useLayout';
 import { TabletColumns } from '../UI/tablet';
@@ -220,7 +221,7 @@ export const Hotel: React.FC = () => {
   const aiRoomPick = routeParams?.aiRoomPick;
   const isFromAiAssistant = route.name === 'hotelFromAi' || Boolean(aiRoomPick);
   const hasBottomTabBar = useHasBottomTabBar();
-  const { isTablet } = useLayout();
+  const { isTablet, isLandscape } = useLayout();
   const safeApiHotelData = apiHotelData ?? undefined;
   const scrollRef = useRef<ScrollView>(null);
   const roomsSectionOffsetRef = useRef(0);
@@ -311,26 +312,48 @@ export const Hotel: React.FC = () => {
 
 
 
+  // Rendered exactly once (it runs the auto mount search): on iPad inside the
+  // right column, on iPhone right after the hotel card — same props either way.
+  const searchSection = (
+    <HotelSearchSection
+      hotelId={hotelId}
+      apiHotelData={safeApiHotelData}
+      onSearchComplete={handleSearchComplete}
+      onSearchingChange={setIsHotelSearching}
+      onSearchSettled={() => setHotelSearchSettled(true)}
+      onParamsChange={handleParamsChange}
+      initialSearchParams={routeParams?.searchParams}
+      mountSearchSignature={hotelMountSearchSignature}
+      skipAutoMountSearch={skipAutoMountSearch}
+    />
+  );
+
   return (
     <>
       <ScreenLayout ref={scrollRef} hasBottomTabBar={hasBottomTabBar}>
         {isTablet ? (
+          // Figma «iPad / Hotel page»: photo card left; right column = price → search → address/map.
           <TabletColumns
+            sideWidth={isLandscape ? 380 : 340}
             side={
-              <HotelDetailsPriceCard
-                rooms={rooms}
-                loading={roomsSectionLoading}
-                searchAttempted={roomsSearchAttempted}
-                searchType={hotelSearchType}
-                searchSnapshot={searchSnapshot}
-                aiRoomPick={aiRoomPick}
-                onChooseRoom={() => scrollToRoomsSection(true)}
-                style={styles.priceCardTablet}
-              />
+              <View style={styles.sideColumnTablet}>
+                <HotelDetailsPriceCard
+                  rooms={rooms}
+                  loading={roomsSectionLoading}
+                  searchAttempted={roomsSearchAttempted}
+                  searchType={hotelSearchType}
+                  searchSnapshot={searchSnapshot}
+                  aiRoomPick={aiRoomPick}
+                  onChooseRoom={() => scrollToRoomsSection(true)}
+                  style={styles.priceCardTablet}
+                />
+                {searchSection}
+                <HotelAddressCardTablet hotel={displayHotel} apiHotelData={safeApiHotelData} />
+              </View>
             }>
             <HotelCard
               hotel={displayHotel}
-              imageHeight={320}
+              imageHeight={isLandscape ? 400 : 320}
               showAddress
               showTags={false}
               showSlider
@@ -360,17 +383,7 @@ export const Hotel: React.FC = () => {
           />
         )}
 
-        <HotelSearchSection
-          hotelId={hotelId}
-          apiHotelData={safeApiHotelData}
-          onSearchComplete={handleSearchComplete}
-          onSearchingChange={setIsHotelSearching}
-          onSearchSettled={() => setHotelSearchSettled(true)}
-          onParamsChange={handleParamsChange}
-          initialSearchParams={routeParams?.searchParams}
-          mountSearchSignature={hotelMountSearchSignature}
-          skipAutoMountSearch={skipAutoMountSearch}
-        />
+        {!isTablet && searchSection}
 
         <View
           onLayout={(event) => {
@@ -462,5 +475,9 @@ const styles = StyleSheet.create({
   priceCardTablet: {
     marginHorizontal: 0,
     marginTop: 0,
+  },
+  /** iPad: right column of the hotel page (price → search → address). */
+  sideColumnTablet: {
+    gap: 16,
   },
 });
