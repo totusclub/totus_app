@@ -7,6 +7,7 @@ import { AppDispatch, RootState } from '../../modules/store';
 import { searchFilters, setAllMyHotels } from '../../modules/store/slices/search';
 import { useTheme } from '../../hooks/useTheme';
 import { withSearchTypeFilters } from '../../utils/searchParamsUtils';
+import { useLayout } from '../../hooks/useLayout';
 import {
   FilterChip,
   buildFilterChips,
@@ -24,6 +25,8 @@ const CHIP_TEXT_COLOR = '#FFFFFF';
 const SelectedFiltersRow: React.FC = () => {
   const { theme } = useTheme();
   const dispatch = useDispatch<AppDispatch>();
+  // iPad: chips aligned with the 24 pt card grid (phone keeps 12).
+  const { isTablet } = useLayout();
 
   // Narrow selectors — whole `search` slice re-renders on every progress tick.
   const hotels = useSelector((state: RootState) => state.search.hotels);
@@ -72,7 +75,7 @@ const SelectedFiltersRow: React.FC = () => {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, isTablet && styles.contentTablet]}
         keyboardShouldPersistTaps="handled">
         {chips.map(chip => (
           <TouchableOpacity
@@ -103,6 +106,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 12,
+  },
+  contentTablet: {
+    paddingHorizontal: 24,
   },
   chip: {
     height: 28,

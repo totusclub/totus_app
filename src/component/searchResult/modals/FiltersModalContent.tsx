@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
-import { AppText, AppButton, Toggle, RangeSlider, Chips } from '../../UI';
+import { AppText, AppButton, Toggle, RangeSlider, Chips, AppIcon } from '../../UI';
 import { RootState, AppDispatch } from '../../../modules/store';
 import { searchFilters, setAllMyHotels } from '../../../modules/store/slices/search';
 import { useTheme } from '../../../hooks/useTheme';
@@ -39,6 +39,15 @@ type FilterState = {
 
 type FiltersModalContentProps = {
   onClose: () => void;
+  /**
+   * iPad only. `sidebar` renders the same filter state as a persistent side
+   * panel (Figma «iPad Landscape / List / Tours»): checkbox rows with hotel
+   * counts, «Сбросить» in the header, «Показать N отелей» as the apply button.
+   * Phone always uses the default `sheet` — its markup is untouched.
+   */
+  variant?: 'sheet' | 'sidebar';
+  /** Current result count for the sidebar apply button. */
+  resultCount?: number;
 };
 
 const WIFI_LABELS: Record<string, string> = {
@@ -157,11 +166,25 @@ const mapFacetOptions = (
   (items || []).map((item: any) => ({
     label: labelFn(item),
     meta: formatOptionMeta(item) || undefined,
+    count: item.hotel_count != null ? Number(item.hotel_count) : undefined,
     value: String(item.id),
     disabled: Boolean(item.disabled),
   }));
 
-const FiltersModalContent: React.FC<FiltersModalContentProps> = ({ onClose }) => {
+const hotelsWord = (n: number): string => {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'отель';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'отеля';
+  return 'отелей';
+};
+
+const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
+  onClose,
+  variant = 'sheet',
+  resultCount,
+}) => {
+  const isSidebar = variant === 'sidebar';
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch<AppDispatch>();
@@ -386,6 +409,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({ onClose }) =>
       return {
         label: a.label,
         meta,
+        count: trueOpt?.hotel_count != null ? Number(trueOpt.hotel_count) : undefined,
         value: a.key,
         disabled: false,
       };
@@ -476,13 +500,61 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({ onClose }) =>
     onClose();
   };
 
+  /** iPad sidebar: checkbox row with the hotel count on the right (Figma). */
+  const renderCheckRows = (
+    options: { label: string; value: string; count?: number; disabled?: boolean }[],
+    selected: string[],
+    stateKey: keyof FilterState,
+  ) => (
+    <View style={sidebarStyles.rows}>
+      {options.map(option => {
+        const isSelected = selected.includes(option.value);
+        return (
+          <TouchableOpacity
+            key={option.value}
+            activeOpacity={0.7}
+            disabled={option.disabled}
+            onPress={() => toggleInList(stateKey, option.value)}
+            style={[sidebarStyles.row, option.disabled && sidebarStyles.rowDisabled]}>
+            <View
+              style={[
+                sidebarStyles.checkbox,
+                {
+                  backgroundColor: isSelected ? theme.brand : 'transparent',
+                  borderColor: isSelected ? theme.brand : theme.textDisabled,
+                },
+              ]}>
+              {isSelected ? <AppIcon name="checkmark" size={14} color="#FFFFFF" /> : null}
+            </View>
+            <AppText style={[sidebarStyles.rowLabel, { color: theme.text }]} numberOfLines={1}>
+              {option.label}
+            </AppText>
+            {option.count != null ? (
+              <AppText style={[sidebarStyles.rowCount, { color: theme.textTertiary }]}>
+                {option.count}
+              </AppText>
+            ) : null}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
   const renderChipSection = (
     title: string,
-    options: { label: string; value: string; meta?: string; disabled?: boolean }[],
+    options: { label: string; value: string; meta?: string; count?: number; disabled?: boolean }[],
     selected: string[],
     stateKey: keyof FilterState,
   ) => {
     if (!options.length) return null;
+    if (isSidebar) {
+      return (
+        <View style={sidebarStyles.section}>
+          <AppText style={[sidebarStyles.sectionTitle, { color: theme.text }]}>{title}</AppText>
+          {renderCheckRows(options, selected, stateKey)}
+        </View>
+      );
+    }
     return (
       <View style={[styles.section, { borderBottomColor: theme.borderLight }]}>
         <AppText style={[styles.sectionTitle, { color: theme.text }]}>{title}</AppText>
@@ -494,6 +566,69 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({ onClose }) =>
       </View>
     );
   };
+
+  if (isSidebar) {
+    const count = resultCount ?? hotels?.hotels_count ?? 0;
+    return (
+      <View style={sidebarStyles.container}>
+        <View style={sidebarStyles.header}>
+          <AppText style={[sidebarStyles.headerTitle, { color: theme.text }]}>Фильтры</AppText>
+          <TouchableOpacity
+            onPress={handleResetLocal}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <AppText style={[sidebarStyles.resetText, { color: theme.brand }]}>Сбросить</AppText>
+          </TouchableOpacity>
+        </View>
+
+        {hasPriceFilter && (
+          <View style={sidebarStyles.section}>
+            <RangeSlider
+              label="Цена за тур"
+              min={filters.priceMin}
+              max={filters.priceMax}
+              minValue={priceBounds.min}
+              maxValue={priceBounds.max}
+              onMinChange={value => setFilters(prev => ({ ...prev, priceMin: value }))}
+              onMaxChange={value => setFilters(prev => ({ ...prev, priceMax: value }))}
+            />
+          </View>
+        )}
+
+        {renderChipSection('Звёзды', starOptions, filters.stars, 'stars')}
+        {renderChipSection('Питание', mealsOptions, filters.meals, 'meals')}
+        {renderChipSection('Линия пляжа', beachLineOptions, filters.beachLine, 'beachLine')}
+        {renderChipSection('Удобства', amenityOptions, filters.amenities, 'amenities')}
+        {renderChipSection('Тип размещения', accommodationOptions, filters.accommodationTypes, 'accommodationTypes')}
+        {renderChipSection('Регион', regionsOptions, filters.regions, 'regions')}
+        {renderChipSection('Рейтинг', ratingOptions, filters.rating, 'rating')}
+        {renderChipSection('Туроператор', providerOptions, filters.providers, 'providers')}
+        {renderChipSection('Wi-Fi', wifiOptions, filters.wifi, 'wifi')}
+        {renderChipSection('Покрытие пляжа', beachSurfaceOptions, filters.beachSurface, 'beachSurface')}
+        {renderChipSection('Тип пляжа', beachTypeOptions, filters.beachType, 'beachType')}
+        {renderChipSection('Категория', categoryOptions, filters.category, 'category')}
+        {renderChipSection('Подтверждение', confirmabilityOptions, filters.confirmability, 'confirmability')}
+
+        <View style={sidebarStyles.section}>
+          <Toggle
+            label="Быстрое подтверждение"
+            value={filters.quickConfirmation}
+            onToggle={() =>
+              setFilters(prev => ({
+                ...prev,
+                quickConfirmation: !prev.quickConfirmation,
+              }))
+            }
+          />
+        </View>
+
+        <AppButton
+          title={`Показать ${count} ${hotelsWord(count)}`}
+          onPress={handleApply}
+          size="medium"
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -777,6 +912,64 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 16,
     borderTopWidth: 1,
+  },
+});
+
+/** iPad sidebar only (Figma «iPad Landscape / List / Tours» → Filters panel). */
+const sidebarStyles = StyleSheet.create({
+  container: {
+    gap: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    lineHeight: 24,
+  },
+  resetText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  section: {
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  rows: {
+    gap: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 30,
+  },
+  rowDisabled: {
+    opacity: 0.4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowLabel: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  rowCount: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
 

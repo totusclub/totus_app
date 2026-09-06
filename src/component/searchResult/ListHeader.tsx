@@ -8,6 +8,8 @@ type ListHeaderProps = {
   resultCount: number;
   resultText?: string;
   onSortPress: () => void;
+  /** iPad (Figma): brand-colored sort label 16/500, count 14; no shadow pill. */
+  tablet?: boolean;
 };
 
 export const ListHeader: React.FC<ListHeaderProps> = ({
@@ -15,20 +17,22 @@ export const ListHeader: React.FC<ListHeaderProps> = ({
   resultCount,
   resultText,
   onSortPress,
+  tablet = false,
 }) => {
   const { theme } = useTheme();
+  const sortColor = tablet ? theme.brand : theme.text;
   return (
     <View style={styles.header}>
       <TouchableOpacity
-        style={styles.sortButton}
+        style={[styles.sortButton, tablet && styles.sortButtonTablet]}
         activeOpacity={0.7}
         onPress={onSortPress}
       >
-        <AppText style={[styles.sortButtonText, { color: theme.text }]}>{selectedSortLabel}</AppText>
-        <AppIcon name="arrowDown" size={16} color={theme.text} />
+        <AppText style={[styles.sortButtonText, tablet && styles.sortButtonTextTablet, { color: sortColor }]}>{selectedSortLabel}</AppText>
+        <AppIcon name="arrowDown" size={16} color={sortColor} />
       </TouchableOpacity>
 
-      <AppText style={[styles.resultCount, { color: theme.textTertiary }]}>
+      <AppText style={[styles.resultCount, tablet && styles.resultCountTablet, { color: theme.textTertiary }]}>
         {resultText || `Найдено ${resultCount} отелей`}
       </AppText>
     </View>
@@ -65,5 +69,18 @@ const styles = StyleSheet.create({
   resultCount: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  sortButtonTablet: {
+    paddingHorizontal: 0,
+    paddingVertical: 8,
+    shadowOpacity: 0,
+  },
+  sortButtonTextTablet: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  resultCountTablet: {
+    fontSize: 14,
+    fontWeight: '400',
   },
 });

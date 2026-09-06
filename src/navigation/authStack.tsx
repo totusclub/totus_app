@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Text, StyleSheet, Platform, View } from 'react-native';
+import { Text, StyleSheet, Platform, View, useWindowDimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
@@ -18,6 +18,17 @@ import { isOnboardingCompleted } from '../utils/onboarding';
 import { getUserById } from "../modules/api/users";
 import TotusAiChatScreen from "../screens/ai/TotusAiChatScreen";
 import { rememberNonAiTab } from '../utils/aiTabReturn';
+import { useLayout } from '../hooks/useLayout';
+
+/**
+ * iPad tab bar (Figma «iPad UI» frames): icons above labels, 5 items grouped in
+ * the centre 112 pt apart, 84 pt tall in portrait / 70 pt in landscape.
+ * React Navigation would otherwise put labels beside icons and stretch the
+ * items across the full width on wide screens. Phone: not applied.
+ */
+const TABLET_TAB_ITEM_WIDTH = 112;
+const TABLET_TAB_BAR_HEIGHT_PORTRAIT = 84;
+const TABLET_TAB_BAR_HEIGHT_LANDSCAPE = 70;
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -35,6 +46,8 @@ const SCREENS_WITHOUT_TAB_BAR = new Set([
 function getTabBarStyle(
   route: { name: string; state?: unknown },
   theme: { navigationBackground: string },
+  /** iPad only — merged on top of the phone style; null on phone. */
+  tabletStyle: { height: number; paddingTop: number; paddingHorizontal: number } | null = null,
 ) {
   // Hide bottom tabs on the entire AI assistant flow (chat + hotel/tickets).
   if (route.name === 'VoiceAssistantStackScreen') {
@@ -52,6 +65,7 @@ function getTabBarStyle(
     backgroundColor:
       Platform.OS === 'android' ? theme.navigationBackground : 'transparent',
     elevation: 0,
+    ...(tabletStyle ?? {}),
   };
 }
 
@@ -148,6 +162,8 @@ const TabBar = () => {
   const { accessToken, userId } = useSelector((state: RootState) => state.auth);
   const [userAccess, setUserAccess] = React.useState<0 | 1 | null>(null);
   const isLoggedIn = !!accessToken;
+  const { isTablet, isLandscape } = useLayout();
+  const { width: windowWidth } = useWindowDimensions();
 
   // access 0 = show AI & Calling, access 1 = hide
   React.useEffect(() => {
@@ -167,6 +183,27 @@ const TabBar = () => {
       })
       .catch(() => setUserAccess(0)); // On error, show tabs (allow access)
   }, [isLoggedIn, userId]);
+
+  // iPad only: number of visible tabs → symmetric padding that centres the group.
+  const visibleTabCount =
+    2 + (isLoggedIn && userAccess === 0 ? 1 : 0) + (isLoggedIn ? 1 : 0) + 1;
+  const tabletTabBarOptions = isTablet
+    ? {
+        tabBarLabelPosition: 'below-icon' as const,
+        tabBarItemStyle: { flex: 0, width: TABLET_TAB_ITEM_WIDTH },
+        tabBarIconStyle: { marginTop: 0 },
+      }
+    : {};
+  const tabletTabBarStyle = isTablet
+    ? {
+        height: isLandscape ? TABLET_TAB_BAR_HEIGHT_LANDSCAPE : TABLET_TAB_BAR_HEIGHT_PORTRAIT,
+        paddingTop: 6,
+        paddingHorizontal: Math.max(
+          0,
+          (windowWidth - visibleTabCount * TABLET_TAB_ITEM_WIDTH) / 2,
+        ),
+      }
+    : null;
 
   return (
     <Tab.Navigator
@@ -239,7 +276,8 @@ const TabBar = () => {
             />
           );
         },
-        tabBarStyle: getTabBarStyle(route, theme),
+        tabBarStyle: getTabBarStyle(route, theme, tabletTabBarStyle),
+        ...tabletTabBarOptions,
       })}>
       <Tab.Screen name="HomeStackScreen" component={HomeStackScreen} />
       <Tab.Screen name="OrdersStackScreen" component={OrdersStackScreen} />
