@@ -141,7 +141,10 @@ const ResultList: React.FC = () => {
   const { theme } = useTheme();
   // iPad only: hotel cards in a 2/3-column grid. On phone `isTablet` is false and
   // every helper below is a transparent passthrough (no extra views, no extra props).
-  const { isTablet, columns } = useLayout();
+  // Figma «iPad / List / Tours»: hotel cards in 2 columns in both orientations
+  // (landscape has the filters sidebar on the left).
+  const { isTablet } = useLayout();
+  const columns = isTablet ? 2 : 1;
   const tabletCellStyle = [styles.cellTablet, { maxWidth: `${100 / columns}%` as `${number}%` }];
   const wrapTablet = (node: React.ReactElement, style: any = tabletCellStyle) =>
     isTablet ? <View style={style}>{node}</View> : node;
@@ -426,6 +429,7 @@ const ResultList: React.FC = () => {
               selectedSortLabel={selectedOption.label}
               resultCount={hotels?.hotels_count || transformedHotels.length}
               onSortPress={() => setSortModalVisible(true)}
+              {...(isTablet ? { tablet: true } : {})}
             />
           , styles.headerTablet)}
           renderItem={({ item, index }) => wrapTablet(
