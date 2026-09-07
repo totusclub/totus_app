@@ -1,4 +1,4 @@
-import {Platform} from 'react-native';
+import {DeviceEventEmitter, Platform} from 'react-native';
 import messaging from '@react-native-firebase/messaging';
 import RNCallKeep from 'react-native-callkeep';
 import {
@@ -12,6 +12,15 @@ import {
 
 let androidMessagingHandlersRegistered = false;
 let androidVoipInitialized = false;
+
+// Пуш чата с поддержкой (calling_api_v2): data.type === 'support_message'.
+// В фоне ничего не показываем сами — FCM `notification` отрисовывает система.
+// В foreground сообщаем в приложение (SupportSocketBridge → счётчик непрочитанных).
+const SUPPORT_PUSH_EVENT = 'support:push';
+
+function isSupportMessage(data) {
+  return Boolean(data) && data.type === 'support_message';
+}
 
 function isIncomingCallMessage(data) {
   if (!data) {
@@ -73,6 +82,9 @@ export function registerAndroidCallBackgroundHandlers() {
 
   messaging().setBackgroundMessageHandler(async remoteMessage => {
     const data = remoteMessage?.data;
+    if (isSupportMessage(data)) {
+      return;
+    }
     if (isIncomingCallMessage(data)) {
       await displayIncomingCall(data);
     }
@@ -80,6 +92,10 @@ export function registerAndroidCallBackgroundHandlers() {
 
   messaging().onMessage(async remoteMessage => {
     const data = remoteMessage?.data;
+    if (isSupportMessage(data)) {
+      DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
+      return;
+    }
     if (isIncomingCallMessage(data)) {
       await displayIncomingCall(data);
     }

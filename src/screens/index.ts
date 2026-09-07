@@ -12,3 +12,4 @@ export {default as CheckoutScreen} from './home/Checkout.tsx';
 export {default as PendingPaymentScreen} from './home/PendingPayment.tsx';
 export {default as FavoritesScreen} from './favorites/FavoritesScreen';
 export {default as PrivacyPolicyScreen} from './account/PrivacyPolicyScreen';
+export {default as SupportChatScreen} from './support/SupportChatScreen';
