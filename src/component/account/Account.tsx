@@ -32,10 +32,14 @@ import { getUserById } from '../../modules/api/users';
 import { useLayout } from '../../hooks/useLayout';
 import { TabletColumns } from '../../component/UI/tablet';
 
-// Support team loyalty ID — change this to your actual support account loyalty_id
-const SUPPORT_LOYALTY_ID = '0978 6356 3712 8057';
-const SUPPORT_DISPLAY_NAME = 'Поддержка Totus';
-const SUPPORT_PHONE_NUMBER = '+74951234567'; // Fallback phone number
+// Support team loyalty ID / phone — shared with the support chat (src/modules/support/supportConstants.ts)
+import {
+  SUPPORT_LOYALTY_ID,
+  SUPPORT_DISPLAY_NAME,
+  SUPPORT_PHONE_NUMBER,
+  SUPPORT_CHAT_ROUTE,
+} from '../../modules/support/supportConstants';
+import { disconnectSupportSocket } from '../../modules/support/supportSocket';
 
 type DecodedToken = {
   id?: string;
@@ -338,6 +342,7 @@ const AccountScreen = () => {
   const [showCallingSupport, setShowCallingSupport] = React.useState(true);
   const { theme, isDark, toggleTheme } = useTheme();
   const { isTablet } = useLayout();
+  const supportUnread = useSelector((state: RootState) => state.supportChat?.unreadCount ?? 0);
 
   // Monitor call state to auto-close CallModal when call ends
   useEffect(() => {
@@ -417,6 +422,7 @@ const AccountScreen = () => {
     // CRITICAL: Clean up call-related state before logout so old account
     // no longer receives VoIP pushes, socket events, or CallKeep UI
     await cleanupVoipOnLogout();
+    disconnectSupportSocket();
     dispatch(logoutReducer());
     navigation.reset({
       index: 0,
@@ -433,6 +439,7 @@ const AccountScreen = () => {
     setDeleteModalVisible(false);
     // Clean up call state before logout (same as handleLogout)
     await cleanupVoipOnLogout();
+    disconnectSupportSocket();
     dispatch(logoutReducer());
     navigation.reset({
       index: 0,
@@ -442,6 +449,10 @@ const AccountScreen = () => {
 
   const handleCallSupport = () => {
     setSupportModalVisible(true);
+  };
+
+  const handleSupportChat = () => {
+    navigation.navigate(SUPPORT_CHAT_ROUTE);
   };
 
   const handleCallSupportPhone = () => {
@@ -506,6 +517,31 @@ const AccountScreen = () => {
             ]}>
             {showCallingSupport ? (
               <>
+                <TouchableOpacity
+                  style={styles.settingsRow}
+                  onPress={handleSupportChat}
+                  activeOpacity={0.65}>
+                  <View
+                    style={[
+                      styles.settingsIcon,
+                      { backgroundColor: isDark ? 'rgba(43,169,226,0.2)' : 'rgba(43,169,226,0.12)' },
+                    ]}>
+                    <AppIcon name="support" size={16} color="#2BA9E2" />
+                    {supportUnread > 0 ? (
+                      <View style={[styles.settingsBadge, { backgroundColor: theme.brand, borderColor: theme.cardBackground }]} />
+                    ) : null}
+                  </View>
+                  <View style={styles.settingsTextCol}>
+                    <AppText style={[styles.settingsTitle, { color: theme.text }]}>
+                      Чат с поддержкой
+                    </AppText>
+                    <AppText style={[styles.settingsSubtitle, { color: theme.textTertiary }]}>
+                      Напишите нам — ответим в чате
+                    </AppText>
+                  </View>
+                  <AppIcon name="arrowRight" size={14} color={theme.textTertiary} />
+                </TouchableOpacity>
+                <View style={[styles.settingsHairline, { backgroundColor: theme.border }]} />
                 <TouchableOpacity
                   style={styles.settingsRow}
                   onPress={handleCallSupport}
@@ -892,6 +928,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400',
     letterSpacing: -0.1,
+  },
+  settingsBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
   },
   settingsHairline: {
     height: StyleSheet.hairlineWidth,
