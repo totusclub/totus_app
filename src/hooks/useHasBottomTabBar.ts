@@ -14,6 +14,8 @@ const ROOT_SCREENS_WITHOUT_TAB_BAR = new Set([
   'checkout',
   'orderDetails',
   'supportChat',
+  'notifications',
+  'notificationSettings',
 ]);
 
 /**
