@@ -15,6 +15,14 @@ import searchReducer from './slices/search';
 import destinationsReducer from './slices/destinations';
 import departuresReducer from './slices/departures';
 import supportChatReducer from './slices/supportChat';
+import notificationsReducer from './slices/notifications';
+
+// Центр уведомлений: сохраняем только «показывали ли предзапрос» и бейдж до первой загрузки.
+const notificationsPersistConfig = {
+  key: 'notifications',
+  storage: AsyncStorage,
+  whitelist: ['prompted', 'unread'],
+};
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -22,6 +30,7 @@ const rootReducer = combineReducers({
   destinations: destinationsReducer,
   departures: departuresReducer,
   supportChat: supportChatReducer,
+  notifications: persistReducer(notificationsPersistConfig, notificationsReducer),
 });
 
 const persistConfig = {
