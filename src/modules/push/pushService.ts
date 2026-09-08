@@ -276,7 +276,11 @@ export function registerPushDevice(): Promise<boolean> {
   return registering;
 }
 
-/** DELETE /api/push/devices {token} — при логауте / выключении push на устройстве. Ошибки не ждём. */
+/**
+ * DELETE /api/push/devices {token} — при логауте / выключении push на устройстве.
+ * Дожидаемся запроса (или ~3 с таймаута), чтобы DELETE ушёл с Bearer текущего пользователя
+ * до того, как logoutReducer сбросит auth; ошибки самого запроса не пробрасываем.
+ */
 export async function unregisterPushDevice(): Promise<void> {
   let token: string | null = null;
   try {
@@ -292,7 +296,9 @@ export async function unregisterPushDevice(): Promise<void> {
     }
   }
   if (token) {
-    apiUnregisterPushDevice(token).catch(e => warn('unregister failed', (e as Error)?.message || e));
+    const request = apiUnregisterPushDevice(token).catch(e => warn('unregister failed', (e as Error)?.message || e));
+    const timeout = new Promise<void>(resolve => setTimeout(resolve, 3000));
+    await Promise.race([request, timeout]).catch(() => {});
   }
   try {
     await AsyncStorage.removeItem(PUSH_STORAGE_TOKEN);
@@ -461,6 +467,10 @@ export function handleNotificationPress(data: PushMessageData | null | undefined
       });
       break;
     case 'account':
+      // Экран «Аккаунт» (корень стека), а не список уведомлений — missed_call/support маршрут account
+      // должен просто открыть вкладку «Аккаунт» (API.md §2, §7).
+      navigateRoot('tab', {screen: 'AccountStackScreen'});
+      break;
     case 'notifications':
       navigateRoot('tab', {
         screen: 'AccountStackScreen',
