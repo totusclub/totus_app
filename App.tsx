@@ -15,6 +15,7 @@ import {
 } from '@tosmedia/ai-assistant-native';
 import { openHotelFromAiAssistantInfo, openHotelFromAiAssistantUrl } from './src/utils/aiAssistantOpenHotel';
 import { setVoipAccessToken } from './src/modules/api/voipAuth';
+import SupportSocketBridge from './src/modules/support/SupportSocketBridge';
 
 function AiAssistantBridge({ children }: { children: React.ReactNode }): React.JSX.Element {
   const { isDark } = useThemeContext();
@@ -242,6 +243,9 @@ function AppContentInner(): React.JSX.Element {
             barStyle={!isDark ? 'dark-content' : 'light-content'}
         />
       <Navigation />
+
+      {/* Сокет чата с поддержкой + счётчик непрочитанных (пока авторизован и приложение активно) */}
+      <SupportSocketBridge />
 
       {/* Minimized Call View - Centered in header only (not at bottom) */}
       {showMinimized && (

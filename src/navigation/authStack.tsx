@@ -6,7 +6,7 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { AppIcon, AppText } from '../component/UI';
 import { useSelector } from 'react-redux';
 import { RootState } from '../modules/store';
-import { AccountScreen, HomeScreen, OnboardingScreen, OrdersScreen, OrderDetailsScreen, LoginScreen, SignupScreen, VerificationScreen, BookingScreen, CheckoutScreen, PendingPaymentScreen, FavoritesScreen, PrivacyPolicyScreen } from '../screens';
+import { AccountScreen, HomeScreen, OnboardingScreen, OrdersScreen, OrderDetailsScreen, LoginScreen, SignupScreen, VerificationScreen, BookingScreen, CheckoutScreen, PendingPaymentScreen, FavoritesScreen, PrivacyPolicyScreen, SupportChatScreen } from '../screens';
 import SearchResultScreen from '../screens/home/SearchResult';
 import HotelScreen from '../screens/home/Hotel';
 import TicketsScreen from '../screens/home/Tickets';
@@ -41,6 +41,7 @@ const SCREENS_WITHOUT_TAB_BAR = new Set([
   'pendingPayment',
   'hotelFromAi',
   'orderDetails',
+  'supportChat',
 ]);
 
 function getTabBarStyle(
@@ -152,6 +153,7 @@ const AccountStackScreen = () => {
       <Stack.Screen name="account" component={AccountScreen} />
       <Stack.Screen name="favorites" component={FavoritesScreen} />
       <Stack.Screen name="privacyPolicy" component={PrivacyPolicyScreen} />
+      <Stack.Screen name="supportChat" component={SupportChatScreen} />
     </Stack.Navigator>
   );
 };

@@ -14,18 +14,20 @@ import authReducer from './slices/auth';
 import searchReducer from './slices/search';
 import destinationsReducer from './slices/destinations';
 import departuresReducer from './slices/departures';
+import supportChatReducer from './slices/supportChat';
 
 const rootReducer = combineReducers({
   auth: authReducer,
   search: searchReducer,
   destinations: destinationsReducer,
   departures: departuresReducer,
+  supportChat: supportChatReducer,
 });
 
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: ['auth', 'search'],
+  whitelist: ['auth', 'search', 'supportChat'],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

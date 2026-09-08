@@ -13,6 +13,7 @@ const ROOT_SCREENS_WITHOUT_TAB_BAR = new Set([
   'booking',
   'checkout',
   'orderDetails',
+  'supportChat',
 ]);
 
 /**
