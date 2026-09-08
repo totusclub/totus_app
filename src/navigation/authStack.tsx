@@ -6,7 +6,7 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { AppIcon, AppText } from '../component/UI';
 import { useSelector } from 'react-redux';
 import { RootState } from '../modules/store';
-import { AccountScreen, HomeScreen, OnboardingScreen, OrdersScreen, OrderDetailsScreen, LoginScreen, SignupScreen, VerificationScreen, BookingScreen, CheckoutScreen, PendingPaymentScreen, FavoritesScreen, PrivacyPolicyScreen, SupportChatScreen } from '../screens';
+import { AccountScreen, HomeScreen, OnboardingScreen, OrdersScreen, OrderDetailsScreen, LoginScreen, SignupScreen, VerificationScreen, BookingScreen, CheckoutScreen, PendingPaymentScreen, FavoritesScreen, PrivacyPolicyScreen, SupportChatScreen, NotificationsScreen, NotificationSettingsScreen } from '../screens';
 import SearchResultScreen from '../screens/home/SearchResult';
 import HotelScreen from '../screens/home/Hotel';
 import TicketsScreen from '../screens/home/Tickets';
@@ -19,6 +19,7 @@ import { getUserById } from "../modules/api/users";
 import TotusAiChatScreen from "../screens/ai/TotusAiChatScreen";
 import { rememberNonAiTab } from '../utils/aiTabReturn';
 import { useLayout } from '../hooks/useLayout';
+import { useAccountTabBadge } from '../modules/push/useAccountTabBadge';
 
 /**
  * iPad tab bar (Figma «iPad UI» frames): icons above labels, 5 items grouped in
@@ -42,6 +43,8 @@ const SCREENS_WITHOUT_TAB_BAR = new Set([
   'hotelFromAi',
   'orderDetails',
   'supportChat',
+  'notifications',
+  'notificationSettings',
 ]);
 
 function getTabBarStyle(
@@ -154,6 +157,8 @@ const AccountStackScreen = () => {
       <Stack.Screen name="favorites" component={FavoritesScreen} />
       <Stack.Screen name="privacyPolicy" component={PrivacyPolicyScreen} />
       <Stack.Screen name="supportChat" component={SupportChatScreen} />
+      <Stack.Screen name="notifications" component={NotificationsScreen} />
+      <Stack.Screen name="notificationSettings" component={NotificationSettingsScreen} />
     </Stack.Navigator>
   );
 };
@@ -166,6 +171,8 @@ const TabBar = () => {
   const isLoggedIn = !!accessToken;
   const { isTablet, isLandscape } = useLayout();
   const { width: windowWidth } = useWindowDimensions();
+  // Непрочитанные уведомления → бейдж на вкладке «Аккаунт» (push-уведомления, этап 2).
+  const accountBadge = useAccountTabBadge();
 
   // access 0 = show AI & Calling, access 1 = hide
   React.useEffect(() => {
@@ -294,7 +301,14 @@ const TabBar = () => {
       import CallsScreen / ChatScreen, uncomment ChatStackScreen above, then:
       <Tab.Screen name="ChatStackScreen" component={CallsScreen} />
       */}
-      <Tab.Screen name="AccountStackScreen" component={AccountStackScreen} />
+      <Tab.Screen
+        name="AccountStackScreen"
+        component={AccountStackScreen}
+        options={{
+          tabBarBadge: accountBadge,
+          tabBarBadgeStyle: { backgroundColor: theme.brand, color: '#FFFFFF', fontSize: 11 },
+        }}
+      />
     </Tab.Navigator>
   );
 };

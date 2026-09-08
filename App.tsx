@@ -16,6 +16,7 @@ import {
 import { openHotelFromAiAssistantInfo, openHotelFromAiAssistantUrl } from './src/utils/aiAssistantOpenHotel';
 import { setVoipAccessToken } from './src/modules/api/voipAuth';
 import SupportSocketBridge from './src/modules/support/SupportSocketBridge';
+import PushBridge from './src/modules/push/PushBridge';
 
 function AiAssistantBridge({ children }: { children: React.ReactNode }): React.JSX.Element {
   const { isDark } = useThemeContext();
@@ -246,6 +247,9 @@ function AppContentInner(): React.JSX.Element {
 
       {/* Сокет чата с поддержкой + счётчик непрочитанных (пока авторизован и приложение активно) */}
       <SupportSocketBridge />
+
+      {/* Push-уведомления: обработчики notifee/FCM, регистрация устройства после входа, предзапрос разрешения */}
+      <PushBridge />
 
       {/* Minimized Call View - Centered in header only (not at bottom) */}
       {showMinimized && (

@@ -13,8 +13,14 @@ import {
   registerAndroidCallBackgroundHandlers,
   queuePendingAnswerFromBackground,
 } from './src/modules/voip/CallService';
+import notifee from '@notifee/react-native';
+import {handleNotifeeBackgroundEvent} from './src/modules/push/pushService';
 
 registerAndroidCallBackgroundHandlers();
+
+// Тап по уведомлению notifee в фоне/после закрытия: data → AsyncStorage push:pendingPress,
+// обработка (deep link) — в PushBridge при следующем активном состоянии.
+notifee.onBackgroundEvent(handleNotifeeBackgroundEvent);
 
 // CallKeep headless hook for Android killed/background process.
 // RNCallKeepBackgroundMessagingService triggers this task name.
