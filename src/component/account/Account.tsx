@@ -40,6 +40,10 @@ import {
   SUPPORT_CHAT_ROUTE,
 } from '../../modules/support/supportConstants';
 import { disconnectSupportSocket } from '../../modules/support/supportSocket';
+// Push-уведомления: строка «Уведомления» и снятие устройства при выходе (src/modules/push)
+import { NOTIFICATIONS_ROUTE, PUSH_TEXTS } from '../../modules/push/pushConstants';
+import { unregisterPushDevice } from '../../modules/push/pushService';
+import { NotificationGlyph } from '../../component/notifications/CategoryIcon';
 
 type DecodedToken = {
   id?: string;
@@ -343,6 +347,7 @@ const AccountScreen = () => {
   const { theme, isDark, toggleTheme } = useTheme();
   const { isTablet } = useLayout();
   const supportUnread = useSelector((state: RootState) => state.supportChat?.unreadCount ?? 0);
+  const notificationsUnread = useSelector((state: RootState) => state.notifications?.unread ?? 0);
 
   // Monitor call state to auto-close CallModal when call ends
   useEffect(() => {
@@ -422,6 +427,7 @@ const AccountScreen = () => {
     // CRITICAL: Clean up call-related state before logout so old account
     // no longer receives VoIP pushes, socket events, or CallKeep UI
     await cleanupVoipOnLogout();
+    await unregisterPushDevice();
     disconnectSupportSocket();
     dispatch(logoutReducer());
     navigation.reset({
@@ -439,6 +445,7 @@ const AccountScreen = () => {
     setDeleteModalVisible(false);
     // Clean up call state before logout (same as handleLogout)
     await cleanupVoipOnLogout();
+    await unregisterPushDevice();
     disconnectSupportSocket();
     dispatch(logoutReducer());
     navigation.reset({
@@ -453,6 +460,10 @@ const AccountScreen = () => {
 
   const handleSupportChat = () => {
     navigation.navigate(SUPPORT_CHAT_ROUTE);
+  };
+
+  const handleNotifications = () => {
+    navigation.navigate(NOTIFICATIONS_ROUTE);
   };
 
   const handleCallSupportPhone = () => {
@@ -515,6 +526,36 @@ const AccountScreen = () => {
                 borderColor: theme.borderLight,
               },
             ]}>
+            <TouchableOpacity
+              style={styles.settingsRow}
+              onPress={handleNotifications}
+              activeOpacity={0.65}>
+              <View
+                style={[
+                  styles.settingsIcon,
+                  { backgroundColor: isDark ? 'rgba(254,115,46,0.2)' : 'rgba(254,115,46,0.12)' },
+                ]}>
+                <NotificationGlyph kind="bell" size={17} color={theme.brand} />
+              </View>
+              <View style={styles.settingsTextCol}>
+                <AppText style={[styles.settingsTitle, { color: theme.text }]}>
+                  {PUSH_TEXTS.accountRowTitle}
+                </AppText>
+                <AppText style={[styles.settingsSubtitle, { color: theme.textTertiary }]}>
+                  {PUSH_TEXTS.accountRowSubtitle}
+                </AppText>
+              </View>
+              {notificationsUnread > 0 ? (
+                <View style={[styles.settingsCountBadge, { backgroundColor: theme.brand }]}>
+                  <AppText style={styles.settingsCountBadgeText}>
+                    {notificationsUnread > 99 ? '99+' : notificationsUnread}
+                  </AppText>
+                </View>
+              ) : null}
+              <AppIcon name="arrowRight" size={14} color={theme.textTertiary} />
+            </TouchableOpacity>
+            <View style={[styles.settingsHairline, { backgroundColor: theme.border }]} />
+
             {showCallingSupport ? (
               <>
                 <TouchableOpacity
@@ -937,6 +978,19 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     borderWidth: 2,
+  },
+  settingsCountBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsCountBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   settingsHairline: {
     height: StyleSheet.hairlineWidth,
