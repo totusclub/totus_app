@@ -69,14 +69,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
       print("⚠️ Could not store bridge in CallKeepHelper, will try to get it dynamically")
     }
 
-    // Request notification permissions
-    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-      if let error = error {
-        print("❌ Failed to request notification permissions: \(error)")
-      } else {
-        print("✅ Notification permissions granted: \(granted)")
-      }
-    }
+    // Notification permission is requested from JS after login (src/modules/push/pushService.ts,
+    // notifee.requestPermission) — not at launch. RNFB Messaging registers the APNs token itself.
 
     // Note: react-native-voip-push-notification library sets up its own PKPushRegistry
     // and will handle VoIP token registration. The library's native module will
