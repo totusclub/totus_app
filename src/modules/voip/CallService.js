@@ -232,3 +232,34 @@ export async function handleBackgroundCallKeepEvent(message) {
     endCall(callUUID);
   }
 }
+
+/**
+ * Headless / background FCM entry (index.js CallKeep tasks).
+ * Hub notifications (orders/support/promo): system tray shows FCM `notification` payload.
+ * Incoming call: hand off to CallKeep display flow.
+ */
+export async function handleIncomingPush(message, source = 'unknown') {
+  try {
+    const data = message?.data || message || null;
+    console.log('[push/voip] handleIncomingPush', source, {
+      type: data?.type || null,
+      hasCallId: Boolean(data?.callId || data?.callUUID || data?.uuid),
+    });
+    if (!data) return;
+
+    if (isSupportMessage(data) || isHubNotificationMessage(data)) {
+      // Background: OS already displays notification payload. Foreground path is onMessage.
+      return;
+    }
+
+    if (isIncomingCallMessage(data)) {
+      await displayIncomingCall(data);
+    }
+  } catch (e) {
+    console.warn('[push/voip] handleIncomingPush failed', source, e?.message || e);
+  }
+}
+
+/** Re-export for index.js headless answer flow. */
+export {queuePendingAnswerFromBackground};
+

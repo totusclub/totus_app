@@ -5,7 +5,7 @@
 // Звонки сюда не заходят: iOS — PushKit/CallKit (VoipService), Android — CallService.js
 // сам отфильтровывает incoming_call и передаёт нам только «обычные» пуши хаба.
 // Разрешение запрашивается из JS после входа (PushBridge → PushPermissionSheet), а не при запуске.
-import {Linking, NativeModules, Platform} from 'react-native';
+import {AppState, Linking, NativeModules, Platform} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging, {type FirebaseMessagingTypes} from '@react-native-firebase/messaging';
 import notifee, {
@@ -35,8 +35,10 @@ import {navigateRoot, navigationRef} from '../../navigation/navigationRef';
 import {SUPPORT_CHAT_ROUTE} from '../support/supportConstants';
 import {
   ANDROID_CHANNELS,
+  FIREBASE_GCM_SENDER_ID,
   NOTIFICATIONS_ROUTE,
   PUSH_STORAGE_DEVICE_ID,
+  PUSH_STORAGE_GCM_SENDER,
   PUSH_STORAGE_PENDING_PRESS,
   PUSH_STORAGE_TOKEN,
   categoryForType,
@@ -217,16 +219,113 @@ export function getAppVersion(): string {
   return packageJson?.version || '0.0.0';
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * iOS: FCM getToken needs an APNs token (firebase-ios-sdk ≥ 10.4).
+ * After registerDeviceForRemoteMessages, APNs can arrive a few hundred ms later.
+ */
+async function waitForApnsToken(timeoutMs = 12000): Promise<string | null> {
+  if (Platform.OS !== 'ios') return 'ok';
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const apns = await messaging().getAPNSToken();
+      if (apns) {
+        log('APNs token ready');
+        return apns;
+      }
+    } catch (e) {
+      warn('getAPNSToken', e);
+    }
+    await sleep(400);
+  }
+  warn('APNs token not available within timeout');
+  return null;
+}
+
+/**
+ * If GoogleService-Info / google-services.json project changed, drop the stale FCM token
+ * (old sender id tokens are rejected by the new Firebase project).
+ */
+async function invalidateTokenIfFirebaseProjectChanged(): Promise<void> {
+  let previous: string | null = null;
+  try {
+    previous = await AsyncStorage.getItem(PUSH_STORAGE_GCM_SENDER);
+  } catch {
+    previous = null;
+  }
+  if (previous && previous !== FIREBASE_GCM_SENDER_ID) {
+    log('Firebase project changed', previous, '→', FIREBASE_GCM_SENDER_ID, '— refreshing FCM token');
+    try {
+      await messaging().deleteToken();
+    } catch (e) {
+      warn('deleteToken after project change failed', e);
+    }
+    try {
+      await AsyncStorage.removeItem(PUSH_STORAGE_TOKEN);
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    await AsyncStorage.setItem(PUSH_STORAGE_GCM_SENDER, FIREBASE_GCM_SENDER_ID);
+  } catch {
+    /* ignore */
+  }
+}
+
 async function getFcmToken(): Promise<string | null> {
   try {
-    if (Platform.OS === 'ios' && !messaging().isDeviceRegisteredForRemoteMessages) {
-      await messaging().registerDeviceForRemoteMessages();
+    await invalidateTokenIfFirebaseProjectChanged();
+
+    if (Platform.OS === 'ios') {
+      if (!messaging().isDeviceRegisteredForRemoteMessages) {
+        log('registerDeviceForRemoteMessages…');
+        await messaging().registerDeviceForRemoteMessages();
+      }
+      const apns = await waitForApnsToken();
+      if (!apns) {
+        warn('register aborted: no APNs token (check Push capability / aps-environment / physical device)');
+        return null;
+      }
     }
-    const token = await messaging().getToken();
+
+    let token = await messaging().getToken();
+    if (token) return token;
+
+    // One recovery path: delete + re-fetch (helps after plist swap / corrupted cache)
+    warn('empty FCM token — deleteToken + retry');
+    try {
+      await messaging().deleteToken();
+    } catch {
+      /* ignore */
+    }
+    if (Platform.OS === 'ios') {
+      const apns = await waitForApnsToken(8000);
+      if (!apns) return null;
+    }
+    token = await messaging().getToken();
     return token || null;
   } catch (e) {
     warn('getToken failed', e);
-    return null;
+    try {
+      await messaging().deleteToken();
+      if (Platform.OS === 'ios') {
+        if (!messaging().isDeviceRegisteredForRemoteMessages) {
+          await messaging().registerDeviceForRemoteMessages();
+        }
+        const apns = await waitForApnsToken(8000);
+        if (!apns) return null;
+      }
+      const token = await messaging().getToken();
+      return token || null;
+    } catch (e2) {
+      warn('getToken retry failed', e2);
+      return null;
+    }
   }
 }
 
@@ -244,7 +343,10 @@ export function registerPushDevice(): Promise<boolean> {
         return false;
       }
       const token = await getFcmToken();
-      if (!token) return false;
+      if (!token) {
+        warn('register skipped: no FCM token (check APNs / Firebase / google-services)');
+        return false;
+      }
       const deviceId = await getPushDeviceId();
       const response = await apiRegisterPushDevice({
         platform: Platform.OS === 'ios' ? 'ios' : 'android',
@@ -383,8 +485,9 @@ export function notificationItemFromPush(data: PushMessageData | null | undefine
 }
 
 /**
- * Баннер для пуша хаба, пришедшего в foreground (FCM сам его не показывает).
- * support_message при открытом экране чата не показываем.
+ * Local banner while the app is open (FCM does not show a system alert in foreground).
+ * Background / killed: do NOT display locally — OS shows the FCM `notification` payload.
+ * One banner only: firebase.json has no foreground banner/sound; plus short dedupe.
  */
 export async function displayForegroundNotification(
   remoteMessage: FirebaseMessagingTypes.RemoteMessage | {data?: Record<string, unknown>; notification?: {title?: string; body?: string}} | null | undefined,
@@ -396,13 +499,31 @@ export async function displayForegroundNotification(
   const item = notificationItemFromPush(data);
   if (item) store.dispatch(notificationReceived(item));
 
+  // Background / inactive → native FCM tray already (or will) show the push.
+  if (AppState.currentState !== 'active') {
+    log('skip local banner (background/closed — system FCM)', AppState.currentState);
+    return;
+  }
+
   if (data.type === 'support_message' && isSupportChatScreenOpen()) {
+    return;
+  }
+
+  const notificationId =
+    data.notificationId != null && String(data.notificationId) !== ''
+      ? String(data.notificationId)
+      : '';
+  const dedupeKey = notificationId || `${String(data.type || '')}:${title}:${body}`;
+  if (shouldSkipDuplicateBanner(dedupeKey)) {
+    log('skip duplicate local banner', dedupeKey);
     return;
   }
 
   try {
     await ensureAndroidChannels();
     await notifee.displayNotification({
+      // Stable id → same hub notification replaces itself instead of stacking a 2nd banner.
+      ...(notificationId ? {id: `hub-${notificationId}`} : {}),
       title,
       body,
       data: toStringMap(data),
@@ -413,11 +534,32 @@ export async function displayForegroundNotification(
       },
       ios: {
         sound: 'default',
+        foregroundPresentationOptions: {
+          banner: true,
+          list: true,
+          sound: true,
+          badge: true,
+        },
       },
     });
   } catch (e) {
     warn('displayNotification failed', e);
   }
+}
+
+const recentBannerKeys = new Map<string, number>();
+const BANNER_DEDUPE_MS = 4000;
+
+function shouldSkipDuplicateBanner(key: string): boolean {
+  if (!key) return false;
+  const now = Date.now();
+  for (const [k, at] of recentBannerKeys) {
+    if (now - at > BANNER_DEDUPE_MS) recentBannerKeys.delete(k);
+  }
+  const prev = recentBannerKeys.get(key);
+  if (prev && now - prev < BANNER_DEDUPE_MS) return true;
+  recentBannerKeys.set(key, now);
+  return false;
 }
 
 // ---------------------------------------------------------------------------

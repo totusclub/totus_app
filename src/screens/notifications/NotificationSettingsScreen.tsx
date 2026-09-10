@@ -1,6 +1,9 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  AppState,
+  type AppStateStatus,
   Platform,
   ScrollView,
   StyleSheet,
@@ -82,8 +85,13 @@ const NotificationSettingsScreen: React.FC = () => {
     (state: RootState) => state.notifications,
   );
   const [pushBusy, setPushBusy] = useState(false);
+  /** Local switch value while register/unregister is in flight (avoids snap-back). */
+  const [optimisticPush, setOptimisticPush] = useState<boolean | null>(null);
+  const pendingEnableRef = useRef(false);
 
   const isLoggedIn = Boolean(fullAuth && accessToken);
+  const pushEnabled = permission === 'granted' && registered;
+  const displayPush = optimisticPush ?? pushEnabled;
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -99,6 +107,46 @@ const NotificationSettingsScreen: React.FC = () => {
     dispatch(fetchSettings());
     getPushStatus().catch(() => undefined);
   }, [dispatch, isLoggedIn]);
+
+  // Clear optimistic flag once Redux matches what the user wanted.
+  useEffect(() => {
+    if (optimisticPush === null) return;
+    if (optimisticPush === pushEnabled) setOptimisticPush(null);
+  }, [optimisticPush, pushEnabled]);
+
+  // After OS settings: if user was enabling push and now granted — register device.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const onAppState = (next: AppStateStatus) => {
+      if (next !== 'active') return;
+      void (async () => {
+        const status = await getPushStatus().catch(() => null);
+        if (!status) return;
+        if (pendingEnableRef.current && status.permission === 'granted') {
+          pendingEnableRef.current = false;
+          setPushBusy(true);
+          setOptimisticPush(true);
+          try {
+            const ok = await registerPushDevice();
+            await getPushStatus();
+            if (!ok) {
+              setOptimisticPush(false);
+              Alert.alert(
+                'Не удалось включить Push',
+                'Разрешение есть, но устройство не зарегистрировалось. Проверьте интернет и попробуйте снова.',
+              );
+            }
+          } finally {
+            setPushBusy(false);
+          }
+        }
+      })();
+    };
+
+    const sub = AppState.addEventListener('change', onAppState);
+    return () => sub.remove();
+  }, [isLoggedIn]);
 
   const email: string = React.useMemo(() => {
     const fromState = (user as {email?: string} | null)?.email;
@@ -134,19 +182,56 @@ const NotificationSettingsScreen: React.FC = () => {
 
   const enablePush = useCallback(async () => {
     setPushBusy(true);
+    setOptimisticPush(true);
     try {
-      if (permission === 'denied') {
-        await openSystemNotificationSettings();
-      } else if (permission === 'granted') {
-        await registerPushDevice();
-      } else {
-        await requestPushPermission();
+      // Always re-read OS permission (stale Redux value broke re-enable after OFF).
+      const status = await getPushStatus();
+
+      if (status.permission === 'denied') {
+        pendingEnableRef.current = true;
+        setOptimisticPush(null);
+        Alert.alert(
+          'Разрешите уведомления',
+          'В системных настройках включите уведомления для Totus, затем вернитесь в приложение — Push включится автоматически.',
+          [
+            {text: 'Отмена', style: 'cancel', onPress: () => { pendingEnableRef.current = false; }},
+            {text: 'Открыть настройки', onPress: () => { void openSystemNotificationSettings(); }},
+          ],
+        );
+        return;
       }
+
+      if (status.permission !== 'granted') {
+        const next = await requestPushPermission();
+        await getPushStatus();
+        if (next !== 'granted') {
+          setOptimisticPush(false);
+          pendingEnableRef.current = true;
+          Alert.alert(
+            'Push не включён',
+            'Нужно разрешение на уведомления. Можно включить в системных настройках.',
+            [
+              {text: 'Отмена', style: 'cancel', onPress: () => { pendingEnableRef.current = false; }},
+              {text: 'Настройки', onPress: () => { void openSystemNotificationSettings(); }},
+            ],
+          );
+        }
+        return;
+      }
+
+      const ok = await registerPushDevice();
       await getPushStatus();
+      if (!ok) {
+        setOptimisticPush(false);
+        Alert.alert(
+          'Не удалось включить Push',
+          'Проверьте интернет и попробуйте снова.',
+        );
+      }
     } finally {
       setPushBusy(false);
     }
-  }, [permission]);
+  }, []);
 
   const handleDevicePush = useCallback(
     async (value: boolean) => {
@@ -154,7 +239,9 @@ const NotificationSettingsScreen: React.FC = () => {
         await enablePush();
         return;
       }
+      pendingEnableRef.current = false;
       setPushBusy(true);
+      setOptimisticPush(false);
       try {
         await unregisterPushDevice();
         await getPushStatus();
@@ -170,7 +257,6 @@ const NotificationSettingsScreen: React.FC = () => {
   }
 
   const prefs = {...DEFAULT_PREFS, ...(settings?.prefs || {})};
-  const pushEnabled = permission === 'granted' && registered;
   const deviceName = getDeviceName();
 
   return (
@@ -197,28 +283,28 @@ const NotificationSettingsScreen: React.FC = () => {
           {/* Статус разрешения */}
           <TouchableOpacity
             style={[styles.card, styles.statusCard, {backgroundColor: theme.cardBackground, borderColor: theme.borderLight}]}
-            onPress={pushEnabled ? openSystemNotificationSettings : enablePush}
+            onPress={displayPush ? openSystemNotificationSettings : enablePush}
             disabled={pushBusy}
             activeOpacity={0.7}
             accessibilityRole="button">
             <CategoryIcon
-              kind={pushEnabled ? 'check' : 'bellOff'}
-              color={pushEnabled ? theme.success : theme.warning}
+              kind={displayPush ? 'check' : 'bellOff'}
+              color={displayPush ? theme.success : theme.warning}
               size={44}
             />
             <View style={styles.rowText}>
               <AppText style={[styles.rowTitle, {color: theme.text}]}>
-                {pushEnabled ? PUSH_TEXTS.pushOnTitle : PUSH_TEXTS.pushOffTitle}
+                {displayPush ? PUSH_TEXTS.pushOnTitle : PUSH_TEXTS.pushOffTitle}
               </AppText>
               <AppText style={[styles.rowSubtitle, {color: theme.textTertiary}]}>
-                {pushEnabled
+                {displayPush
                   ? `${deviceName} · ${PUSH_TEXTS.pushOnSubtitle}`
                   : permission === 'denied'
                     ? 'Разрешите уведомления в системных настройках'
                     : 'Сообщим об оплате, документах и вылете'}
               </AppText>
             </View>
-            {pushEnabled ? (
+            {displayPush ? (
               <AppIcon name="arrowRight" size={14} color={theme.textTertiary} />
             ) : (
               <View style={[styles.enableButton, {backgroundColor: theme.brand}]}>
@@ -263,7 +349,7 @@ const NotificationSettingsScreen: React.FC = () => {
             <SwitchRow
               title={PUSH_TEXTS.channelPushTitle}
               subtitle={deviceName}
-              value={pushEnabled}
+              value={displayPush}
               disabled={pushBusy}
               onChange={value => void handleDevicePush(value)}
             />

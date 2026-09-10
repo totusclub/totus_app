@@ -5,6 +5,7 @@ import ReactAppDependencyProvider
 import PushKit
 import UserNotifications
 import FirebaseCore
+import FirebaseMessaging
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
@@ -70,7 +71,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
     }
 
     // Notification permission is requested from JS after login (src/modules/push/pushService.ts,
-    // notifee.requestPermission) — not at launch. RNFB Messaging registers the APNs token itself.
+    // notifee.requestPermission) — not at launch. RNFB Messaging also swizzles APNs callbacks;
+    // we still set Messaging.apnsToken explicitly below for reliability after GoogleService-Info swaps.
 
     // Note: react-native-voip-push-notification library sets up its own PKPushRegistry
     // and will handle VoIP token registration. The library's native module will
@@ -79,9 +81,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
 
     return true
   }
+
+  // MARK: - APNs (FCM)
+
+  func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    // .unknown lets Firebase pick sandbox (Debug) vs production (TestFlight/App Store).
+    Messaging.messaging().setAPNSToken(deviceToken, type: .unknown)
+    let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
+    let preview = hex.count > 16 ? String(hex.prefix(16)) + "…" : hex
+    print("📱 APNs device token set on Firebase Messaging (\(preview))")
+  }
+
+  func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    print("❌ APNs registration failed: \(error.localizedDescription)")
+  }
   
-  // MARK: - PKPushRegistryDelegate
-  
+  // MARK: - PKPushRegistryDelegate  
   // This method is called when the VoIP push token is updated
   // Forward to the library's native module via Objective-C helper
   func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {

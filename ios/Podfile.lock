@@ -2004,6 +2004,11 @@ PODS:
     - Yoga
   - RNFS (2.20.0):
     - React-Core
+  - RNNotifee (9.1.8):
+    - React-Core
+    - RNNotifee/NotifeeCore (= 9.1.8)
+  - RNNotifee/NotifeeCore (9.1.8):
+    - React-Core
   - RNScreens (4.18.0):
     - DoubleConversion
     - glog
@@ -2136,6 +2141,7 @@ DEPENDENCIES:
   - "RNFBCrashlytics (from `../node_modules/@react-native-firebase/crashlytics`)"
   - "RNFBMessaging (from `../node_modules/@react-native-firebase/messaging`)"
   - RNFS (from `../node_modules/react-native-fs`)
+  - "RNNotifee (from `../node_modules/@notifee/react-native`)"
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSoundPlayer (from `../node_modules/react-native-sound-player`)
   - RNSVG (from `../node_modules/react-native-svg`)
@@ -2342,6 +2348,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-firebase/messaging"
   RNFS:
     :path: "../node_modules/react-native-fs"
+  RNNotifee:
+    :path: "../node_modules/@notifee/react-native"
   RNScreens:
     :path: "../node_modules/react-native-screens"
   RNSoundPlayer:
@@ -2460,6 +2468,7 @@ SPEC CHECKSUMS:
   RNFBCrashlytics: 139644f84321c24058bc3626a84e0fc464860d6c
   RNFBMessaging: 440e2b41861408d8bee58862b6bfd103214127c6
   RNFS: 89de7d7f4c0f6bafa05343c578f61118c8282ed8
+  RNNotifee: 5e3b271e8ea7456a36eec994085543c9adca9168
   RNScreens: 1ab3bef959f7cd731ad5a1d6a66ea580a05d62a2
   RNSoundPlayer: 7961678d02c7339d9e9cfb78b9f3e8fde17f9df2
   RNSVG: c61e38e1c0c90ed982418ed696ec272b706995bb

@@ -10,6 +10,14 @@ export const NOTIFICATION_SETTINGS_ROUTE = 'notificationSettings';
 export const PUSH_STORAGE_DEVICE_ID = 'push:deviceId';
 export const PUSH_STORAGE_TOKEN = 'push:token';
 export const PUSH_STORAGE_PENDING_PRESS = 'push:pendingPress';
+/** Last known Firebase GCM sender — if GoogleService-Info changes, FCM token must be refreshed. */
+export const PUSH_STORAGE_GCM_SENDER = 'push:gcmSenderId';
+
+/**
+ * Must match `GCM_SENDER_ID` in ios/totusClubApp/GoogleService-Info.plist
+ * (and android/app/google-services.json project_number).
+ */
+export const FIREBASE_GCM_SENDER_ID = '222263759005';
 
 /** Android-каналы notifee (создаёт приложение при старте). */
 export type AndroidChannelId = 'orders' | 'reminders' | 'support_chat' | 'promo' | 'system';

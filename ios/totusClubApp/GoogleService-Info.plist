@@ -3,28 +3,28 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>ATestTestTestTestTestTestTestTestTest00</string>
+	<string>AIzaSyDARIExuiUajpQjcjk2kC7pSHv67yRmKKM</string>
 	<key>GCM_SENDER_ID</key>
-	<string>632950151350</string>
+	<string>222263759005</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>app.totus.club</string>
 	<key>PROJECT_ID</key>
-	<string>test-1aaaa</string>
+	<string>totusapp-2ab2b</string>
 	<key>STORAGE_BUCKET</key>
-	<string>test-1aaaa.appspot.com</string>
+	<string>totusapp-2ab2b.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
-	<false/>
+	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
-	<false/>
+	<false></false>
 	<key>IS_APPINVITE_ENABLED</key>
-	<false/>
+	<true></true>
 	<key>IS_GCM_ENABLED</key>
-	<true/>
+	<true></true>
 	<key>IS_SIGNIN_ENABLED</key>
-	<false/>
+	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:632950151350:ios:d5b0d08d4f00f4b1</string>
+	<string>1:222263759005:ios:925e1cc7b4fddffc5cc474</string>
 </dict>
 </plist>
