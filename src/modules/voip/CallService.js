@@ -9,6 +9,10 @@ import {
   rejectCall as voipRejectCall,
   queuePendingAnswerFromBackground,
 } from './VoipService';
+import {
+  displayForegroundNotification,
+  isSupportChatScreenOpen,
+} from '../push/pushService';
 
 let androidMessagingHandlersRegistered = false;
 let androidVoipInitialized = false;
@@ -20,6 +24,12 @@ const SUPPORT_PUSH_EVENT = 'support:push';
 
 function isSupportMessage(data) {
   return Boolean(data) && data.type === 'support_message';
+}
+
+// Любой пуш хаба уведомлений (data.type задан, не звонок): в foreground показываем
+// баннер через notifee (pushService), в фоне ничего не делаем — `notification` рисует система.
+function isHubNotificationMessage(data) {
+  return Boolean(data) && Boolean(data.type) && !isIncomingCallMessage(data);
 }
 
 function isIncomingCallMessage(data) {
@@ -82,7 +92,7 @@ export function registerAndroidCallBackgroundHandlers() {
 
   messaging().setBackgroundMessageHandler(async remoteMessage => {
     const data = remoteMessage?.data;
-    if (isSupportMessage(data)) {
+    if (isSupportMessage(data) || isHubNotificationMessage(data)) {
       return;
     }
     if (isIncomingCallMessage(data)) {
@@ -94,6 +104,13 @@ export function registerAndroidCallBackgroundHandlers() {
     const data = remoteMessage?.data;
     if (isSupportMessage(data)) {
       DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
+      if (!isSupportChatScreenOpen()) {
+        await displayForegroundNotification(remoteMessage);
+      }
+      return;
+    }
+    if (isHubNotificationMessage(data)) {
+      await displayForegroundNotification(remoteMessage);
       return;
     }
     if (isIncomingCallMessage(data)) {

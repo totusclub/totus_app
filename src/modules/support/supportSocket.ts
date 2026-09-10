@@ -1,7 +1,8 @@
 // Отдельный Socket.io-сокет для чата с поддержкой (тот же namespace voip.totus.club,
 // что и звонки). Сокет VoipService приватный и в 190 КБ-файл мы не заходим, поэтому
 // чат держит собственное соединение. По токену сервер кладёт сокет в комнату u:<userId>
-// и шлёт support:message / support:read / support:typing / support:chat-updated.
+// и шлёт support:message / support:read / support:typing / support:chat-updated,
+// а также notify:new / notify:badge хаба уведомлений (pushSocket.ts).
 // registerDevice по этому сокету НЕ отправляется — звонки идут через VoipService.
 //
 // Политика подключения (SupportSocketBridge + useSupportChat):
@@ -47,6 +48,9 @@ function createSocket(): Socket {
   forward('support:read');
   forward('support:typing');
   forward('support:chat-updated');
+  // Хаб уведомлений (тот же сокет, комната u:<userId>) — см. src/modules/push/pushSocket.ts.
+  forward('notify:new');
+  forward('notify:badge');
 
   return s;
 }
