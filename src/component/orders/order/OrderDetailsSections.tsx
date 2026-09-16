@@ -20,6 +20,8 @@ type OrderDetailsSectionsProps = {
   destination: string;
   order: Order | null;
   apiDocuments?: OrderDocumentApiItem[];
+  /** Туроператор внутреннего бронирования (`totus_booking.operator`, напр. «Arlekino»); по умолчанию Level.Travel. */
+  operatorName?: string | null;
 };
 
 const OrderDetailsSections: React.FC<OrderDetailsSectionsProps> = ({
@@ -28,6 +30,7 @@ const OrderDetailsSections: React.FC<OrderDetailsSectionsProps> = ({
   destination,
   order,
   apiDocuments = [],
+  operatorName,
 }) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -85,7 +88,7 @@ const OrderDetailsSections: React.FC<OrderDetailsSectionsProps> = ({
             <View style={[styles.divider, { backgroundColor: theme.divider }]} />
             <InfoRow
               label="Туроператор"
-              value="Level.Travel"
+              value={operatorName || 'Level.Travel'}
             />
           </View>
         </View>

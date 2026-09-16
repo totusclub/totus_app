@@ -9,7 +9,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton, AppHeader, AppText } from '../UI';
-import { checkPay, createPay } from '../../modules/api/levelTravelApi';
+import { checkPay, createPay, getOrder } from '../../modules/api/levelTravelApi';
 import { useTheme } from '../../hooks/useTheme';
 import {
   getPayErrorMessage,
@@ -20,6 +20,12 @@ import {
   storeSbpQrcId,
 } from '../../utils/sbpPayment';
 import { TabletCentered } from '../UI/tablet';
+import TotusBookingSuccess from './TotusBookingSuccess';
+import {
+  getTotusBooking,
+  isTotusInternalOrderId,
+  type TotusBooking,
+} from '../../utils/totusBooking';
 
 type PendingPaymentParams = {
   order_id: number | string;
@@ -46,6 +52,13 @@ export const PendingPayment: React.FC = () => {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const qrcIdRef = useRef<string | null>(route.params?.qrcId || null);
   const paidRef = useRef(false);
+  // Внутренний заказ (наш номер, оператор Arlekino): после оплаты — экран «Бронирование отправлено
+  // на подтверждение» вместо авто-перехода к списку заказов. Признак — `totus_booking` в ответе
+  // /check_pay либо номер заказа ≥ 900000000 (детали тогда подгружаем из /orders).
+  const [totusBooking, setTotusBooking] = useState<TotusBooking | null>(null);
+  const [isInternalOrder, setIsInternalOrder] = useState<boolean>(
+    isTotusInternalOrderId(route.params?.order_id),
+  );
 
   const expireAtRef = useRef(
     route.params?.expireAt ||
@@ -73,6 +86,11 @@ export const PendingPayment: React.FC = () => {
       });
       if (isSbpPaymentPaid(result)) {
         paidRef.current = true;
+        const booking = getTotusBooking(result);
+        if (booking) {
+          setTotusBooking(booking);
+          setIsInternalOrder(true);
+        }
         setStatus('paid');
         return true;
       }
@@ -119,12 +137,28 @@ export const PendingPayment: React.FC = () => {
   }, [status, confirmPayment]);
 
   useEffect(() => {
-    if (status !== 'paid') return;
+    if (status !== 'paid' || isInternalOrder) return;
     const t = setTimeout(() => {
       navigation.navigate('OrdersStackScreen' as any, { screen: 'orders' });
     }, 1200);
     return () => clearTimeout(t);
-  }, [status, navigation]);
+  }, [status, navigation, isInternalOrder]);
+
+  // Внутренний заказ без `totus_booking` в /check_pay → подтягиваем детали из /orders (для подзаголовка).
+  useEffect(() => {
+    if (status !== 'paid' || !isInternalOrder || totusBooking || !orderId) return;
+    let cancelled = false;
+    getOrder(Number(orderId))
+      .then((order) => {
+        if (cancelled) return;
+        const booking = getTotusBooking(order);
+        if (booking) setTotusBooking(booking);
+      })
+      .catch((e) => console.warn('[PendingPayment] getOrder after pay failed', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [status, isInternalOrder, totusBooking, orderId]);
 
   const openPayUrl = useCallback(async (url: string) => {
     try {
@@ -241,7 +275,15 @@ export const PendingPayment: React.FC = () => {
           </>
         )}
 
-        {status === 'paid' && (
+        {status === 'paid' && isInternalOrder && (
+          <TotusBookingSuccess
+            orderId={orderId}
+            booking={totusBooking}
+            amount={route.params?.amount ?? null}
+          />
+        )}
+
+        {status === 'paid' && !isInternalOrder && (
           <>
             <AppText style={[styles.title, { color: theme.text }]}>
               Оплата прошла

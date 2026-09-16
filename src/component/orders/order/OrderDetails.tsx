@@ -25,6 +25,13 @@ import { useTheme } from '../../../hooks/useTheme';
 import { getOrder, getOrderDocuments } from '../../../modules/api/levelTravelApi';
 import { RootState } from '../../../modules/store';
 import { TabletCentered } from '../../UI/tablet';
+import {
+  getTotusBooking,
+  getTotusBookingPalette,
+  getTotusBookingShortLabel,
+  getTotusBookingSubtitle,
+} from '../../../utils/totusBooking';
+import TotusBookingDetails from '../totusBooking/TotusBookingDetails';
 
 const OrderDetailsScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -74,6 +81,15 @@ const OrderDetailsScreen: React.FC = () => {
 
   const pkg = useMemo(() => getPackageData(order || undefined), [order]);
 
+  // Внутреннее бронирование (наш номер, оператор Arlekino, без Level.Travel): статус из `totus_booking`.
+  const booking = useMemo(() => getTotusBooking(order), [order]);
+  const bookingPalette = useMemo(
+    () => (booking ? getTotusBookingPalette(booking.status, theme) : null),
+    [booking, theme],
+  );
+  const bookingRefunded =
+    booking?.status === 'rejected' || booking?.status === 'cancelled';
+
   const handlePaySbp = useCallback(() => {
     const id = order?.order_id ?? order?.id;
     if (id != null) {
@@ -85,15 +101,25 @@ const OrderDetailsScreen: React.FC = () => {
   const isCancelled = order ? isOrderCancelled(order, pkg) : false;
   const paymentSectionTitle = showPay
     ? 'К оплате'
-    : isCancelled
-      ? 'Отменено'
-      : 'Оплачено';
+    : bookingRefunded
+      ? 'Возврат'
+      : isCancelled
+        ? 'Отменено'
+        : 'Оплачено';
 
-  const statusColor = order ? getStatusColor(pkg, order) : ORDER_STATUS_COLORS.pending;
+  const statusColor = bookingPalette
+    ? bookingPalette.accent
+    : order
+      ? getStatusColor(pkg, order)
+      : ORDER_STATUS_COLORS.pending;
   const orderId = order?.order_id ?? order?.id ?? '—';
   const price = formatPrice(pkg?.price ?? pkg?.full_price ?? order?.package?.price);
   const tourists = order ? collectTourists(order, pkg) : '';
-  const statusLabel = order ? getStatusLabel(order, pkg) : 'Статус заказа';
+  const statusLabel = booking
+    ? getTotusBookingShortLabel(booking.status)
+    : order
+      ? getStatusLabel(order, pkg)
+      : 'Статус заказа';
 
   const hotelName = pkg?.hotel?.name || '';
   const destination = [pkg?.hotel?.city, pkg?.hotel?.country].filter(Boolean).join(', ');
@@ -136,11 +162,24 @@ const OrderDetailsScreen: React.FC = () => {
           <TabletCentered>
           <View style={[styles.card, { backgroundColor: theme.cardBackground, shadowColor: theme.shadow, borderColor: theme.border }]}>
             <View style={styles.cardHeader}>
-              <AppText style={[styles.cardTitle, { color: theme.text, flex: 1 }]}>Тур № {orderId}</AppText>
-              <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-                <AppText style={styles.statusText}>{statusLabel}</AppText>
+              <AppText style={[styles.cardTitle, { color: theme.text, flex: 1 }]}>
+                {booking ? 'Заказ' : 'Тур'} № {orderId}
+              </AppText>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: bookingPalette ? bookingPalette.bg : statusColor },
+                ]}>
+                <AppText style={[styles.statusText, bookingPalette && { color: bookingPalette.fg }]}>
+                  {statusLabel}
+                </AppText>
               </View>
             </View>
+            {!!booking && (
+              <AppText style={[styles.bookingSubtitle, { color: theme.textTertiary }]}>
+                {getTotusBookingSubtitle(booking)}
+              </AppText>
+            )}
 
             <View style={[styles.detailsPanel, { backgroundColor: theme.backgroundSecondary, borderColor: theme.borderSecondary, borderBottomColor: theme.brand }]}>
               <View style={[styles.section, { borderBottomColor: theme.divider }]}>
@@ -155,17 +194,25 @@ const OrderDetailsScreen: React.FC = () => {
                   {paymentSectionTitle}
                 </AppText>
                 <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>
-                  {hotelName ? `Тур в ${hotelName}` : 'Данные уточняются'}
+                  {hotelName
+                    ? `${booking ? 'Отель' : 'Тур в'} ${hotelName}`
+                    : 'Данные уточняются'}
                   {destination ? `, ${destination}` : ''}
                 </AppText>
-                <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>{price}</AppText>
+                <AppText
+                  style={[
+                    styles.sectionSubtitle,
+                    { color: bookingRefunded && bookingPalette ? bookingPalette.accent : theme.textTertiary },
+                  ]}>
+                  {price}
+                </AppText>
               </View>
 
               <View style={[styles.section, styles.sectionSpacing, { borderBottomColor: theme.divider }]}>
                 <AppText style={[styles.sectionTitle, { color: theme.text }]}>Туристы</AppText>
                 <View style={styles.touristsList}>
-                  {order.package.tourists.map((tourist: any) => (
-                    <View key={tourist.id}>
+                  {(order.package?.tourists ?? []).map((tourist: any, index: number) => (
+                    <View key={tourist.id ?? index}>
                       <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>{tourist.name} {tourist.surname},  {tourist.birthday} , До: {tourist.passport_expires_on}</AppText>
                       <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>паспорт: {tourist.passport || ''}</AppText>
                     </View>
@@ -186,12 +233,15 @@ const OrderDetailsScreen: React.FC = () => {
             )}
           </View>
 
+          {!!booking && <TotusBookingDetails booking={booking} />}
+
           <OrderDetailsSections
             pkg={pkg}
             hotelName={hotelName}
             destination={destination}
             order={order}
             apiDocuments={apiDocuments}
+            operatorName={booking?.operator}
           />
           </TabletCentered>
         </ScrollView>
@@ -258,6 +308,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  bookingSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -4,
+    marginBottom: 12,
+  },
   section: {
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -293,4 +349,3 @@ const styles = StyleSheet.create({
     gap: 4,
   },
 });
-

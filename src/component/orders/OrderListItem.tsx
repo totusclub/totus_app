@@ -18,6 +18,13 @@ import {
 } from '../../utils/ordersUtils';
 import { SbpPayButton } from '../UI';
 import { useTheme } from '../../hooks/useTheme';
+import {
+  getTotusBooking,
+  getTotusBookingPalette,
+  getTotusBookingShortLabel,
+  getTotusBookingShortText,
+} from '../../utils/totusBooking';
+import TotusBookingBanner from './totusBooking/TotusBookingBanner';
 
 type Props = {
   order: Order;
@@ -28,8 +35,21 @@ const OrderListItem: React.FC<Props> = ({ order }) => {
   const navigation = useNavigation<any>();
   const pkg = useMemo(() => getPackageData(order), [order]);
 
-  const statusColor = useMemo(() => getStatusColor(pkg, order), [pkg, order]);
-  const statusLabel = useMemo(() => getStatusLabel(order, pkg), [order, pkg]);
+  // Внутреннее бронирование (наш номер, оператор Arlekino, без Level.Travel): статус из `totus_booking`.
+  const booking = useMemo(() => getTotusBooking(order), [order]);
+  const bookingPalette = useMemo(
+    () => (booking ? getTotusBookingPalette(booking.status, theme) : null),
+    [booking, theme],
+  );
+
+  const statusColor = useMemo(
+    () => (bookingPalette ? bookingPalette.accent : getStatusColor(pkg, order)),
+    [bookingPalette, pkg, order],
+  );
+  const statusLabel = useMemo(
+    () => (booking ? getTotusBookingShortLabel(booking.status) : getStatusLabel(order, pkg)),
+    [booking, order, pkg],
+  );
 
   const location = pkg?.hotel
     ? [pkg.hotel.city, pkg.hotel.country].filter(Boolean).join(', ')
@@ -62,25 +82,41 @@ const OrderListItem: React.FC<Props> = ({ order }) => {
       <TouchableOpacity activeOpacity={0.9} onPress={handleOpenDetails}>
       <View style={styles.cardHeader}>
         <AppText style={[styles.cardTitle, { color: theme.text, flex: 1 }]}>
-          Тур <AppText style={[styles.cardId, { color: theme.textTertiary }]}>№ {order?.order_id ?? order?.id}</AppText>
+          {booking ? 'Заказ' : 'Тур'} <AppText style={[styles.cardId, { color: theme.textTertiary }]}>№ {order?.order_id ?? order?.id}</AppText>
         </AppText>
         <View
           style={[
             styles.statusBadge,
-            { backgroundColor: statusColor },
+            { backgroundColor: bookingPalette ? bookingPalette.bg : statusColor },
           ]}>
-          <AppText style={styles.statusText}>{statusLabel}</AppText>
+          <AppText style={[styles.statusText, bookingPalette && { color: bookingPalette.fg }]}>
+            {statusLabel}
+          </AppText>
         </View>
       </View>
+      {!!booking && (
+        <TotusBookingBanner
+          booking={booking}
+          text={getTotusBookingShortText(booking)}
+          compact
+          style={styles.bookingBanner}
+        />
+      )}
 
       <AppText style={[styles.cardDate, { color: theme.textTertiary }]}>
         От {formatOrderDate((order as any)?.c_date || pkg?.created_at)}
       </AppText>
       <AppText style={[styles.price, { color: theme.text }]}>{formatPrice(pkg?.price ?? pkg?.full_price)}</AppText>
-      {!!getPaymentMethodLabel(order) && (
+      {booking ? (
         <AppText style={[styles.payment, { color: theme.textTertiary }]}>
-          {getPaymentMethodLabel(order)}
+          Туроператор: {booking.operator}
         </AppText>
+      ) : (
+        !!getPaymentMethodLabel(order) && (
+          <AppText style={[styles.payment, { color: theme.textTertiary }]}>
+            {getPaymentMethodLabel(order)}
+          </AppText>
+        )
       )}
 
       <View style={[styles.divider, { backgroundColor: theme.divider }]} />
@@ -153,6 +189,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  bookingBanner: {
+    marginTop: 10,
+  },
   price: {
     fontSize: 14,
     fontWeight: '500',
@@ -211,4 +250,3 @@ const styles = StyleSheet.create({
 });
 
 export default OrderListItem;
-
