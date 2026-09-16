@@ -123,3 +123,4 @@ export const getRoomFeatures = (room: HotelRoom, offers: Offer[]) => {
   }
   return features;
 };
+
