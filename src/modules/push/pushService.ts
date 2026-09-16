@@ -5,7 +5,7 @@
 // Звонки сюда не заходят: iOS — PushKit/CallKit (VoipService), Android — CallService.js
 // сам отфильтровывает incoming_call и передаёт нам только «обычные» пуши хаба.
 // Разрешение запрашивается из JS после входа (PushBridge → PushPermissionSheet), а не при запуске.
-import {AppState, Linking, NativeModules, Platform} from 'react-native';
+import {AppState, DeviceEventEmitter, Linking, NativeModules, Platform} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging, {type FirebaseMessagingTypes} from '@react-native-firebase/messaging';
 import notifee, {
@@ -32,7 +32,7 @@ import {
   type NotificationItem,
 } from '../api/notifications';
 import {navigateRoot, navigationRef} from '../../navigation/navigationRef';
-import {SUPPORT_CHAT_ROUTE} from '../support/supportConstants';
+import {SUPPORT_CHAT_ROUTE, SUPPORT_PUSH_EVENT} from '../support/supportConstants';
 import {
   ANDROID_CHANNELS,
   FIREBASE_GCM_SENDER_ID,
@@ -505,7 +505,9 @@ export async function displayForegroundNotification(
     return;
   }
 
+  // Support: hide only while the chat screen is open (user already sees the message).
   if (data.type === 'support_message' && isSupportChatScreenOpen()) {
+    log('skip local banner (support chat open)');
     return;
   }
 
@@ -544,6 +546,56 @@ export async function displayForegroundNotification(
     });
   } catch (e) {
     warn('displayNotification failed', e);
+  }
+}
+
+/**
+ * Local support banner while the app is open (hub skips FCM when the user socket is live).
+ * Background / killed → system FCM after the socket disconnects.
+ */
+export async function showSupportLocalPush(input: {
+  title?: string | null;
+  body?: string | null;
+  chatId?: number | string | null;
+  messageId?: number | string | null;
+}): Promise<void> {
+  if (AppState.currentState !== 'active') return;
+  if (isSupportChatScreenOpen()) return;
+
+  const title = String(input.title || 'Поддержка Totus');
+  const body = String(input.body || '').trim();
+  if (!body) return;
+
+  const dedupeKey = `support:${input.messageId || input.chatId || ''}:${body}`;
+  if (shouldSkipDuplicateBanner(dedupeKey)) return;
+
+  try {
+    await ensureAndroidChannels();
+    await notifee.displayNotification({
+      ...(input.messageId != null ? {id: `support-${input.messageId}`} : {}),
+      title,
+      body,
+      data: {
+        type: 'support_message',
+        route: 'support_chat',
+        ...(input.chatId != null ? {chatId: String(input.chatId)} : {}),
+      },
+      android: {
+        channelId: 'support_chat',
+        pressAction: {id: 'default'},
+      },
+      ios: {
+        sound: 'default',
+        foregroundPresentationOptions: {
+          banner: true,
+          list: true,
+          sound: true,
+          badge: true,
+        },
+      },
+    });
+  } catch (e) {
+    warn('showSupportLocalPush failed', e);
   }
 }
 
@@ -753,6 +805,9 @@ export function initPushHandlers(): void {
     unsubscribeIosMessage = messaging().onMessage(async remoteMessage => {
       const data = remoteMessage?.data as Record<string, unknown> | undefined;
       if (!isHubMessage(data)) return;
+      if (data?.type === 'support_message') {
+        DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
+      }
       await displayForegroundNotification(remoteMessage);
     });
   }

@@ -199,11 +199,15 @@ export function useSupportChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused, loading, chat?.userUnread, unreadFromStaff]);
 
-  // ---- Сокет ----
+  // ---- Сокет: только пока экран чата в фокусе (уход со экрана → FCM сможет уйти) ----
   useEffect(() => {
+    if (!isFocused) {
+      releaseSupportSocket(HOLDER);
+      return;
+    }
     connectSupportSocket(HOLDER);
     return () => releaseSupportSocket(HOLDER);
-  }, []);
+  }, [isFocused]);
 
   useEffect(() => {
     const offMessage = onSupportEvent(

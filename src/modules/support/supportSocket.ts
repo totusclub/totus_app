@@ -6,8 +6,9 @@
 // registerDevice по этому сокету НЕ отправляется — звонки идут через VoipService.
 //
 // Политика подключения (SupportSocketBridge + useSupportChat):
-//   - экран чата открыт → connect;
-//   - пользователь авторизован и приложение активно (AppState) → connect;
+//   - экран чата в фокусе → connect (holder «screen»);
+//   - пользователь авторизован и приложение активно (AppState) → connect (holder «app»);
+//   - приложение ушло в фон → pause (форс-disconnect), иначе хаб считает сокет живым и не шлёт FCM;
 //   - логаут → disconnectSupportSocket().
 import {io, Socket} from 'socket.io-client';
 import {VOIP_BASE_URL} from '../../config/server';
@@ -18,6 +19,8 @@ export type SupportSocketHandler = (payload: any) => void;
 let socket: Socket | null = null;
 const holders = new Map<string, boolean>();
 const listeners = new Map<string, Set<SupportSocketHandler>>();
+/** true while AppState is background/inactive — block reconnect until resume. */
+let pausedForBackground = false;
 
 function createSocket(): Socket {
   const s = io(VOIP_BASE_URL, {
@@ -74,16 +77,27 @@ function anyHolderActive(): boolean {
   return false;
 }
 
-/**
- * Заявить потребность в соединении от имени `holder` («screen», «app»).
- * Сокет живёт, пока активен хотя бы один держатель.
- */
-export function connectSupportSocket(holder: string = 'app'): void {
-  holders.set(holder, true);
+function ensureSocketConnected(): void {
+  if (pausedForBackground) return;
+  if (!anyHolderActive()) return;
   if (!socket) socket = createSocket();
+  try {
+    socket.io.reconnection(true);
+  } catch {
+    /* ignore */
+  }
   if (!socket.connected && !socket.active) {
     socket.connect();
   }
+}
+
+/**
+ * Заявить потребность в соединении от имени `holder` («screen», «app»).
+ * Сокет живёт, пока активен хотя бы один держатель (и приложение не в фоне).
+ */
+export function connectSupportSocket(holder: string = 'app'): void {
+  holders.set(holder, true);
+  ensureSocketConnected();
 }
 
 /** Снять потребность держателя; при отсутствии активных — отключить сокет. */
@@ -94,9 +108,43 @@ export function releaseSupportSocket(holder: string = 'app'): void {
   }
 }
 
+/**
+ * App went to background / inactive: force-close support socket even if the chat
+ * screen holder is still true (React Navigation keeps screens mounted).
+ * Hub skips FCM while any socket is in u:<userId> — without this, closed-app
+ * support pushes never arrive.
+ */
+export function pauseSupportSocketForBackground(): void {
+  pausedForBackground = true;
+  if (!socket) return;
+  try {
+    socket.io.reconnection(false);
+  } catch {
+    /* ignore */
+  }
+  if (socket.connected || socket.active) {
+    console.log('[support-socket] pause for background (enable FCM push)');
+    socket.disconnect();
+  }
+}
+
+/** App became active again — reconnect if any holder still wants the socket. */
+export function resumeSupportSocketFromForeground(): void {
+  if (!pausedForBackground) {
+    ensureSocketConnected();
+    return;
+  }
+  pausedForBackground = false;
+  console.log('[support-socket] resume from foreground', {
+    holders: [...holders.entries()].filter(([, v]) => v).map(([k]) => k),
+  });
+  ensureSocketConnected();
+}
+
 /** Полное отключение (логаут): сбрасывает всех держателей и закрывает соединение. */
 export function disconnectSupportSocket(): void {
   holders.clear();
+  pausedForBackground = false;
   if (socket) {
     socket.removeAllListeners();
     socket.disconnect();
