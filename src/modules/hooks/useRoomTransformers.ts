@@ -1,5 +1,7 @@
 import { HotelInfo } from '../../component/UI';
 import { HotelRoom, Offer, RoomImage } from '../store/types/hotels';
+import { minOfferPrice } from '../../utils/roomOffers';
+import { isHotelOnlySearch } from '../../utils/bookingFlowUtils';
 
 // Transform room images to HotelInfo images format.
 // Empty when the room has no photos — UI shows Totus radiologo instead.
@@ -32,11 +34,15 @@ export const transformRoomImages = (images?: RoomImage[]): any[] => {
 };
 
 
-// Transform room data to HotelInfo format for HotelCard
+// Transform room data to HotelInfo format for HotelCard.
+// Room Type v3: наши предложения («Arlekino», `lt_extras.totus.custom`) лежат внутри
+// `offers[meal]` того же номера — цена «от» считается по всем предложениям на дату,
+// без дедупликации по названию/оператору.
 export const transformRoomToHotelInfo = (
   room: HotelRoom,
   selectedDate: string | null,
   preferredOffers?: Offer[],
+  searchType?: string | null,
 ): HotelInfo => {
   const images = transformRoomImages(room.room.images);
 
@@ -62,16 +68,17 @@ export const transformRoomToHotelInfo = (
   };
 
   const offers = preferredOffers?.length ? preferredOffers : getOffersForDate();
-  const minPrice = offers.length > 0
-    ? Math.min(...offers.map((o) => o.price))
-    : room.min_price;
+  // Минимум по всем предложениям (Arlekino + Level.Travel); fallback — min_price номера.
+  const minPrice = minOfferPrice(offers) ?? room.min_price;
 
   // Get nights count from first offer
   const nightsCount = offers.length > 0 ? offers[0].nights_count : 7;
 
   // Format price
-  const formattedPrice = `от ${minPrice.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`;
-  const dateRange = `за ${nightsCount} ночей с перелётом`;
+  const formattedPrice = `от ${String(minPrice).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`;
+  // Подпись по search_type текущего поиска: hotel — без перелёта, package — с перелётом.
+  const flightLabel = isHotelOnlySearch(searchType) ? 'без перелёта' : 'с перелётом';
+  const dateRange = `за ${nightsCount} ночей ${flightLabel}`;
 
   return {
     id: room.ID,

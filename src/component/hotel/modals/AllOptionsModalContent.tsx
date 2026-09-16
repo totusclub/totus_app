@@ -28,6 +28,12 @@ import {
   formatOfferDate,
   formatOfferPrice,
 } from '../../../utils/hotelUtils/roomHelpers';
+import {
+  OFFER_GROUP_LABELS,
+  OFFER_GROUP_ORDER,
+  getOfferSource,
+  type OfferSource,
+} from '../../../utils/roomOffers';
 import { createPackage } from '../../../modules/api/levelTravelApi';
 import { extractPackageId } from '../../../utils/hotelUtils/packageHelpers';
 import {
@@ -162,6 +168,27 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
     return sorted;
   }, [filteredRoom, selectedOperator]);
 
+  // Room Type v3: одна карточка номера, внутри две группы предложений —
+  // «Arlekino» (наши, `lt_extras.totus.custom`) и «Level.Travel» (оригинальные).
+  // Фильтры по оператору/дате/ночам уже применены выше к обеим группам;
+  // внутри группы — секции по питанию, предложения отсортированы по цене.
+  // Пустые группы не показываем; ничего не дедуплицируем.
+  const offerGroups = useMemo(
+    () =>
+      OFFER_GROUP_ORDER.map((source: OfferSource) => ({
+        source,
+        label: OFFER_GROUP_LABELS[source],
+        sections: Object.entries(offersByMealType)
+          .map(([mealTypeId, { mealType, offers }]) => ({
+            mealTypeId,
+            mealType,
+            offers: offers.filter((offer) => getOfferSource(offer) === source),
+          }))
+          .filter((section) => section.offers.length > 0),
+      })).filter((group) => group.sections.length > 0),
+    [offersByMealType],
+  );
+
   const formatHiddenOffersLabel = (count: number) => {
     if (count === 1) return 'вариант';
     if (count < 5) return 'варианта';
@@ -253,13 +280,21 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
           styles.scrollContent,
           { paddingBottom: insets.bottom + 24 },
         ]}>
-        {Object.entries(offersByMealType).map(([mealTypeId, { mealType, offers }]) => {
-          const showAll = Boolean(expandedMealTypes[mealTypeId]);
+        {offerGroups.map((group) => (
+        <View key={group.source} style={styles.sourceGroup}>
+          <View style={[styles.sourceGroupHeader, { borderBottomColor: theme.borderLight }]}>
+            <AppText style={[styles.sourceGroupTitle, { color: theme.text }]}>
+              {group.label}
+            </AppText>
+          </View>
+        {group.sections.map(({ mealTypeId, mealType, offers }) => {
+          const expandKey = `${group.source}:${mealTypeId}`;
+          const showAll = Boolean(expandedMealTypes[expandKey]);
           const hiddenCount = Math.max(0, offers.length - 1);
           const visibleOffers = showAll ? offers : offers.slice(0, 1);
 
           return (
-          <View key={mealTypeId} style={styles.mealTypeSection}>
+          <View key={expandKey} style={styles.mealTypeSection}>
             <View style={styles.mealTypeHeader}>
               <AppText style={[styles.mealTypeTitle, { color: theme.text }]}>
                 {roomTypeName[mealTypeId] || mealType.description || mealTypeId}
@@ -337,7 +372,7 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
               {hiddenCount > 0 ? (
                 <TouchableOpacity
                   style={styles.showMoreButton}
-                  onPress={() => toggleMealTypeExpanded(mealTypeId)}
+                  onPress={() => toggleMealTypeExpanded(expandKey)}
                   activeOpacity={0.7}
                 >
                   <AppText style={[styles.showMoreText, { color: theme.brand }]}>
@@ -351,6 +386,8 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
           </View>
           );
         })}
+        </View>
+        ))}
       </ScrollView>
 
       {/* Footer Button */}
@@ -375,6 +412,9 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
               }
               try {
                 setIsProcessing(true);
+                // tour_id — id именно выбранной строки: для наших предложений (`t…`)
+                // totus_API перехватывает package_details и ведёт внутренний booking flow,
+                // для Level.Travel — обычный путь. package_id берём из этого же ответа.
                 const packageDetails = await createPackage({
                   request_id: requestId,
                   tour_id: selectedOffer.id,
@@ -465,6 +505,18 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 24,
+  },
+  sourceGroup: {
+    marginBottom: 8,
+  },
+  sourceGroupHeader: {
+    paddingBottom: 8,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+  },
+  sourceGroupTitle: {
+    fontSize: 18,
+    fontWeight: '600',
   },
   mealTypeSection: {
     marginBottom: 16,
