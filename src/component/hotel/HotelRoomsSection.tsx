@@ -39,6 +39,8 @@ type HotelRoomsSectionProps = {
   /** Exact nights from hotel search — match kedam-WEB fixed-date rooming. */
   searchNights?: number | null;
   aiRoomPick?: AiRoomPick | null;
+  /** Тип текущего поиска (package | hotel) — подпись «с перелётом / без перелёта» у цены номера. */
+  searchType?: string | null;
 };
 
 const HotelRoomsSection: React.FC<HotelRoomsSectionProps> = ({
@@ -53,6 +55,7 @@ const HotelRoomsSection: React.FC<HotelRoomsSectionProps> = ({
   initialSelectedDate,
   searchNights = null,
   aiRoomPick = null,
+  searchType = null,
 }) => {
   const { theme } = useTheme();
   // iPad: room cards in 2 (portrait) / 3 (landscape) columns; phone keeps the plain list.
@@ -183,7 +186,7 @@ const HotelRoomsSection: React.FC<HotelRoomsSectionProps> = ({
                       offers[0] ?? resolveAiSelectedOffer(room, enrichedAiRoomPick, selectedDate)?.offer,
                     )
                   : null;
-                const hotelInfo = transformRoomToHotelInfo(room, selectedDate, offers);
+                const hotelInfo = transformRoomToHotelInfo(room, selectedDate, offers, searchType);
                 const roomFeatures = getRoomFeatures(room, offers);
                 return (
                   <HotelCard
@@ -211,7 +214,7 @@ const HotelRoomsSection: React.FC<HotelRoomsSectionProps> = ({
                   offers[0] ?? resolveAiSelectedOffer(room, enrichedAiRoomPick, selectedDate)?.offer,
                 )
               : null;
-            const hotelInfo = transformRoomToHotelInfo(room, selectedDate, offers);
+            const hotelInfo = transformRoomToHotelInfo(room, selectedDate, offers, searchType);
             const roomFeatures = getRoomFeatures(room, offers);
             return (
               <HotelCard

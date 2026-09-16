@@ -413,6 +413,7 @@ export const Hotel: React.FC = () => {
             initialSelectedDate={searchSnapshot?.startDateISO || null}
             searchNights={searchSnapshot?.nights ?? null}
             aiRoomPick={aiRoomPick}
+            searchType={hotelSearchType}
           />
         </View>
           <HotelDescriptionCard
