@@ -29,7 +29,6 @@ import {
   formatOfferPrice,
 } from '../../../utils/hotelUtils/roomHelpers';
 import {
-  OFFER_GROUP_LABELS,
   OFFER_GROUP_ORDER,
   getOfferSource,
   type OfferSource,
@@ -173,11 +172,11 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
   // Фильтры по оператору/дате/ночам уже применены выше к обеим группам;
   // внутри группы — секции по питанию, предложения отсортированы по цене.
   // Пустые группы не показываем; ничего не дедуплицируем.
+  // Заголовок группы не выводим: оператор и так указан в каждой строке предложения.
   const offerGroups = useMemo(
     () =>
       OFFER_GROUP_ORDER.map((source: OfferSource) => ({
         source,
-        label: OFFER_GROUP_LABELS[source],
         sections: Object.entries(offersByMealType)
           .map(([mealTypeId, { mealType, offers }]) => ({
             mealTypeId,
@@ -282,11 +281,6 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
         ]}>
         {offerGroups.map((group) => (
         <View key={group.source} style={styles.sourceGroup}>
-          <View style={[styles.sourceGroupHeader, { borderBottomColor: theme.borderLight }]}>
-            <AppText style={[styles.sourceGroupTitle, { color: theme.text }]}>
-              {group.label}
-            </AppText>
-          </View>
         {group.sections.map(({ mealTypeId, mealType, offers }) => {
           const expandKey = `${group.source}:${mealTypeId}`;
           const showAll = Boolean(expandedMealTypes[expandKey]);
@@ -509,15 +503,6 @@ const styles = StyleSheet.create({
   sourceGroup: {
     marginBottom: 8,
   },
-  sourceGroupHeader: {
-    paddingBottom: 8,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-  },
-  sourceGroupTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
   mealTypeSection: {
     marginBottom: 16,
   },
@@ -620,4 +605,3 @@ const styles = StyleSheet.create({
 });
 
 export default AllOptionsModalContent;
-
