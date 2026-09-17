@@ -22,6 +22,7 @@ import { loginUser } from '../../modules/store/actions/auth';
 import { ELoginDataType } from '../../types/auth';
 import { AppDispatch } from '../../modules/store';
 import { TabletCentered } from '../../component/UI/tablet';
+import YandexIdButton from '../../component/auth/YandexIdButton';
 
 const LoginScreen = () => {
   const { theme } = useTheme();
@@ -168,6 +169,9 @@ const LoginScreen = () => {
             size="large"
             isProcessing={loading}
           />
+
+          {/* Вход через Яндекс ID — появляется, только если раздел включён на сервере */}
+          <YandexIdButton />
         </View>
         </TabletCentered>
       </ScrollView>
