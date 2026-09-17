@@ -3,7 +3,7 @@
  *
  * Слушает deep link totus://auth/yandex?ticket=… (и ?error=…), меняет одноразовый
  * ticket на наши токены и кладёт их в redux тем же setAuth, что и код из письма.
- * У нового пользователя показывает неблокирующий шаг «Почти готово» (телефон).
+ * У нового пользователя показывает неблокирующий шаг «Почти готово» (телефон, только РФ).
  * Макеты: claude/YANDEX_AUTH_DESIGN_RU.md.
  */
 import React, {useCallback, useEffect, useRef, useState} from 'react';
@@ -21,6 +21,7 @@ import {AppText, AppButton, AppInput} from '../../component/UI';
 import {useTheme} from '../../hooks/useTheme';
 import {setAuth} from '../store/slices/auth';
 import {navigateRoot} from '../../navigation/navigationRef';
+import {formatRuPhoneInput, normalizeRuPhone, RU_PHONE_HINT} from '../../utils/phone';
 import {
   parseYandexDeepLink,
   updateProfilePhone,
@@ -33,7 +34,6 @@ const ERROR_TEXT: Record<string, string> = {
   yandex_email_required:
     'Яндекс не передал адрес почты. Она нужна, чтобы связать вход с вашим аккаунтом Totus Club. Разрешите доступ к почте на странице Яндекса или войдите по email.',
   yandex_access_denied: 'Вы не разрешили доступ на странице Яндекса. Можно попробовать снова или войти по email.',
-  user_blocked: 'Доступ к этому аккаунту ограничен. Напишите в поддержку — мы разберёмся.',
   ticket_invalid: 'Ссылка устарела: на подтверждение даётся две минуты. Начните вход заново.',
 };
 
@@ -115,16 +115,21 @@ const YandexAuthBridge: React.FC = () => {
     });
   };
 
+  const onPhoneChange = (value: string) => {
+    setPhone(formatRuPhoneInput(value));
+    if (phoneError) setPhoneError('');
+  };
+
   const onSavePhone = async () => {
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length < 10) {
-      setPhoneError('Введите номер целиком');
+    const normalized = normalizeRuPhone(phone);
+    if (!normalized) {
+      setPhoneError(RU_PHONE_HINT);
       return;
     }
     setPhoneError('');
     setSaving(true);
     try {
-      const data = await updateProfilePhone(phone);
+      const data = await updateProfilePhone(normalized);
       const token = data?.accessToken || data?.authToken;
       if (token) {
         dispatch(
@@ -139,7 +144,7 @@ const YandexAuthBridge: React.FC = () => {
     } catch (error: any) {
       setPhoneError(
         error?.response?.data?.error === 'phone_invalid'
-          ? 'Проверьте номер'
+          ? error?.response?.data?.message || RU_PHONE_HINT
           : 'Не удалось сохранить номер',
       );
     } finally {
@@ -171,11 +176,15 @@ const YandexAuthBridge: React.FC = () => {
               </AppText>
               <AppInput
                 value={phone}
-                onChange={setPhone}
+                onChange={onPhoneChange}
                 placeholder="+7 999 123-45-67"
                 keyboardType="phone-pad"
+                maxLength={18}
                 focusBorderColor={theme.brand}
               />
+              <AppText style={[styles.hint, {color: theme.textTertiary}]}>
+                Только российские номера: +7 или 8
+              </AppText>
               {phoneError ? (
                 <AppText style={[styles.text, {color: theme.error}]}>{phoneError}</AppText>
               ) : null}
@@ -226,6 +235,11 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 15,
     lineHeight: 21,
+  },
+  hint: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -8,
   },
   skip: {
     alignItems: 'center',
