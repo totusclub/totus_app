@@ -4,6 +4,9 @@
  * Слушает deep link totus://auth/yandex?ticket=… (и ?error=…), меняет одноразовый
  * ticket на наши токены и кладёт их в redux тем же setAuth, что и код из письма.
  * У нового пользователя показывает неблокирующий шаг «Почти готово» (телефон, только РФ).
+ *
+ * Если Яндекс не отдал почту — это не тупик: предлагаем повторить вход с экраном
+ * прав (force_confirm) либо сразу войти по email.
  * Макеты: claude/YANDEX_AUTH_DESIGN_RU.md.
  */
 import React, {useCallback, useEffect, useRef, useState} from 'react';
@@ -26,13 +29,14 @@ import {
   parseYandexDeepLink,
   updateProfilePhone,
   yandexExchange,
+  yandexStartUrl,
 } from '../api/yandexAuth';
 
 type Stage = 'idle' | 'loading' | 'phone' | 'error';
 
 const ERROR_TEXT: Record<string, string> = {
   yandex_email_required:
-    'Яндекс не передал адрес почты. Она нужна, чтобы связать вход с вашим аккаунтом Totus Club. Разрешите доступ к почте на странице Яндекса или войдите по email.',
+    'Яндекс не передал адрес почты. Она нужна, чтобы связать вход с вашим аккаунтом Totus Club. Можно вернуться на страницу Яндекса и разрешить доступ — или войти по email.',
   yandex_access_denied: 'Вы не разрешили доступ на странице Яндекса. Можно попробовать снова или войти по email.',
   ticket_invalid: 'Ссылка устарела: на подтверждение даётся две минуты. Начните вход заново.',
 };
@@ -45,7 +49,7 @@ const YandexAuthBridge: React.FC = () => {
   const handled = useRef<Set<string>>(new Set());
 
   const [stage, setStage] = useState<Stage>('idle');
-  const [errorText, setErrorText] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -57,7 +61,7 @@ const YandexAuthBridge: React.FC = () => {
       if (!parsed) return;
 
       if (parsed.error) {
-        setErrorText(ERROR_TEXT[parsed.error] || DEFAULT_ERROR);
+        setErrorCode(parsed.error);
         setStage('error');
         return;
       }
@@ -70,7 +74,7 @@ const YandexAuthBridge: React.FC = () => {
         const data = await yandexExchange(ticket);
         const token = data.accessToken || data.authToken;
         if (!data?.auth || !token) {
-          setErrorText(ERROR_TEXT.ticket_invalid);
+          setErrorCode('ticket_invalid');
           setStage('error');
           return;
         }
@@ -93,8 +97,7 @@ const YandexAuthBridge: React.FC = () => {
           params: {screen: 'account'},
         });
       } catch (error: any) {
-        const code = error?.response?.data?.error;
-        setErrorText(ERROR_TEXT[code] || DEFAULT_ERROR);
+        setErrorCode(error?.response?.data?.error || 'yandex_failed');
         setStage('error');
       }
     },
@@ -112,6 +115,20 @@ const YandexAuthBridge: React.FC = () => {
     navigateRoot('tab', {
       screen: 'AccountStackScreen',
       params: {screen: 'account'},
+    });
+  };
+
+  /** Повтор входа: с force Яндекс снова покажет экран прав, где можно выдать почту. */
+  const retryYandex = (force: boolean) => {
+    setStage('idle');
+    Linking.openURL(yandexStartUrl({force})).catch(() => undefined);
+  };
+
+  const goEmailLogin = () => {
+    setStage('idle');
+    navigateRoot('tab', {
+      screen: 'AccountStackScreen',
+      params: {screen: 'login'},
     });
   };
 
@@ -153,6 +170,9 @@ const YandexAuthBridge: React.FC = () => {
   };
 
   if (stage === 'idle') return null;
+
+  const needsEmailPermission = errorCode === 'yandex_email_required';
+  const errorText = ERROR_TEXT[errorCode] || DEFAULT_ERROR;
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={() => setStage('idle')}>
@@ -202,9 +222,21 @@ const YandexAuthBridge: React.FC = () => {
 
           {stage === 'error' ? (
             <>
-              <AppText style={[styles.title, {color: theme.text}]}>Не получилось войти</AppText>
+              <AppText style={[styles.title, {color: theme.text}]}>
+                {needsEmailPermission ? 'Нужен доступ к почте' : 'Не получилось войти'}
+              </AppText>
               <AppText style={[styles.text, {color: theme.textTertiary}]}>{errorText}</AppText>
-              <AppButton title="Понятно" onPress={() => setStage('idle')} size="large" />
+              <AppButton
+                title={needsEmailPermission ? 'Разрешить доступ к почте' : 'Попробовать снова'}
+                onPress={() => retryYandex(needsEmailPermission)}
+                size="large"
+              />
+              {needsEmailPermission ? (
+                <AppText style={[styles.hint, {color: theme.textTertiary}]}>
+                  На странице Яндекса отметьте «Адрес электронной почты» и нажмите «Разрешить».
+                </AppText>
+              ) : null}
+              <AppButton title="Войти по email" onPress={goEmailLogin} size="large" type="transparent" />
             </>
           ) : null}
         </View>
