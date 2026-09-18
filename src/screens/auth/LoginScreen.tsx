@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -22,7 +22,13 @@ import { loginUser } from '../../modules/store/actions/auth';
 import { ELoginDataType } from '../../types/auth';
 import { AppDispatch } from '../../modules/store';
 import { TabletCentered } from '../../component/UI/tablet';
+import YandexIdButton from '../../component/auth/YandexIdButton';
 
+/**
+ * Вход по email. Капча появляется ПОСЛЕ нажатия «Войти» и, как только пройдена,
+ * сама отправляет запрос — дальше экран подтверждения кода.
+ * Вход через Яндекс ID капчу не требует.
+ */
 const LoginScreen = () => {
   const { theme } = useTheme();
   const navigation = useNavigation<any>();
@@ -31,13 +37,13 @@ const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [emailValid, setEmailValid] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaVisible, setCaptchaVisible] = useState(false);
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [captchaStatus, setCaptchaStatus] = useState<CaptchaStatus>('loading');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const captchaRequired = Boolean(YANDEX_SMARTCAPTCHA_SITEKEY);
-  /** Keep button tappable when email is valid so reviewers get feedback, not a dead gray control. */
   const buttonDisabled = useMemo(
     () => !emailValid || loading,
     [emailValid, loading],
@@ -54,18 +60,7 @@ const LoginScreen = () => {
     setCaptchaResetKey(k => k + 1);
   };
 
-  const onSubmit = async () => {
-    if (!emailValid || loading) return;
-
-    if (captchaRequired && !captchaToken) {
-      setError(
-        captchaStatus === 'error'
-          ? 'Обновите капчу и попробуйте снова'
-          : 'Пройдите проверку «Я не робот» ниже, затем нажмите «Войти»',
-      );
-      return;
-    }
-
+  const submit = async (token: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -73,8 +68,8 @@ const LoginScreen = () => {
         loginUser({
           type: ELoginDataType.email,
           email: email.trim(),
-          'smart-token': captchaToken,
-          smartToken: captchaToken,
+          'smart-token': token,
+          smartToken: token,
         }),
       );
       if (loginUser.fulfilled.match(result)) {
@@ -106,6 +101,30 @@ const LoginScreen = () => {
       setLoading(false);
     }
   };
+
+  const onSubmit = async () => {
+    if (!emailValid || loading) return;
+
+    // Капча нужна — показываем её; запрос уйдёт сам после прохождения.
+    if (captchaRequired && !captchaToken) {
+      setCaptchaVisible(true);
+      setError(
+        captchaStatus === 'error' && captchaVisible
+          ? 'Обновите капчу и попробуйте снова'
+          : null,
+      );
+      return;
+    }
+
+    await submit(captchaToken);
+  };
+
+  // Капча пройдена после нажатия «Войти» — отправляем без второго нажатия.
+  useEffect(() => {
+    if (!captchaVisible || !captchaToken || loading || !emailValid) return;
+    void submit(captchaToken);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captchaToken, captchaVisible]);
 
   return (
     <KeyboardAvoidingView
@@ -146,14 +165,21 @@ const LoginScreen = () => {
             </AppText>
           </View>
 
-          <YandexSmartCaptcha
-            resetKey={captchaResetKey}
-            onTokenChange={token => {
-              setCaptchaToken(token);
-              if (token) setError(null);
-            }}
-            onStatusChange={setCaptchaStatus}
-          />
+          {captchaVisible ? (
+            <>
+              <AppText style={[styles.infoText, { color: theme.textTertiary }]}>
+                Подтвердите, что вы не робот — и мы отправим код на почту
+              </AppText>
+              <YandexSmartCaptcha
+                resetKey={captchaResetKey}
+                onTokenChange={token => {
+                  setCaptchaToken(token);
+                  if (token) setError(null);
+                }}
+                onStatusChange={setCaptchaStatus}
+              />
+            </>
+          ) : null}
 
           {error ? (
             <AppText style={[styles.errorText, { color: theme.error }]}>
@@ -168,6 +194,9 @@ const LoginScreen = () => {
             size="large"
             isProcessing={loading}
           />
+
+          {/* Вход через Яндекс ID — появляется, только если раздел включён на сервере */}
+          <YandexIdButton />
         </View>
         </TabletCentered>
       </ScrollView>
