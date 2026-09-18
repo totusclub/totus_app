@@ -82,6 +82,33 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
     return true
   }
 
+  // MARK: - Deep links (totus://)
+
+  /// Возврат из браузера после входа через Яндекс ID: totus://auth/yandex?ticket=…
+  /// Без этого проброса React Native не получает событие Linking 'url' —
+  /// приложение просто открывается, а обмен ticket на токены не запускается.
+  func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    print("🔗 openURL: \(url.scheme ?? "-")://\(url.host ?? "")\(url.path)")
+    return RCTLinkingManager.application(app, open: url, options: options)
+  }
+
+  /// Universal Links (на будущее — сейчас не используются, но метод не мешает).
+  func application(
+    _ application: UIApplication,
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+  ) -> Bool {
+    return RCTLinkingManager.application(
+      application,
+      continue: userActivity,
+      restorationHandler: restorationHandler
+    )
+  }
+
   // MARK: - APNs (FCM)
 
   func application(
