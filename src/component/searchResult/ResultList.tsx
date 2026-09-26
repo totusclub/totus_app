@@ -438,6 +438,7 @@ const ResultList: React.FC = () => {
               imageHeight={200}
               showTags={true}
               dateRange={formattedDateRange}
+              equalHeight={isTablet}
               onPress={() => {
                 const hotelData = (item as any).hotel || item;
                 const hotelIdValue = hotelData.id || item.id;
@@ -563,8 +564,10 @@ const styles = StyleSheet.create({
   headerTablet: {
     paddingHorizontal: 8,
   },
+  // stretch: both cards in a row get the height of the taller one
+  // (HotelCard `equalHeight` fills the cell and pins the price to the bottom).
   rowTablet: {
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
   },
   cellTablet: {
     flex: 1,

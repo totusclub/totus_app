@@ -41,6 +41,9 @@ type HotelCardProps = {
     onReviewsPress?: () => void; // Handler for reviews count tap
     showAiBadge?: boolean;
     aiPriceChange?: AiPriceChange | null;
+    // iPad grid: the card fills its grid cell, the title and the tags reserve a fixed
+    // height, and the price is pinned to the bottom — every card in a row lines up.
+    equalHeight?: boolean;
 
 };
 
@@ -60,6 +63,7 @@ const HotelCard: React.FC<HotelCardProps> = ({
     onReviewsPress,
     showAiBadge = false,
     aiPriceChange = null,
+    equalHeight = false,
 }) => {
     const { theme } = useTheme();
     // iPad: the card sits in a grid cell / column, so the module-scope screen width is wrong
@@ -174,7 +178,7 @@ const HotelCard: React.FC<HotelCardProps> = ({
 
     if (onPress) {
         return (
-            <TouchableOpacity activeOpacity={1} onPress={() => onPress ? onPress() : null} style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+            <TouchableOpacity activeOpacity={1} onPress={() => onPress ? onPress() : null} style={[styles.card, { backgroundColor: theme.cardBackground }, equalHeight && styles.cardEqualHeight]}>
                 {(showSlider || isRoomCard) && images.length > 1 ? (
                     <View style={styles.imageSection} onLayout={handleImageSectionLayout}>
                         <FlatList
@@ -353,7 +357,7 @@ const HotelCard: React.FC<HotelCardProps> = ({
                     <View
                         activeOpacity={0.94}
                         onPress={onPress}
-                        style={styles.content}>
+                        style={[styles.content, equalHeight && styles.contentEqualHeight]}>
                         {!isRoomCard && (
                             <View style={styles.ratingRow}>
                                 {Array.from({ length: 5 }).map((_, index) => {
@@ -370,7 +374,11 @@ const HotelCard: React.FC<HotelCardProps> = ({
                             </View>
                         )}
 
-                        <AppText style={[styles.hotelName, { color: theme.text }]}>{hotel.name}</AppText>
+                        <AppText
+                            numberOfLines={equalHeight ? 2 : undefined}
+                            style={[styles.hotelName, { color: theme.text }, equalHeight ? styles.hotelNameEqualHeight : {}]}>
+                            {hotel.name}
+                        </AppText>
 
                         {!isRoomCard && (
                             <View style={styles.reviewRow}>
@@ -389,10 +397,10 @@ const HotelCard: React.FC<HotelCardProps> = ({
                         )}
 
                         {showTags && (
-                            <View style={styles.tagsContainer}>
+                            <View style={[styles.tagsContainer, equalHeight && styles.tagsContainerEqualHeight]}>
                                 {hotel.tags.map((tag, index) => (
                                     <View key={`${hotel.id}-${tag}`} style={[styles.tag, { backgroundColor: theme.backgroundTertiary }]}>
-                                        <AppText style={[styles.tagText, { color: theme.text }]}>{tag}</AppText>
+                                        <AppText style={[styles.tagText, { color: theme.text }, equalHeight ? styles.tagTextEqualHeight : {}]}>{tag}</AppText>
                                     </View>
                                 ))}
                             </View>
@@ -400,7 +408,7 @@ const HotelCard: React.FC<HotelCardProps> = ({
 
                         {/* Show price only for hotel cards in search results, not on hotel detail page */}
                         {!isRoomCard && !showAddress && (
-                            <View style={styles.priceSection}>
+                            <View style={[styles.priceSection, equalHeight && styles.priceSectionBottom]}>
                                 <AppText style={styles.priceText}>{hotel.price}</AppText>
                                 <AppText style={[styles.dateText, { color: theme.textTertiary }]}>
                                     {dateRange || hotel.dateRange}
@@ -974,6 +982,30 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '500',
         marginLeft: 8,
+    },
+
+    // --- equalHeight (iPad grid) ---
+    cardEqualHeight: {
+        flex: 1,
+    },
+    contentEqualHeight: {
+        flex: 1,
+    },
+    // two lines are always reserved (hotelName lineHeight 20 × 2)
+    hotelNameEqualHeight: {
+        minHeight: 40,
+    },
+    // two rows of tags are always reserved: tag = 6 + 16 + 6, rows gap 8
+    tagsContainerEqualHeight: {
+        minHeight: 64,
+        alignContent: 'flex-start',
+    },
+    tagTextEqualHeight: {
+        lineHeight: 16,
+    },
+    // pushes the price to the bottom of the stretched card
+    priceSectionBottom: {
+        marginTop: 'auto',
     },
 });
 
