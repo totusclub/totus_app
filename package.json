@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "start": "react-native start",
     "start:clean": "react-native start --reset-cache",
-    "test": "jest"
+    "test": "jest",
+    "check": "node scripts/check-mic-permission.mjs"
   },
   "dependencies": {
     "@notifee/react-native": "^9.1.8",

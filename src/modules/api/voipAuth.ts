@@ -10,11 +10,18 @@
 // Модуль не импортирует store и axios — чтобы не создавать цикл импортов с VoipService.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {VOIP_BASE_URL} from '../../config/server';
+import {cancelMicPermissionRequest, ensureMicPermissionWhenActive} from '../voip/micPermission';
 
 let currentAccessToken: string | null = null;
 
 export function setVoipAccessToken(token: string | null | undefined): void {
   currentAccessToken = token || null;
+  // Токен появился = пользователь вошёл (App.tsx вызывает при каждом изменении токена).
+  // iOS: спросить доступ к микрофону заранее, пока приложение на экране, — иначе первый
+  // ответ на звонок из CallKit / с экрана блокировки сбрасывается (запрос нельзя показать).
+  // Вызов идемпотентный; при выходе (token = null) ожидающий запрос снимается.
+  if (currentAccessToken) ensureMicPermissionWhenActive();
+  else cancelMicPermissionRequest();
 }
 
 async function readPersistedToken(): Promise<string | null> {
