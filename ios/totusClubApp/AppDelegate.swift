@@ -13,6 +13,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
 
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
+  /// PKPushRegistry must exist from launch and stay alive for the process lifetime.
+  /// When a VoIP push wakes the closed app, iOS delivers it only to a registry created
+  /// in didFinishLaunching. Before, the registry was created later from JS (after the
+  /// bundle and PersistGate loaded) as a local object of the voip-push library — with
+  /// the app closed the push could be lost and the call never rang (totus_support_app
+  /// has done this since PR #1 and rings from the closed state).
+  private var voipRegistry: PKPushRegistry?
 
   func application(
     _ application: UIApplication,
@@ -21,6 +28,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
     if FirebaseApp.app() == nil {
       FirebaseApp.configure()
     }
+
+    // PushKit before React Native starts, so a VoIP push can wake the closed app.
+    let registry = PKPushRegistry(queue: .main)
+    registry.delegate = self
+    registry.desiredPushTypes = [.voIP]
+    voipRegistry = registry
 
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
@@ -74,10 +87,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
     // notifee.requestPermission) — not at launch. RNFB Messaging also swizzles APNs callbacks;
     // we still set Messaging.apnsToken explicitly below for reliability after GoogleService-Info swaps.
 
-    // Note: react-native-voip-push-notification library sets up its own PKPushRegistry
-    // and will handle VoIP token registration. The library's native module will
-    // automatically set AppDelegate as the delegate, so we just need to implement
-    // the PKPushRegistryDelegate methods below.
+    // VoIP token: the registry above (strong reference) delivers it to pushRegistry(_:didUpdate:)
+    // below, which forwards it to the voip-push library -> JS 'register' -> /api/register-device.
+    // JS may still call registerVoipToken(); that is harmless.
 
     return true
   }
