@@ -6,7 +6,7 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { AppIcon, AppText } from '../component/UI';
 import { useSelector } from 'react-redux';
 import { RootState } from '../modules/store';
-import { AccountScreen, HomeScreen, OnboardingScreen, OrdersScreen, OrderDetailsScreen, LoginScreen, SignupScreen, VerificationScreen, BookingScreen, CheckoutScreen, PendingPaymentScreen, FavoritesScreen, PrivacyPolicyScreen, SupportChatScreen, NotificationsScreen, NotificationSettingsScreen } from '../screens';
+import { AccountScreen, HomeScreen, OnboardingScreen, OrdersScreen, OrderDetailsScreen, LoginScreen, SignupScreen, VerificationScreen, BookingScreen, CheckoutScreen, PendingPaymentScreen, FavoritesScreen, LegalDocumentsScreen, LegalDocumentScreen, SupportChatScreen, NotificationsScreen, NotificationSettingsScreen } from '../screens';
 import SearchResultScreen from '../screens/home/SearchResult';
 import HotelScreen from '../screens/home/Hotel';
 import TicketsScreen from '../screens/home/Tickets';
@@ -20,6 +20,11 @@ import TotusAiChatScreen from "../screens/ai/TotusAiChatScreen";
 import { rememberNonAiTab } from '../utils/aiTabReturn';
 import { useLayout } from '../hooks/useLayout';
 import { useAccountTabBadge } from '../modules/push/useAccountTabBadge';
+import {
+  LEGAL_DOCUMENTS_ROUTE,
+  LEGAL_DOCUMENT_ROUTE,
+  PRIVACY_POLICY_ROUTE,
+} from '../screens/legal/legalRoutes';
 
 /**
  * iPad tab bar (Figma «iPad UI» frames): icons above labels, 5 items grouped in
@@ -155,7 +160,14 @@ const AccountStackScreen = () => {
       <Stack.Screen name="verification" component={VerificationScreen} />
       <Stack.Screen name="account" component={AccountScreen} />
       <Stack.Screen name="favorites" component={FavoritesScreen} />
-      <Stack.Screen name="privacyPolicy" component={PrivacyPolicyScreen} />
+      {/* «Документы» ООО «ТОТУСКЛАБ» из CMS; старый маршрут privacyPolicy открывает документ privacy-policy */}
+      <Stack.Screen name={LEGAL_DOCUMENTS_ROUTE} component={LegalDocumentsScreen} />
+      <Stack.Screen name={LEGAL_DOCUMENT_ROUTE} component={LegalDocumentScreen} />
+      <Stack.Screen
+        name={PRIVACY_POLICY_ROUTE}
+        component={LegalDocumentScreen}
+        initialParams={{ slug: 'privacy-policy' }}
+      />
       <Stack.Screen name="supportChat" component={SupportChatScreen} />
       <Stack.Screen name="notifications" component={NotificationsScreen} />
       <Stack.Screen name="notificationSettings" component={NotificationSettingsScreen} />
