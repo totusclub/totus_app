@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">totusClubApp</string>
+    <string name="totus_incoming_connection_hint">Установка соединения...</string>
+    <string name="totus_incoming_title">Входящий звонок</string>
+    <string name="totus_incoming_subtitle">Входящий вызов</string>
+    <string name="totus_incoming_reject">Сбросить</string>
+    <string name="totus_incoming_reject_label">Сбросить</string>
+    <string name="totus_incoming_answer">Ответить</string>
+    <string name="totus_incoming_answer_label">Ответить</string>
+    <string name="totus_incoming_fallback_name">Неизвестный</string>
+    <string name="totus_incoming_connecting">Соединение...</string>
+</resources>
