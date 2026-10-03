@@ -1,8 +1,10 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
-apply plugin: "com.google.gms.google-services"
-apply plugin: "com.google.firebase.crashlytics"
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+    apply plugin: "com.google.firebase.crashlytics"
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -75,6 +77,7 @@ def enableProguardInReleaseBuilds = false
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 configurations.all {
+    exclude group: 'com.android.support'
     resolutionStrategy {
         force 'androidx.core:core:1.13.1'
     }

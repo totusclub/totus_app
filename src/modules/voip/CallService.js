@@ -90,33 +90,41 @@ export function registerAndroidCallBackgroundHandlers() {
     return;
   }
 
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-    const data = remoteMessage?.data;
-    if (isSupportMessage(data) || isHubNotificationMessage(data)) {
-      return;
-    }
-    if (isIncomingCallMessage(data)) {
-      await displayIncomingCall(data);
-    }
-  });
-
-  messaging().onMessage(async remoteMessage => {
-    const data = remoteMessage?.data;
-    if (isSupportMessage(data)) {
-      DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
-      if (!isSupportChatScreenOpen()) {
-        await displayForegroundNotification(remoteMessage);
+  try {
+    messaging().setBackgroundMessageHandler(async remoteMessage => {
+      const data = remoteMessage?.data;
+      if (isSupportMessage(data) || isHubNotificationMessage(data)) {
+        return;
       }
-      return;
-    }
-    if (isHubNotificationMessage(data)) {
-      await displayForegroundNotification(remoteMessage);
-      return;
-    }
-    if (isIncomingCallMessage(data)) {
-      await displayIncomingCall(data);
-    }
-  });
+      if (isIncomingCallMessage(data)) {
+        await displayIncomingCall(data);
+      }
+    });
+
+    messaging().onMessage(async remoteMessage => {
+      const data = remoteMessage?.data;
+      if (isSupportMessage(data)) {
+        DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
+        if (!isSupportChatScreenOpen()) {
+          await displayForegroundNotification(remoteMessage);
+        }
+        return;
+      }
+      if (isHubNotificationMessage(data)) {
+        await displayForegroundNotification(remoteMessage);
+        return;
+      }
+      if (isIncomingCallMessage(data)) {
+        await displayIncomingCall(data);
+      }
+    });
+  } catch (e) {
+    console.warn(
+      '[firebase] Default app is not configured. Add android/app/google-services.json and rebuild.',
+      e?.message || e,
+    );
+    return;
+  }
 
   androidMessagingHandlersRegistered = true;
 }

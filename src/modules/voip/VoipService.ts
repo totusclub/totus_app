@@ -351,7 +351,12 @@ async function runAndroidTelecomRegistrationAudit(): Promise<void> {
       }
     }
 
-    if (typeof callKeepAny?.hasDefaultPhoneAccount === 'function') {
+    const canReadPhoneState = await PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+    );
+    if (!canReadPhoneState) {
+      telecomDebug('hasDefaultPhoneAccount_skipped_missing_phone_permission');
+    } else if (typeof callKeepAny?.hasDefaultPhoneAccount === 'function') {
       const hasDefaultPhoneAccount = await Promise.resolve(callKeepAny.hasDefaultPhoneAccount());
       telecomDebug('hasDefaultPhoneAccount', {hasDefaultPhoneAccount});
       lastTelecomAudit.hasDefaultPhoneAccount = hasDefaultPhoneAccount;
@@ -3118,7 +3123,7 @@ async function attemptReconnection(callUUID: string) {
   }
 }
 
-export function initVoipAndCallKeep(loyaltyId?: string) {
+export async function initVoipAndCallKeep(loyaltyId?: string) {
   if (isVoipInitializing) {
     androidTelemetry('init_skipped_in_progress');
     return;
@@ -3188,6 +3193,9 @@ export function initVoipAndCallKeep(loyaltyId?: string) {
       hasAndroid: !!(callKeepSetupOptions as any)?.android,
       alertTitle: (callKeepSetupOptions as any)?.android?.alertTitle || null,
     });
+    if (Platform.OS === 'android') {
+      await requestAndroidCallPermissions();
+    }
     RNCallKeep.setup(callKeepSetupOptions);
     telecomDebug('setup_called');
     RNCallKeep.setAvailable(true);
@@ -3214,7 +3222,6 @@ export function initVoipAndCallKeep(loyaltyId?: string) {
           },
         );
       }
-      void requestAndroidCallPermissions();
       void ensureAndroidBatteryOptimizationHandled();
       void messaging()
         .getToken()

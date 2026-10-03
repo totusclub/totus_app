@@ -104,7 +104,7 @@ PODS:
   - hermes-engine/Pre-built (0.79.7)
   - JitsiWebRTC (124.0.2)
   - lottie-ios (4.6.0)
-  - lottie-react-native (7.3.8):
+  - lottie-react-native (7.5.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1487,9 +1487,9 @@ PODS:
     - Yoga
   - react-native-netinfo (11.5.2):
     - React-Core
-  - react-native-safe-area-context (5.8.0):
+  - react-native-safe-area-context (5.10.0):
     - React-Core
-  - react-native-slider (5.2.0):
+  - react-native-slider (5.2.1):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1504,7 +1504,7 @@ PODS:
     - React-hermes
     - React-ImageManager
     - React-jsi
-    - react-native-slider/common (= 5.2.0)
+    - react-native-slider/common (= 5.2.1)
     - React-NativeModulesApple
     - React-RCTFabric
     - React-renderercss
@@ -1514,7 +1514,7 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - react-native-slider/common (5.2.0):
+  - react-native-slider/common (5.2.1):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1542,7 +1542,7 @@ PODS:
     - React
   - react-native-voice (3.2.4):
     - React-Core
-  - react-native-webrtc (124.0.7):
+  - react-native-webrtc (124.0.8):
     - JitsiWebRTC (~> 124.0.0)
     - React-Core
   - react-native-webview (13.17.0):
@@ -1891,7 +1891,7 @@ PODS:
     - React-logger (= 0.79.7)
     - React-perflogger (= 0.79.7)
     - React-utils (= 0.79.7)
-  - ReactNativeIncallManager (4.2.1):
+  - ReactNativeIncallManager (4.3.0):
     - React-Core
   - RNCallKeep (4.3.16):
     - React
@@ -2364,10 +2364,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  boost: 6df658815b399483a37436aa1b80c1a501a92258
+  boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
   BVLinearGradient: cb006ba232a1f3e4f341bb62c42d1098c284da70
-  DoubleConversion: 97309e3f48df33a6b04274d8f04eca2cb75a0e75
-  fast_float: 1b69509d14873f8c53de845440f7ab15195dbaba
+  DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
+  fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
   FBLazyVector: b60fe06f0f15b7d7408f169442176e69e8eeacde
   Firebase: 99f203d3a114c6ba591f3b32263a9626e450af65
   FirebaseCore: f4428e22415ea3b3eca652c2098413dabf2a23a9
@@ -2378,18 +2378,18 @@ SPEC CHECKSUMS:
   FirebaseMessaging: ed18fb50634e6e85b5d3e77e628c21e2c928cc53
   FirebaseRemoteConfigInterop: a169873f4093b241eb5e27a4fbad91af36d64b8d
   FirebaseSessions: dba7635960740ad77cc2f3387d90ff22a7942f82
-  fmt: e58163c36f191f41be4a4b2d71d3c6ed8601082b
-  glog: be5c1ae3fc8780c9ece2956daae1e6a2404921e5
+  fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
+  glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleUtilities: 766ace00c6b10d8148408f329d10c4f051931850
-  hermes-engine: 9c3ffe6bc36be0c7731d3e6a92e16d29d583696d
+  hermes-engine: 13c84524b3b6e884b2cf3b3b1e002ffd147d88a3
   JitsiWebRTC: 985d33965f27d80f6c10823875a8519525c3d8a6
   lottie-ios: 8f959969761e9c45d70353667d00af0e5b9cadb3
-  lottie-react-native: 92fca96bfa0c07b0b933947f3b8754c900a3d119
+  lottie-react-native: f99d713986633e9fb2ef298536e939e41ecd6024
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   PromisesSwift: 217dea0fd5d2ad65222a109c48698add13cc1c5b
-  RCT-Folly: b4eaa8fa062dc7c11fbb6c7372068b6e659324ec
+  RCT-Folly: e78785aa9ba2ed998ea4151e314036f6c49e6d82
   RCTDeprecation: b9b1716eec53aaeaa859aa45e27de7b615cff732
   RCTRequired: 862acb469086f601f81aab298e00c2a13d572099
   RCTTypeSafety: 45120b9028ec6819266f3ef7a6b8e8a9f0a083d4
@@ -2422,11 +2422,11 @@ SPEC CHECKSUMS:
   React-microtasksnativemodule: aa6b872c40429aa7b4bce78ec34fe8e89c45481a
   react-native-blur: 0cbcfd9966016730dd711dcb740e99cd86f7f5cb
   react-native-netinfo: 387c95161b1971d0b2acd61f5ecf394c8fd3fb95
-  react-native-safe-area-context: 700f3e707470d3cef056231541c77df29a5f0d9e
-  react-native-slider: f2ce88a349eba011b8980d701f5f5f4535d5c67c
+  react-native-safe-area-context: fc67329a260d7387cb4762f3e43c8c32680f88ab
+  react-native-slider: 06b67551f1371cc8e60533bdcd5c0b59758d9947
   react-native-tracking-transparency: 15eb319f2b982070eb9831582af27d87badfa624
   react-native-voice: 908a0eba96c8c3d643e4f98b7232c6557d0a6f9c
-  react-native-webrtc: e8f0ce746353adc2744a2b933645e1aeb41eaa74
+  react-native-webrtc: da75ba1f85a36981cbcb3fdae7dfbab7ad63c040
   react-native-webview: b055d2efd6ce86f9ed7bdc0c2e948e90d76815bb
   React-NativeModulesApple: 889490414c604f57066540e84e7bd8f672dac9b0
   React-oscompat: 0047f0ce53a328ce225777a6c617970556602c7c
@@ -2459,7 +2459,7 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: b203bace11326361b7f0513b3f5854cd340aa929
   ReactCodegen: 7241880e54e276454ced5735f7d422df215bec6e
   ReactCommon: 7aecadba671f30ab03ce021f3c6445ef8acafa9a
-  ReactNativeIncallManager: dccd3e7499caa3bb73d3acfedf4fb0360f1a87d5
+  ReactNativeIncallManager: 4e46198f76b162ca8bdff48a4553a479b26b6d12
   RNCallKeep: 1930a01d8caf48f018be4f2db0c9f03405c2f977
   RNCAsyncStorage: b44e8a4e798c3e1f56bffccd0f591f674fb9198f
   RNCClipboard: f6679d470d0da2bce2a37b0af7b9e0bf369ecda5
@@ -2477,6 +2477,6 @@ SPEC CHECKSUMS:
   TextToSpeech: 89b239221ec378d213af422d14789a729705360b
   Yoga: fce72270ebed754904bbe5e18bb05cda3c3075db
 
-PODFILE CHECKSUM: 36f02484d812993ff9120cd3c3eeffae8740d141
+PODFILE CHECKSUM: ae07689c1a415ba204841304c54ce50ec3ccad14
 
 COCOAPODS: 1.16.2
