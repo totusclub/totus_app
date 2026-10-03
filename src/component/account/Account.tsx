@@ -44,6 +44,8 @@ import { disconnectSupportSocket } from '../../modules/support/supportSocket';
 import { NOTIFICATIONS_ROUTE, PUSH_TEXTS } from '../../modules/push/pushConstants';
 import { unregisterPushDevice } from '../../modules/push/pushService';
 import { NotificationGlyph } from '../../component/notifications/CategoryIcon';
+// «Документы» ООО «ТОТУСКЛАБ» (тексты из CMS): src/screens/legal
+import { LEGAL_DOCUMENTS_ROUTE } from '../../screens/legal/legalRoutes';
 
 type DecodedToken = {
   id?: string;
@@ -501,8 +503,8 @@ const AccountScreen = () => {
     }
   };
 
-  const handlePrivacyPolicy = () => {
-    navigation.navigate('privacyPolicy');
+  const handleDocuments = () => {
+    navigation.navigate(LEGAL_DOCUMENTS_ROUTE);
   };
 
   const userName = user ? `${user.name || ''} ${user.l_name || ''}`.trim() : 'Пользователь';
@@ -655,7 +657,7 @@ const AccountScreen = () => {
             ]}>
             <TouchableOpacity
               style={styles.settingsRow}
-              onPress={handlePrivacyPolicy}
+              onPress={handleDocuments}
               activeOpacity={0.65}>
               <View
                 style={[
@@ -666,10 +668,10 @@ const AccountScreen = () => {
               </View>
               <View style={styles.settingsTextCol}>
                 <AppText style={[styles.settingsTitle, { color: theme.text }]}>
-                  Политика конфиденциальности
+                  Документы
                 </AppText>
                 <AppText style={[styles.settingsSubtitle, { color: theme.textTertiary }]}>
-                  Как мы защищаем ваши данные
+                  Соглашение, политика данных, реквизиты
                 </AppText>
               </View>
               <AppIcon name="arrowRight" size={14} color={theme.textTertiary} />
