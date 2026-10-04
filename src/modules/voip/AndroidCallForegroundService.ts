@@ -1,12 +1,16 @@
-/** Android-only no-ops on iOS. */
+/** Android: microphone foreground service for a call in progress. No-ops on iOS. */
+import {startAndroidOngoingCall, stopAndroidOngoingCall} from './androidCallUi';
 
 export async function startAndroidCallForegroundService(
-  _callUUID?: string,
-  _title?: string,
+  callUUID?: string,
+  title?: string,
 ): Promise<void> {
-  // no-op on iOS
+  if (!callUUID) {
+    return;
+  }
+  await startAndroidOngoingCall(callUUID, title || '');
 }
 
 export async function stopAndroidCallForegroundService(): Promise<void> {
-  // no-op on iOS
+  stopAndroidOngoingCall();
 }

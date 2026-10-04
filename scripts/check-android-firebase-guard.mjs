@@ -53,9 +53,15 @@ await check('every getAndroidMessaging() use is in an Android-only branch', () =
   for (const m of code.matchAll(/getAndroidMessaging\(\)(?!:)/g)) {
     uses++;
     const before = code.slice(Math.max(0, m.index - 4000), m.index);
-    assert.ok(/Platform\.OS === 'android'/.test(before), `use #${uses} not under an Android check`);
+    // notifyServerAndroid() itself is called only from Android branches (checked below)
+    const inAndroidHelper = /function notifyServerAndroid\(/.test(before.slice(-1500));
+    assert.ok(inAndroidHelper || /Platform\.OS === 'android'/.test(before), `use #${uses} not under an Android check`);
   }
-  assert.equal(uses, 2, `uses: ${uses}`);
+  assert.equal(uses, 3, `uses: ${uses}`);
+  for (const m of code.matchAll(/notifyServerAndroid\((?!callId: string)/g)) {
+    const before = code.slice(Math.max(0, m.index - 300), m.index);
+    assert.ok(/Platform\.OS === 'android'/.test(before), 'notifyServerAndroid() outside an Android branch');
+  }
 });
 await check('MainActivity drops saved state (react-native-screens) ', () => {
   const ma = fs.readFileSync(path.join(root, 'android/app/src/main/java/com/totus/com/MainActivity.kt'), 'utf8');
@@ -183,14 +189,11 @@ if (!process.env.VOIP_CHECK_VERBOSE) {
 }
 
 out('VoipService.ts (Android, mocked native modules)');
-await check('no google-services.json: init does not stop halfway (CallKeep listeners, event recovery, resume)', async () => {
+await check('no google-services.json: init does not stop halfway (resume handler registered)', async () => {
   const {V, M} = await fresh({firebase: false});
   await V.initVoipAndCallKeep('client-1');
   await sleep(50);
   assert.ok(M.messagingCalls >= 1, 'Firebase was tried');
-  assert.ok((M.listeners.answerCall || []).length >= 1, 'answerCall listener registered');
-  assert.ok((M.listeners.endCall || []).length >= 1, 'endCall listener registered');
-  assert.ok(M.initialEventsReads >= 1, 'CallKeep initial events recovered');
   assert.ok(M.appStateListeners.length >= 1, 'resume handler registered');
 });
 await check('no google-services.json: sign-in (setUserLoyaltyId) does not throw', async () => {
@@ -206,20 +209,14 @@ await check('with Firebase: FCM token is requested and the device is registered 
   await sleep(50);
   assert.ok(M.tokenRequests >= 1, 'getToken called');
   assert.ok(M.fetches.some(f => /register/i.test(f.url) && f.body.includes('fcm-token-1')), `register fetch: ${JSON.stringify(M.fetches.map(f => f.url))}`);
-  assert.ok((M.listeners.answerCall || []).length >= 1);
 });
-await check('Samsung, READ_PHONE_STATE denied: calling-account settings do not call hasDefaultPhoneAccount', async () => {
+await check('Samsung: CallKeep native is never called on Android (no getDefaultOutgoingPhoneAccount crash)', async () => {
   const {V, M} = await fresh({granted: ['RECORD_AUDIO']});
+  await V.initVoipAndCallKeep('client-4');
   assert.doesNotThrow(() => V.openAndroidCallingAccountSettings());
   await sleep(20);
   assert.equal(M.defaultAccountCalls, 0);
-  assert.equal(M.openedAccounts, 1, 'settings screen still opens');
-});
-await check('READ_PHONE_STATE granted: hasDefaultPhoneAccount is still checked', async () => {
-  const {V, M} = await fresh({granted: ['RECORD_AUDIO', 'READ_PHONE_STATE']});
-  V.openAndroidCallingAccountSettings();
-  await sleep(20);
-  assert.equal(M.defaultAccountCalls, 1);
+  assert.equal(M.openedAccounts, 0, 'no system phone-account screen');
 });
 await check('no unhandled promise rejections', async () => {
   await sleep(50);
