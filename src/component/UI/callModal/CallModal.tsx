@@ -10,6 +10,7 @@ import {
     StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     getCallState,
     getActiveCallInfo,
@@ -41,6 +42,10 @@ type CallModalProps = {
 export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimize }) => {
     const { theme, isDark } = useTheme();
     const { isTablet } = useLayout();
+    const insets = useSafeAreaInsets();
+    // Android (approved mockup 04.10.2026): status-bar insets (edge-to-edge on Android 15+),
+    // one status line, Russian labels, Back minimizes the call. iOS unchanged.
+    const isAndroid = Platform.OS === 'android';
     const [callState, setCallState] = useState(getCallState());
     const [callInfo, setCallInfo] = useState(getActiveCallInfo());
     const [connectionStatus, setConnectionStatus] = useState(getConnectionStatus());
@@ -326,12 +331,14 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
         <Modal
             visible={visible}
             animationType="fade"
-            onRequestClose={onClose}
+            onRequestClose={isAndroid ? (onMinimize || onClose) : onClose}
             presentationStyle="fullScreen"
+            statusBarTranslucent={isAndroid}
+            navigationBarTranslucent={isAndroid}
             transparent={true}>
     
-            <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
-                <View style={[styles.cardHeader, isTablet && styles.cardHeaderTablet, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
+            <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }, isAndroid && { paddingBottom: insets.bottom }]}>
+                <View style={[styles.cardHeader, isTablet && styles.cardHeaderTablet, isAndroid && { paddingTop: insets.top + 12 }, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
                     {/* Internet Status - Left side of header */}
                     <View style={styles.headerInternetStatus}>
                         <Text allowFontScaling={false} style={[
@@ -345,14 +352,17 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                             }
                         ]}>
                             {connectionQuality === 'high'
-                                ? 'качество соединения - хорошее'
+                                ? (isAndroid ? 'Хорошее соединение' : 'качество соединения - хорошее')
                                 : connectionQuality === 'low'
-                                    ? 'качество соединения низкий'
+                                    ? (isAndroid ? 'Слабое соединение' : 'качество соединения низкий')
                                     : 'Нет подключения'}
                         </Text>
                     </View>
                     
                     <Text allowFontScaling={false} style={[styles.cardHeaderTitle, { color: theme.text }]}>Звонок</Text>
+                    {isAndroid && isIncoming ? (
+                        <View style={styles.closeButton} />
+                    ) : (
                     <TouchableOpacity
                         style={styles.closeButton}
                         onPress={() => {
@@ -366,6 +376,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                         activeOpacity={0.7}>
                         <Text allowFontScaling={false} style={[styles.closeButtonText, { color: theme.textTertiary }]}>✕</Text>
                     </TouchableOpacity>
+                    )}
                 </View>
                 {/* White Card - Full Height */}
                 <View style={[styles.card, { backgroundColor: theme.backgroundSecondary }]}>
@@ -388,10 +399,12 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                             <Text allowFontScaling={false} style={[styles.callerName, { color: theme.text }]}>{displayName}</Text>
 
                             {/* Phone Number */}
+                            {!(isAndroid && !callerPhone) && (
                             <Text allowFontScaling={false} style={[styles.phoneNumber, { color: theme.textTertiary }]}>{formatPhoneNumber(callerPhone)}</Text>
+                            )}
 
                             {/* Connection Status - Show in all call states */}
-                            {(connectionStatus?.connectionState || isIncoming || isOutgoing || isActive) && (
+                            {!(isAndroid && isIncoming) && (connectionStatus?.connectionState || isIncoming || isOutgoing || isActive) && (
                                 <Text allowFontScaling={false} style={[
                                     styles.connectionStatus,
                                     {
@@ -458,7 +471,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                         <Text allowFontScaling={false} style={[
                                             styles.actionButtonLabel,
                                             { color: effectiveState.speakerMode === 'loudspeaker' ? theme.warning : theme.text },
-                                        ]}>SPEAKER</Text>
+                                        ]}>{isAndroid ? 'ДИНАМИК' : 'SPEAKER'}</Text>
                                     </View>
                                     <LinearGradient
                                         colors={isDark
@@ -476,7 +489,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                             activeOpacity={0.8}>
                                             <AppIcon name="phone" size={24} color="#FFFFFF" />
                                         </TouchableOpacity>
-                                        <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>СБРОСИТЬ</Text>
+                                        <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>{isAndroid ? 'ЗАВЕРШИТЬ' : 'СБРОСИТЬ'}</Text>
                                     </View>
                                 </View>
                             )}
@@ -501,7 +514,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                         <Text allowFontScaling={false} style={[
                                             styles.actionButtonLabel,
                                             { color: effectiveState.isMuted ? theme.error : theme.text },
-                                        ]}>MUTE</Text>
+                                        ]}>{isAndroid ? 'МИКРОФОН' : 'MUTE'}</Text>
                                     </View>
                                     <LinearGradient
                                         colors={isDark
@@ -529,7 +542,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                         <Text allowFontScaling={false} style={[
                                             styles.actionButtonLabel,
                                             { color: effectiveState.speakerMode === 'loudspeaker' ? theme.warning : theme.text },
-                                        ]}>SPEAKER</Text>
+                                        ]}>{isAndroid ? 'ДИНАМИК' : 'SPEAKER'}</Text>
                                     </View>
                                     <LinearGradient
                                         colors={isDark
@@ -547,7 +560,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                             activeOpacity={0.8}>
                                             <AppIcon name="phone" size={24} color="#FFFFFF" />
                                         </TouchableOpacity>
-                                        <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>СБРОСИТЬ</Text>
+                                        <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>{isAndroid ? 'ЗАВЕРШИТЬ' : 'СБРОСИТЬ'}</Text>
                                     </View>
                                 </View>
                             )}
@@ -563,7 +576,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                             activeOpacity={0.8}>
                                             <AppIcon name="phone" size={24} color="#FFFFFF" />
                                         </TouchableOpacity>
-                                        <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>СБРОСИТЬ</Text>
+                                        <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>{isAndroid ? 'ОТКЛОНИТЬ' : 'СБРОСИТЬ'}</Text>
                                     </View>
 
 
