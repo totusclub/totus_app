@@ -570,6 +570,23 @@ await check('iOS CallKeepHelper: PushKit completion runs while the call is still
     assert.ok(new RegExp(`"${r}"[^]*?return ${v};`).test(m), r);
   }
 });
+await check('iOS: CallKit provider is set up natively at launch, before PushKit (closed / background iPhone rings)', async () => {
+  // Crash reports 05.10 (TestFlight 1.0.19 (8) and (10)): FRONTBOARD 0xbaadca11, Role: Non UI —
+  // iOS killed the app launched in the background by the VoIP push because no call was reported.
+  const ad = read('ios/totusClubApp/AppDelegate.swift');
+  const setup = ad.indexOf('CallKeepHelper.setupCallKitNatively()');
+  const registry = ad.indexOf('PKPushRegistry(queue: .main)');
+  assert.ok(setup > 0 && registry > setup, 'CallKit set up before the PushKit registry');
+  const m = read('ios/totusClubApp/CallKeepHelper.m');
+  const fn = m.slice(m.indexOf('+ (void)setupCallKitNatively'), m.indexOf('+ (void)reportIncomingCall:'));
+  assert.ok(/\[RNCallKeep setup:options\]/.test(fn), 'react-native-callkeep native setup');
+  const js = read('src/modules/voip/VoipService.ts');
+  const jsName = (js.match(/ios:\s*\{\s*appName:\s*'([^']+)'/) || [])[1];
+  assert.ok(jsName && fn.includes(`@"appName": @"${jsName}"`), 'same appName as JS CALLKEEP_OPTIONS');
+  const report = m.slice(m.indexOf('+ (void)reportIncomingCall:'), m.indexOf('// RNCallKeep endCallWithUUID'));
+  assert.ok(!/getBridge/.test(report), 'reporting a call does not touch the React Native bridge');
+  assert.ok(/\+ \(void\)setupCallKitNatively;/.test(read('ios/totusClubApp/CallKeepHelper.h')));
+});
 await check('Android native: endRemote ends only this call (ringing, notification, Telecom); late Telecom call finished', async () => {
   const mod = read('android/app/src/main/java/com/totus/com/TotusCallModule.kt');
   const man = read('android/app/src/main/java/com/totus/com/TotusCallManager.kt');
