@@ -8,6 +8,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (void)setBridge:(RCTBridge *)bridge;
 + (RCTBridge *)getBridge;
+/// CallKit provider at app launch, before PushKit (react-native-callkeep native setup).
++ (void)setupCallKitNatively;
 + (void)reportIncomingCall:(NSString *)callId
                     handle:(NSString *)handle
                 callerName:(NSString *)callerName
