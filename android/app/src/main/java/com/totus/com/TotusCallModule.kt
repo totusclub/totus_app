@@ -51,6 +51,12 @@ class TotusCallModule(private val reactContext: ReactApplicationContext) :
     TotusCallManager.dismissIncoming(reactContext, callId)
   }
 
+  /** The call ended elsewhere (FCM call_ended / server check): this call only, not the others. */
+  @ReactMethod
+  fun endRemote(callId: String) {
+    TotusCallManager.endRemote(reactContext, callId)
+  }
+
   @ReactMethod
   fun startOngoing(callId: String, callerName: String?, promise: Promise) {
     promise.resolve(TotusCallManager.startOngoing(reactContext, callId, callerName ?: ""))
