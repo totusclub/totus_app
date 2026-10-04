@@ -118,6 +118,12 @@ class TotusConnectionService : ConnectionService() {
     connection.setRinging()
     if (callId.isNotEmpty()) {
       TotusTelecom.register(callId, connection)
+      if (TotusCallManager.isFinished(callId)) {
+        // The call ended (call_ended push, declined) before Telecom created the connection.
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+          connection.finish(DisconnectCause.REMOTE)
+        }
+      }
     }
     return connection
   }
