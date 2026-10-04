@@ -29,6 +29,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
       FirebaseApp.configure()
     }
 
+    // CallKit provider before PushKit: a VoIP push that launches the closed app in the background
+    // (no UI scene, no React Native) must be reported to CallKit right away, or iOS kills the app
+    // (crash 0xbaadca11) and the call never rings on the lock screen.
+    CallKeepHelper.setupCallKitNatively()
+
     // PushKit before React Native starts, so a VoIP push can wake the closed app.
     let registry = PKPushRegistry(queue: .main)
     registry.delegate = self
