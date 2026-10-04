@@ -12,7 +12,7 @@
     "start": "react-native start",
     "start:clean": "react-native start --reset-cache",
     "test": "jest",
-    "check": "node scripts/check-mic-permission.mjs && node scripts/check-voip-answer-recovery.mjs"
+    "check": "node scripts/check-mic-permission.mjs && node scripts/check-voip-answer-recovery.mjs && node scripts/check-android-firebase-guard.mjs"
   },
   "dependencies": {
     "@notifee/react-native": "^9.1.8",
