@@ -99,6 +99,27 @@ static RCTBridge *storedBridge = nil;
     return nil;
 }
 
++ (void)setupCallKitNatively {
+    // A VoIP push can launch the closed app in the background without React Native (it starts
+    // only with the UI scene). The CallKit provider must exist, with its delegate, before the push
+    // is handled: otherwise the call is never reported, iOS kills the app ("0xbaadca11") and no
+    // incoming call appears on the lock screen / in the background. Same options as JS
+    // (VoipService CALLKEEP_OPTIONS); the JS RNCallKeep.setup() is then a no-op.
+    NSDictionary *options = @{
+        @"appName": @"Totus",
+        @"includesCallsInRecents": @YES,
+        @"supportsVideo": @NO,
+        @"maximumCallGroups": @"1",
+        @"maximumCallsPerCallGroup": @"1",
+    };
+    if ([RNCallKeep respondsToSelector:@selector(setup:)]) {
+        [RNCallKeep setup:options];
+        NSLog(@"📞 CallKeepHelper: CallKit provider set up natively");
+    } else {
+        NSLog(@"⚠️ CallKeepHelper: RNCallKeep.setup unavailable");
+    }
+}
+
 + (void)reportIncomingCall:(NSString *)callId
                     handle:(NSString *)handle
                 callerName:(NSString *)callerName
@@ -134,7 +155,7 @@ static RCTBridge *storedBridge = nil;
                              fromPushKit:YES
                                  payload:safePayload
                    withCompletionHandler:completion];
-        NSLog(@"✅ Reported incoming call to CallKeep (bridge=%@): %@", [self getBridge] ? @"yes" : @"no", safeCallId);
+        NSLog(@"✅ Reported incoming call to CallKeep: %@", safeCallId);
         return;
     }
 
