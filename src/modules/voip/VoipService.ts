@@ -48,6 +48,7 @@ import {
   stopAndroidCallForegroundService,
 } from './AndroidCallForegroundService';
 import {
+  nativeEndRemoteCall as endAndroidRemoteCall,
   nativeStopVoipService,
   nativeUpdateConnectionStatus,
 } from './NativeVoipOrchestrator';
@@ -599,6 +600,9 @@ async function registerDeviceWithBackend(token: string, loyaltyId: string | null
     voipToken: cleanToken,
     platform: Platform.OS,
     loyaltyId: loyaltyId,
+    // Приложение понимает отменяющий push звонка (FCM / APNs VoIP type=call_ended): сервер шлёт
+    // его этому телефону, когда звонок закончился на другом устройстве (CALL_END_SYNC_RU.md).
+    callEndedPush: true,
   };
   
   // console.log('📤 Sending device registration to backend:');
@@ -656,7 +660,8 @@ async function unregisterDeviceWithBackend(loyaltyId: string): Promise<void> {
     const response = await voipFetch(`${BASE_URL}/api/unregister-device`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({loyaltyId}),
+      // deviceId: сервер снимает только этот телефон, остальные телефоны аккаунта продолжают звонить.
+      body: JSON.stringify(currentDeviceId ? {loyaltyId, deviceId: currentDeviceId} : {loyaltyId}),
     });
     if (!response.ok) {
       const text = await response.text();
@@ -833,6 +838,11 @@ export async function handleAndroidIncomingCallNotification(
   if (toLoyaltyId && currentLoyaltyId && toLoyaltyId !== currentLoyaltyId) {
     return;
   }
+  if (wasCallEndedRemotely(callUUID)) {
+    androidTelemetry('incoming_ignored_ended', {});
+    return;
+  }
+  replaceStaleRingingCall(callUUID);
   if (isAnotherCallInProgress(callUUID)) {
     androidTelemetry('incoming_ignored_busy', {});
     return;
@@ -863,6 +873,7 @@ export async function handleAndroidIncomingCallNotification(
   ensureNativeConnectionStatusSync();
   pushNativeConnectionStatus();
   startIncomingRingtone();
+  startRingingTimeout(callUUID);
 
   if (!options?.skipNativeDisplay && USE_ANDROID_CALLKEEP_INCOMING_UI) {
     isIncomingDisplayWindowActive = true;
@@ -898,6 +909,293 @@ function dropStaleCallLeftovers(callId: string): void {
   if (activeCallUUID && activeCallUUID !== callId && !pc) {
     activeCallUUID = null;
     activeCallStartedAt = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Завершение звонка на всех устройствах (claude/CALL_END_SYNC_RU.md).
+// Звонок закончился в другом месте (ответили на другом устройстве, отбой, сброс, пропущенный):
+// сервер шлёт отменяющий push (FCM data type=call_ended, APNs VoIP type=call_ended), а при
+// открытии приложения и подключении сокета «звонящий» звонок сверяется с сервером.
+// Закончившийся звонок не должен снова показываться как входящий и не должен занимать
+// устройство: следующий звонок приходит как обычно. Android и iOS одинаково.
+// ---------------------------------------------------------------------------
+const RINGING_TIMEOUT_MS = 65000; // сервер объявляет звонок пропущенным через 60 с
+const ENDED_CALL_MEMORY = 50;
+const remotelyEndedCallIds = new Set<string>();
+let ringingTimer: ReturnType<typeof setTimeout> | null = null;
+let ringingTimerCallId: string | null = null;
+let ringingVerifyInFlight: string | null = null;
+
+function rememberRemotelyEndedCall(callId: string): void {
+  remotelyEndedCallIds.delete(callId);
+  remotelyEndedCallIds.add(callId);
+  while (remotelyEndedCallIds.size > ENDED_CALL_MEMORY) {
+    const first = remotelyEndedCallIds.values().next().value;
+    if (first === undefined) {
+      break;
+    }
+    remotelyEndedCallIds.delete(first);
+  }
+}
+
+/** Звонок уже закончился (отменяющий push, сокет, сверка с сервером): входящий по нему не показывать. */
+export function wasCallEndedRemotely(callId: string | null | undefined): boolean {
+  return Boolean(callId) && remotelyEndedCallIds.has(String(callId));
+}
+
+/** CXCallEndedReason: 2 remoteEnded, 3 unanswered, 4 answeredElsewhere, 5 declinedElsewhere. */
+function callKitEndReason(reason: string | null | undefined): number {
+  switch (reason) {
+    case 'answered_elsewhere':
+      return 4;
+    case 'rejected':
+      return 5;
+    case 'missed':
+    case 'caller_cancel':
+      return 3;
+    default:
+      return 2;
+  }
+}
+
+/** Звонок только «звонит» на этом устройстве: не отвечен, ответ не идёт, медиа нет. */
+function isRingingOnly(callId: string | null | undefined): boolean {
+  if (!callId) {
+    return false;
+  }
+  return (
+    incomingCallUUID === callId &&
+    currentCallState === 'ringing' &&
+    activeCallUUID !== callId &&
+    pendingAnswerCallUUID !== callId &&
+    !pc &&
+    !answerGate.isInFlight(callId) &&
+    !answerGate.isDone(callId)
+  );
+}
+
+function clearRingingTimeout(callId?: string | null): void {
+  if (callId && ringingTimerCallId && ringingTimerCallId !== callId) {
+    return;
+  }
+  if (ringingTimer) {
+    clearTimeout(ringingTimer);
+  }
+  ringingTimer = null;
+  ringingTimerCallId = null;
+}
+
+/** Входящий не может «звонить» вечно: без ответа дольше таймаута сервера — снимаем. */
+function startRingingTimeout(callId: string): void {
+  if (!callId || ringingTimerCallId === callId) {
+    return;
+  }
+  clearRingingTimeout();
+  ringingTimerCallId = callId;
+  ringingTimer = setTimeout(() => {
+    ringingTimer = null;
+    if (ringingTimerCallId !== callId) {
+      return;
+    }
+    ringingTimerCallId = null;
+    if (isRingingOnly(callId)) {
+      console.warn(`Incoming call still ringing after ${RINGING_TIMEOUT_MS} ms, dropping it`, callId);
+      handleRemoteCallEnded(callId, 'missed');
+    }
+  }, RINGING_TIMEOUT_MS);
+}
+
+/** Только нативный экран / уведомление этого звонка (в JS он не текущий). */
+function endNativeCallOnly(callId: string, reason: string | null | undefined): void {
+  if (Platform.OS === 'android') {
+    endAndroidRemoteCall(callId);
+    return;
+  }
+  try {
+    RNCallKeep.reportEndCallWithUUID(callId, callKitEndReason(reason));
+  } catch (e) {
+    console.warn('CallKit reportEndCall failed', e);
+  }
+}
+
+/**
+ * Текущий звонок закончился не на этом устройстве: сбросить состояние, звонок, медиа.
+ * Без callKitReason (сокет 'ended') — как раньше, RNCallKeep.endCall. С ним (push, сверка,
+ * таймаут) на iOS CallKit получает «завершён удалённо» и не шлёт серверу свой /end.
+ */
+function applyCallEndedLocally(callId: string, callKitReason?: number): void {
+  markAndroidCallCancelled(callId);
+  clearRingingTimeout(callId);
+  currentCallState = 'ended';
+  connectionState = 'disconnected';
+  pushNativeConnectionStatus();
+  try {
+    if (callKitReason && Platform.OS === 'ios') {
+      RNCallKeep.reportEndCallWithUUID(callId, callKitReason);
+    } else {
+      RNCallKeep.endCall(callId);
+    }
+  } catch (e) {
+    console.warn('Failed to end CallKeep call after remote end', e);
+  }
+  if (Platform.OS === 'android') {
+    endAndroidRemoteCall(callId);
+  }
+
+  if (activeCallUUID === callId) {
+    activeCallUUID = null;
+  }
+  if (incomingCallUUID === callId) {
+    incomingCallUUID = null;
+  }
+  if (pendingAnswerCallUUID === callId) {
+    pendingAnswerCallUUID = null;
+  }
+  incomingOfferByCallId.delete(callId);
+  activeCallStartedAt = null;
+  callerName = null;
+
+  // Reset microphone and speaker states (endVoiceCall will also do this, but explicit here for clarity)
+  isMuted = false;
+  isSpeakerEnabled = false;
+  currentSpeakerMode = 'earpiece';
+
+  // Clean up all media tracks and resources
+  endVoiceCall();
+  nativeStopVoipService().catch(() => {});
+  stopRingback();
+  stopIncomingRingtone();
+
+  // Reset call state after a delay (so modal can show "ended" state briefly)
+  setTimeout(() => {
+    if (currentCallState === 'ended') {
+      currentCallState = 'idle';
+    }
+  }, 3000);
+}
+
+/**
+ * Звонок закончился на другом устройстве / у собеседника: отменяющий push (FCM / APNs VoIP
+ * type=call_ended), сверка с сервером, таймаут «звонит». Текущий звонок сбрасывается, чужой —
+ * снимается только с нативного экрана (уведомление Android, CallKit).
+ */
+export function handleRemoteCallEnded(callId: string | null | undefined, reason?: string | null): void {
+  if (!callId) {
+    return;
+  }
+  const id = String(callId);
+  // «Ответили на другом устройстве» не относится к устройству, которое само ответило.
+  if (
+    reason === 'answered_elsewhere' &&
+    (answerGate.isInFlight(id) ||
+      answerGate.isDone(id) ||
+      pendingAnswerCallUUID === id ||
+      (activeCallUUID === id && currentCallState !== 'ringing'))
+  ) {
+    console.log('call_ended(answered_elsewhere) for a call answered on this device, ignored', id);
+    return;
+  }
+  rememberRemotelyEndedCall(id);
+  const current = activeCallUUID || incomingCallUUID || pendingAnswerCallUUID;
+  console.log('Call ended elsewhere:', id, reason || '', 'current:', current);
+  if (current === id) {
+    applyCallEndedLocally(id, callKitEndReason(reason));
+    return;
+  }
+  endNativeCallOnly(id, reason);
+}
+
+/** Новый входящий вытесняет звонок, который на этом устройстве только «звонил» (не «занято»). */
+function replaceStaleRingingCall(newCallId: string): void {
+  const old = incomingCallUUID;
+  if (!old || old === newCallId || !isRingingOnly(old)) {
+    return;
+  }
+  console.log('New incoming call replaces a call that was only ringing:', old, '->', newCallId);
+  androidTelemetry('incoming_replaced_stale_ringing', {});
+  rememberRemotelyEndedCall(old);
+  applyCallEndedLocally(old, callKitEndReason('missed'));
+}
+
+const FINISHED_CALL_STATES = new Set(['ended', 'rejected', 'missed', 'cancelled', 'canceled', 'failed']);
+
+/** Ответ GET /api/calls/:id: звонок для этого устройства уже закончился? (reason или null) */
+export function finishedCallReason(
+  status: number,
+  body: any,
+  deviceId: string | null,
+): string | null {
+  if (status === 404) {
+    return 'gone';
+  }
+  if (status < 200 || status >= 300 || !body) {
+    return null; // сеть / сервер: не знаем — ничего не трогаем
+  }
+  const state = String(body.state || '');
+  if (FINISHED_CALL_STATES.has(state)) {
+    return body.endReason || (state === 'rejected' ? 'rejected' : 'hangup');
+  }
+  if (state === 'answered' && body.answeredBy && body.answeredBy !== deviceId) {
+    return 'answered_elsewhere';
+  }
+  return null;
+}
+
+async function fetchFinishedCallReason(callId: string): Promise<string | null> {
+  try {
+    const res = await voipFetch(`${BASE_URL}/api/calls/${encodeURIComponent(callId)}`, {method: 'GET'});
+    const body = res.status === 404 ? null : await res.json().catch(() => null);
+    return finishedCallReason(res.status, body, currentDeviceId);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Открытие приложения / подключение сокета: «звонящий» звонок сверяется с сервером. Закончился
+ * (в т.ч. пока телефон спал или был выгружен) — снять CallModal, уведомление, CallKit.
+ */
+export async function verifyRingingCallWithServer(source: string): Promise<void> {
+  const callId = incomingCallUUID;
+  if (callId && isRingingOnly(callId) && ringingVerifyInFlight !== callId) {
+    ringingVerifyInFlight = callId;
+    try {
+      const reason = await fetchFinishedCallReason(callId);
+      if (reason && isRingingOnly(callId)) {
+        console.log('Ringing call already finished on the server (' + source + '):', callId, reason);
+        handleRemoteCallEnded(callId, reason);
+      }
+    } finally {
+      ringingVerifyInFlight = null;
+    }
+  }
+  if (Platform.OS !== 'ios') {
+    return;
+  }
+  // iOS: входящие CallKit, о которых JS не знает (выгруженный iPhone разбудил PushKit).
+  try {
+    const calls: any[] = (await (RNCallKeep as any).getCalls?.()) || [];
+    for (const c of calls) {
+      const uuid = c?.callUUID ? String(c.callUUID) : '';
+      if (!uuid || c.outgoing || c.hasConnected || c.hasEnded) {
+        continue;
+      }
+      if (uuid === activeCallUUID || uuid === pendingAnswerCallUUID || answerGate.isInFlight(uuid) || answerGate.isDone(uuid)) {
+        continue;
+      }
+      if (uuid === incomingCallUUID) {
+        continue; // проверен выше
+      }
+      const reason = wasCallEndedRemotely(uuid) ? 'hangup' : await fetchFinishedCallReason(uuid);
+      if (reason) {
+        console.log('CallKit call already finished on the server (' + source + '):', uuid, reason);
+        rememberRemotelyEndedCall(uuid);
+        endNativeCallOnly(uuid, reason);
+      }
+    }
+  } catch (e) {
+    console.warn('CallKit calls check failed', e);
   }
 }
 
@@ -1014,6 +1312,8 @@ function ensureSocketConnected() {
       });
       // console.log('Socket connected, registered device (no loyaltyId yet)');
     }
+    // Пока сокета не было, «звонящий» звонок мог закончиться: сверить с сервером.
+    verifyRingingCallWithServer('socket_connect').catch(() => {});
   });
 
   socket.on('disconnect', () => {
@@ -1045,14 +1345,23 @@ function ensureSocketConnected() {
     const currentCallId = activeCallUUID || incomingCallUUID || pendingAnswerCallUUID;
     if (callId && callId !== currentCallId) {
       if (payload?.state === 'ringing') {
+        if (wasCallEndedRemotely(callId)) {
+          console.log('Socket ringing for an already finished call ignored:', callId);
+          return;
+        }
         if (isBusyWithOtherCall(callId)) {
           console.log('Socket ringing for another call ignored (busy):', callId, 'current:', currentCallId);
           return;
         }
+        replaceStaleRingingCall(callId);
         dropStaleCallLeftovers(callId);
         incomingCallUUID = callId;
       } else {
         if (payload?.state === 'ended' || payload?.state === 'rejected') {
+          rememberRemotelyEndedCall(callId);
+          if (Platform.OS === 'android') {
+            endAndroidRemoteCall(callId);
+          }
           try {
             RNCallKeep.endCall(callId);
           } catch (e) {}
@@ -1116,44 +1425,9 @@ function ensureSocketConnected() {
     // end the CallKeep call and reset local state.
     if (payload?.state === 'ended' && callId) {
       console.log('Remote hangup received for call', callId);
-      markAndroidCallCancelled(callId);
-      currentCallState = 'ended';
-      connectionState = 'disconnected';
-      pushNativeConnectionStatus();
-      try {
-        RNCallKeep.endCall(callId);
-      } catch (e) {
-        console.warn('Failed to end CallKeep call from socket', e);
-      }
-      
-      // Reset all call states
-      if (activeCallUUID === callId) {
-        activeCallUUID = null;
-      }
-      if (incomingCallUUID === callId) {
-        incomingCallUUID = null;
-      }
-      activeCallStartedAt = null;
-      callerName = null;
-      
-      // Reset microphone and speaker states (endVoiceCall will also do this, but explicit here for clarity)
-      isMuted = false;
-      isSpeakerEnabled = false;
-      currentSpeakerMode = 'earpiece';
+      rememberRemotelyEndedCall(callId);
+      applyCallEndedLocally(callId);
       console.log('Remote hangup: ✅ Reset microphone (unmuted) and speaker states');
-      
-      // Clean up all media tracks and resources
-      endVoiceCall();
-      nativeStopVoipService().catch(() => {});
-      stopRingback();
-      stopIncomingRingtone();
-      
-      // Reset call state after a delay (so modal can show "ended" state briefly)
-      setTimeout(() => {
-        if (currentCallState === 'ended') {
-          currentCallState = 'idle';
-        }
-      }, 3000);
     }
     
     // Handle ringing state (incoming call)
@@ -1163,6 +1437,9 @@ function ensureSocketConnected() {
       pushNativeConnectionStatus();
       if (payload?.callerName) {
         callerName = payload.callerName;
+      }
+      if (incomingCallUUID === callId) {
+        startRingingTimeout(callId);
       }
     }
   });
@@ -1186,12 +1463,17 @@ function ensureSocketConnected() {
     }
     // For incoming calls, only cache offer and set ringing state.
     // Do NOT create RTCPeerConnection here; create it only after user answers.
+    if (wasCallEndedRemotely(callId)) {
+      console.log('Socket offer for an already finished call ignored:', callId);
+      return;
+    }
     incomingOfferByCallId.set(callId, offer);
     if (isBusyWithOtherCall(callId)) {
       console.log('Socket offer cached, device is busy with another call:', callId);
       return;
     }
     if (!activeCallUUID || activeCallUUID !== callId) {
+      replaceStaleRingingCall(callId);
       dropStaleCallLeftovers(callId);
       incomingCallUUID = callId;
       currentCallState = 'ringing';
@@ -1201,6 +1483,7 @@ function ensureSocketConnected() {
       console.log('Incoming call offer cached from socket - callerName:', callerName);
       ensureNativeConnectionStatusSync();
       pushNativeConnectionStatus();
+      startRingingTimeout(callId);
     }
   });
 
@@ -1578,6 +1861,7 @@ function onVoipAppActive(): void {
   }
   ensureSocketConnected();
   recoverCallKeepInitialEvents('app_active');
+  verifyRingingCallWithServer('app_active').catch(() => {});
   const target = pendingAnswerCallUUID || activeCallUUID;
   const decision = decideOnResume({
     pendingAnswerUUID: pendingAnswerCallUUID,
@@ -3503,6 +3787,18 @@ export async function initVoipAndCallKeep(loyaltyId?: string) {
   VoipPushNotification.addEventListener('notification', (notification: any) => {
     console.log('Incoming VoIP push:', notification);
 
+    // Отменяющий push: звонок закончился на другом устройстве. CallKit его уже завершил
+    // нативно (AppDelegate -> CallKeepHelper.reportCallEnded), здесь — состояние JS.
+    if (notification?.type === 'call_ended') {
+      handleRemoteCallEnded(notification.callId || notification.uuid, notification.reason || null);
+      return;
+    }
+    if (wasCallEndedRemotely(notification?.callId || notification?.uuid)) {
+      console.log('VoIP push for an already finished call ignored:', notification?.callId || notification?.uuid);
+      endNativeCallOnly(String(notification.callId || notification.uuid), 'hangup');
+      return;
+    }
+
     // CRITICAL: Guard - ignore pushes for other users after account switch.
     // Backend includes toLoyaltyId (callee) in payload. If we're logged in as different user, ignore.
     const toLoyaltyId = notification.toLoyaltyId || notification.toUserId;
@@ -3563,6 +3859,7 @@ export async function initVoipAndCallKeep(loyaltyId?: string) {
 
     // Start incoming call ringtone (for Android or custom iOS behavior)
     startIncomingRingtone();
+    startRingingTimeout(callUUID);
 
     // NOTE:
     // On iOS we already trigger CallKit UI natively in AppDelegate
