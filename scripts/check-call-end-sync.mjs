@@ -548,14 +548,24 @@ await check('iOS AppDelegate: VoIP push call_ended ends the CallKit call; incomi
   assert.ok(/completion\(\)/.test(block) && /return\n/.test(block));
   assert.ok(/PKPushRegistry\(queue: \.main\)/.test(ad), 'registry still created at launch');
 });
-await check('iOS CallKeepHelper: reports to CallKit (PushKit rule), then ends with the right reason', async () => {
+await check('iOS CallKeepHelper: PushKit completion runs while the call is still in CallKit, the end comes after', async () => {
+  // iOS 13+: at completion the app must have a call in CallKit; ending it before completion makes
+  // iOS kill the app and, after a few pushes, stop delivering VoIP pushes (no incoming calls at all).
   const m = read('ios/totusClubApp/CallKeepHelper.m');
   const h = read('ios/totusClubApp/CallKeepHelper.h');
   assert.ok(/\+ \(void\)reportCallEnded:\(NSString \*\)callId/.test(h));
-  const body = m.slice(m.indexOf('+ (void)reportCallEnded:'));
-  assert.ok(/\[self reportIncomingCall:safeCallId/.test(body), 'every VoIP push reports a call');
-  assert.ok(/endCallWithUUID:safeCallId reason:endReason/.test(body));
-  assert.ok(/CXCallObserver/.test(body) && /hasConnected/.test(body), 'answered call kept on answered_elsewhere');
+  const body = m.slice(m.indexOf('+ (void)reportCallEnded:'), m.lastIndexOf('@end'));
+  const exist = body.slice(body.indexOf('if (existing) {'), body.indexOf('NSString *placeholderId'));
+  assert.ok(exist.indexOf('completion();') >= 0 && exist.indexOf('completion();') < exist.indexOf('endCallWithUUID:safeCallId'),
+    'existing call: completion before the end');
+  assert.ok(/dispatch_async\(dispatch_get_main_queue\(\), \^\{\s*\[RNCallKeep endCallWithUUID:safeCallId/.test(exist), 'end on the next run-loop turn');
+  assert.ok(/existing\.hasConnected && \[reason isEqualToString:@"answered_elsewhere"\]/.test(exist), 'answered call kept on answered_elsewhere');
+  assert.ok(!/reportIncomingCall:safeCallId/.test(body), 'an ended call UUID is never reported again');
+  const ph = body.slice(body.indexOf('NSString *placeholderId'));
+  assert.ok(/placeholderId = \[\[NSUUID UUID\] UUIDString\]/.test(ph), 'placeholder gets a new UUID');
+  assert.ok(/\[self reportIncomingCall:placeholderId/.test(ph), 'no call in CallKit: a placeholder is reported');
+  assert.ok(ph.indexOf('completion();') >= 0 && ph.indexOf('completion();') < ph.indexOf('endCallWithUUID:placeholderId'),
+    'placeholder: completion before the end');
   for (const [r, v] of [['answered_elsewhere', 4], ['rejected', 5], ['missed', 3]]) {
     assert.ok(new RegExp(`"${r}"[^]*?return ${v};`).test(m), r);
   }
