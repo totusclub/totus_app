@@ -69,7 +69,7 @@ const MOCKS = {
       M().callKeep.push([String(k), ...a]);
       if (k === 'getCalls') return Promise.resolve(M().ckCalls);
       if (k === 'getInitialEvents') return Promise.resolve([]);
-      if (k === 'addEventListener') return { remove() {} };
+      if (k === 'addEventListener') { (M().ckListeners[a[0]] ||= []).push(a[1]); return { remove() {} }; }
       return Promise.resolve(true);
     } });`,
   'react-native-voip-push-notification': `
@@ -148,11 +148,11 @@ const sleep = ms => new Promise(r => realSetTimeout(r, ms));
 process.on('unhandledRejection', () => {});
 
 let n = 0;
-async function fresh({os = 'android', calls = {}, ckCalls = [], withCallService = false} = {}) {
+async function fresh({os = 'android', calls = {}, ckCalls = [], withCallService = false, appState = 'background'} = {}) {
   const M = {
-    os, appState: 'background', fcmToken: 'fcm-1', calls, ckCalls,
+    os, appState, fcmToken: 'fcm-1', calls, ckCalls,
     appStateListeners: [], callKeep: [], posts: [], gets: [], peers: [], native: [], banners: [], deviceEvents: [],
-    socketHandlers: {}, socketEmits: [], voipListeners: {}, fcm: {},
+    socketHandlers: {}, socketEmits: [], voipListeners: {}, fcm: {}, ckListeners: {},
   };
   M.totusCall = new Proxy({}, {
     get: (_, k) => (...a) => {
@@ -406,6 +406,7 @@ await check('headless entry (index.js): call_ended is not treated as an incoming
 out('iOS: VoipService.ts (mocked CallKit)');
 async function initIos(V) {
   await V.initVoipAndCallKeep('client-1');
+  globalThis.__ce.voipListeners.register?.('ios-voip-token'); // PushKit token -> device id, socket
   await sleep(40);
 }
 await check('VoIP push call_ended while JS runs: state reset, CallKit told "answered elsewhere", nothing sent', async () => {
@@ -475,6 +476,62 @@ for (const os of ['android', 'ios']) {
     assert.equal(V.getCallState().state, 'idle', 'nothing brings the call back');
   });
 }
+
+out('iOS: support call while the iPhone is in the background / closed (05.10)');
+const UP = id => id.toUpperCase(); // CallKit getCalls() returns upper-case UUIDs
+const SUP = '5e1f0c2a-7d3b-4c6e-9a1f-2b3c4d5e6f70';
+await check('iPhone woken by the VoIP push: the ringing CallKit call is NOT ended by the server check', async () => {
+  const {V, M} = await fresh({os: 'ios', calls: {[SUP]: {state: 'ringing', callerName: 'Поддержка Totus'}},
+    ckCalls: [{callUUID: UP(SUP), hasConnected: false, hasEnded: false, outgoing: false}]});
+  await initIos(V);
+  for (const cb of M.socketHandlers.connect || []) cb();
+  await sleep(60);
+  assert.ok(M.gets.includes(SUP), 'asked the server with the lower-case call id');
+  assert.ok(!M.gets.includes(UP(SUP)), 'never with the upper-case CallKit UUID (server: 404)');
+  const ended = [...ck(M, 'reportEndCallWithUUID'), ...ck(M, 'endCall')].filter(c => String(c[1]).toLowerCase() === SUP);
+  assert.deepEqual(ended, [], 'CallKit call left ringing');
+});
+await check('iPhone opened while CallKit rings: the call becomes the app call (one call in window and CallKit)', async () => {
+  const {V, M} = await fresh({os: 'ios', calls: {[SUP]: {state: 'ringing', callerName: 'Поддержка Totus'}},
+    ckCalls: [{callUUID: UP(SUP), hasConnected: false, hasEnded: false, outgoing: false}]});
+  await initIos(V);
+  await resume(M);
+  assert.equal(V.getCallState().state, 'ringing');
+  assert.equal(V.getCallState().callUUID, SUP);
+  assert.equal(V.getCallState().callerName, 'Поддержка Totus');
+  assert.equal(ck(M, 'reportEndCallWithUUID').length, 0);
+});
+await check('declined on Android while the iPhone app is open: window and CallKit both end (reportEndCall, declinedElsewhere)', async () => {
+  const {V, M} = await fresh({os: 'ios', calls: {[SUP]: {state: 'ringing'}},
+    ckCalls: [{callUUID: UP(SUP), hasConnected: false, hasEnded: false, outgoing: false}]});
+  await initIos(V);
+  await resume(M);
+  assert.equal(V.getCallState().state, 'ringing');
+  M.ckCalls.length = 0; // CallKit closes the call on reportEndCall
+  for (const cb of M.socketHandlers['call-state'] || []) cb({callId: SUP, state: 'ended', reason: 'rejected_elsewhere'});
+  await sleep(60);
+  assert.notEqual(V.getCallState().state, 'ringing');
+  assert.ok(ck(M, 'reportEndCallWithUUID').some(c => c[1] === SUP && c[2] === 5), JSON.stringify(ck(M, 'reportEndCallWithUUID')));
+  assert.equal(ck(M, 'endCall').length, 0, 'no CXEndCallAction needed');
+  assert.equal(posted(M, 'end', SUP).length + posted(M, 'reject', SUP).length, 0, 'nothing sent for a call ended elsewhere');
+});
+await check('ended elsewhere, JS never knew the call (only CallKit): CallKit ends', async () => {
+  const {V, M} = await fresh({os: 'ios'});
+  await initIos(V);
+  for (const cb of M.socketHandlers['call-state'] || []) cb({callId: SUP, state: 'ended', reason: 'answered_elsewhere'});
+  await sleep(20);
+  assert.ok(ck(M, 'reportEndCallWithUUID').some(c => c[1] === SUP && c[2] === 4));
+});
+await check('CallKit still shows the call after reportEndCall: ended by CXEndCallAction, no /end, current state untouched', async () => {
+  const {V, M} = await fresh({os: 'ios', ckCalls: [{callUUID: UP(SUP), hasConnected: false, hasEnded: false, outgoing: false}]});
+  await initIos(V);
+  for (const cb of M.socketHandlers['call-state'] || []) cb({callId: SUP, state: 'ended', reason: 'hangup'});
+  await sleep(80); // 1.5 s check (scaled)
+  assert.ok(ck(M, 'endCall').some(c => c[1] === SUP), 'fallback endCall');
+  for (const cb of M.ckListeners.endCall || []) cb({callUUID: SUP}); // CallKit performEndCallAction -> JS
+  await sleep(20);
+  assert.equal(posted(M, 'end', SUP).length, 0, 'the app-initiated end is not sent to the server');
+});
 
 console.log = quiet.log;
 console.warn = quiet.warn;
