@@ -167,41 +167,63 @@ static RCTBridge *storedBridge = nil;
     NSLog(@"📞 CallKeepHelper: call ended elsewhere: %@ (%@)", callId, reason ?: @"-");
     NSString *safeCallId = (callId.length > 0) ? callId : [[NSUUID UUID] UUIDString];
     int endReason = [self callKitEndReason:reason ?: @""];
+    BOOL canEnd = [RNCallKeep respondsToSelector:@selector(endCallWithUUID:reason:)];
 
-    // A call this iPhone has answered itself is not ended by "answered elsewhere"
-    // (the server does not send that to the answering phone; this is only a safety net).
-    BOOL keepCall = NO;
+    // PushKit rule (iOS 13+): when the completion handler runs, the app must have a call in
+    // CallKit. Ending the call BEFORE completion (as before) left the app without a call: iOS
+    // killed it and, after a few such pushes, stopped delivering VoIP pushes to the app at all
+    // (no incoming calls on the iPhone). Now: complete first, end right after.
+    CXCall *existing = nil;
     NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:safeCallId];
     if (uuid) {
         CXCallObserver *observer = [[CXCallObserver alloc] init];
         for (CXCall *call in observer.calls) {
-            if ([call.UUID isEqual:uuid] && call.hasConnected && !call.hasEnded &&
-                [reason isEqualToString:@"answered_elsewhere"]) {
-                keepCall = YES;
+            if ([call.UUID isEqual:uuid] && !call.hasEnded) {
+                existing = call;
             }
         }
     }
 
-    void (^finish)(void) = ^{
-        if (!keepCall && [RNCallKeep respondsToSelector:@selector(endCallWithUUID:reason:)]) {
-            [RNCallKeep endCallWithUUID:safeCallId reason:endReason];
-            NSLog(@"✅ CallKit call ended (reason %d): %@", endReason, safeCallId);
-        }
+    if (existing) {
+        // The call is still in CallKit (ringing or in progress): it satisfies PushKit.
         if (completion) {
             completion();
         }
-    };
+        // A call this iPhone answered itself is not ended by "answered elsewhere"
+        // (the server does not send that to the answering phone; this is only a safety net).
+        BOOL keepCall = existing.hasConnected && [reason isEqualToString:@"answered_elsewhere"];
+        if (!keepCall && canEnd) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [RNCallKeep endCallWithUUID:safeCallId reason:endReason];
+                NSLog(@"✅ CallKit call ended (reason %d): %@", endReason, safeCallId);
+            });
+        }
+        return;
+    }
 
-    // PushKit: every VoIP push must report a call to CallKit, otherwise iOS kills the app.
-    // If this call is still ringing, the report fails as a duplicate (harmless) and the call is
-    // ended right after; if CallKit no longer has it, it is reported and ended at once.
+    // CallKit no longer has the call (already ended by the app) or never showed it: PushKit
+    // still needs a reported call. A UUID of an ended call cannot be reported again, so a
+    // placeholder with a new UUID is reported, the push is completed, and the placeholder is
+    // ended on the next run-loop turn.
+    NSString *placeholderId = [[NSUUID UUID] UUIDString];
     NSMutableDictionary *safePayload = payload ? [payload mutableCopy] : [NSMutableDictionary dictionary];
-    [self reportIncomingCall:safeCallId
+    safePayload[@"placeholderFor"] = safeCallId;
+    [self reportIncomingCall:placeholderId
                       handle:@"totus"
                   callerName:(callerName.length > 0 ? callerName : @"Totus")
                     hasVideo:NO
                      payload:safePayload
-                  completion:finish];
+                  completion:^{
+        if (completion) {
+            completion();
+        }
+        if (canEnd) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [RNCallKeep endCallWithUUID:placeholderId reason:endReason];
+                NSLog(@"✅ CallKit placeholder ended (reason %d) for %@", endReason, safeCallId);
+            });
+        }
+    }];
 }
 
 @end
