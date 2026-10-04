@@ -380,6 +380,21 @@ async function runAndroidTelecomRegistrationAudit(): Promise<void> {
   }
 }
 
+// Android: without android/app/google-services.json (or when native Firebase failed to start)
+// messaging() throws synchronously "No Firebase App '[DEFAULT]' has been created". That used to
+// abort initVoipAndCallKeep halfway (no CallKeep listeners, no socket, no device registration)
+// and crash after sign-in in setUserLoyaltyId. Used only in Android branches.
+function getAndroidMessaging(): ReturnType<typeof messaging> | null {
+  try {
+    return messaging();
+  } catch (e: any) {
+    telecomDebug('firebase_messaging_unavailable', {
+      error: e?.message || String(e),
+    });
+    return null;
+  }
+}
+
 export async function ensureAndroidTelecomReady(): Promise<void> {
   if (Platform.OS !== 'android') {
     return;
@@ -430,10 +445,20 @@ export function openAndroidCallingAccountSettings(): void {
   }
   const callKeepAny = RNCallKeep as any;
   try {
+    // Samsung: hasDefaultPhoneAccount -> TelecomManager.getDefaultOutgoingPhoneAccount needs
+    // READ_PHONE_STATE; without it the native method throws SecurityException (app crash).
     if (typeof callKeepAny?.hasDefaultPhoneAccount === 'function') {
-      callKeepAny.hasDefaultPhoneAccount((enabled: boolean) => {
-        telecomDebug('hasDefaultPhoneAccount_callback', {enabled});
-      });
+      PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE)
+        .then(canReadPhoneState => {
+          if (!canReadPhoneState) {
+            telecomDebug('hasDefaultPhoneAccount_skipped_missing_phone_permission');
+            return;
+          }
+          callKeepAny.hasDefaultPhoneAccount((enabled: boolean) => {
+            telecomDebug('hasDefaultPhoneAccount_callback', {enabled});
+          });
+        })
+        .catch(() => {});
     }
     if (typeof callKeepAny?.openPhoneAccounts === 'function') {
       callKeepAny.openPhoneAccounts();
@@ -3223,48 +3248,51 @@ export async function initVoipAndCallKeep(loyaltyId?: string) {
         );
       }
       void ensureAndroidBatteryOptimizationHandled();
-      void messaging()
-        .getToken()
-        .then(token => {
-          if (!token) {
-            return;
-          }
-          currentDeviceId = token;
-          return registerDeviceWithBackend(token, currentLoyaltyId);
-        })
-        .catch(e => {
-          console.warn('Failed to register Android FCM token', e);
-        });
-
-      if (!fcmTokenRefreshUnsubscribe) {
-        fcmTokenRefreshUnsubscribe = messaging().onTokenRefresh(token => {
-          if (!token) {
-            return;
-          }
-          currentDeviceId = token;
-          registerDeviceWithBackend(token, currentLoyaltyId).catch(e => {
-            console.warn('Failed to refresh Android FCM token registration', e);
+      const androidMessaging = getAndroidMessaging();
+      if (androidMessaging) {
+        void androidMessaging
+          .getToken()
+          .then(token => {
+            if (!token) {
+              return;
+            }
+            currentDeviceId = token;
+            return registerDeviceWithBackend(token, currentLoyaltyId);
+          })
+          .catch(e => {
+            console.warn('Failed to register Android FCM token', e);
           });
-        });
-      }
 
-      void messaging()
-        .getInitialNotification()
-        .then(initialMessage => {
-          if (initialMessage?.data) {
-            handleAndroidIncomingCallNotification(initialMessage.data).catch(
-              e => {
-                console.warn(
-                  'Failed to process Android initial notification call',
-                  e,
-                );
-              },
-            );
-          }
-        })
-        .catch(e => {
-          console.warn('Failed to read Android initial notification', e);
-        });
+        if (!fcmTokenRefreshUnsubscribe) {
+          fcmTokenRefreshUnsubscribe = androidMessaging.onTokenRefresh(token => {
+            if (!token) {
+              return;
+            }
+            currentDeviceId = token;
+            registerDeviceWithBackend(token, currentLoyaltyId).catch(e => {
+              console.warn('Failed to refresh Android FCM token registration', e);
+            });
+          });
+        }
+
+        void androidMessaging
+          .getInitialNotification()
+          .then(initialMessage => {
+            if (initialMessage?.data) {
+              handleAndroidIncomingCallNotification(initialMessage.data).catch(
+                e => {
+                  console.warn(
+                    'Failed to process Android initial notification call',
+                    e,
+                  );
+                },
+              );
+            }
+          })
+          .catch(e => {
+            console.warn('Failed to read Android initial notification', e);
+          });
+      }
 
       // CallKeep initial events (answer before JS start) are recovered below for both platforms.
     }
@@ -4021,8 +4049,8 @@ export function setUserLoyaltyId(loyaltyId: string) {
         console.warn('Failed to request VoIP token registration', e);
       }
     } else if (Platform.OS === 'android' && isVoipInitialized) {
-      messaging()
-        .getToken()
+      getAndroidMessaging()
+        ?.getToken()
         .then(token => {
           if (!token) {
             return;
