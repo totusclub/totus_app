@@ -187,6 +187,16 @@ object TotusCallManager {
     stopInAppRinging()
   }
 
+  /**
+   * The call ended on another device or by the caller (FCM call_ended, server check, ring timeout):
+   * stop its ringing / notification and disconnect its Telecom call. Other calls are not touched;
+   * the id is remembered, so a late incoming push of this call is not shown again.
+   */
+  fun endRemote(context: Context, callId: String) {
+    dismissIncoming(context, callId)
+    TotusTelecom.disconnect(callId, android.telecom.DisconnectCause.REMOTE)
+  }
+
   private fun cancelIncomingNotification(context: Context) {
     incomingNotificationShown = false
     try {
@@ -598,6 +608,8 @@ object TotusCallManager {
   }
 
   fun isIncomingCall(callId: String): Boolean = incomingCallId == callId
+
+  fun isFinished(callId: String): Boolean = synchronized(lock) { finishedCallIds.contains(callId) }
 
   fun canUseFullScreenIntent(context: Context): Boolean {
     if (Build.VERSION.SDK_INT < 34) {
