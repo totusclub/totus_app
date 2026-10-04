@@ -245,19 +245,26 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
         });
     };
 
+    // The window closes even if ending the call throws (the call state is reset first in endCall).
     const handleEndCall = () => {
-        endCall();
-        onClose?.();
+        try {
+            endCall();
+        } finally {
+            onClose?.();
+        }
     };
 
     const handleRejectCall = () => {
-        const current = getCallState();
-        if (current.callUUID) {
-            rejectCall(current.callUUID);
-        } else {
-            endCall();
+        try {
+            const current = getCallState();
+            if (current.callUUID) {
+                rejectCall(current.callUUID);
+            } else {
+                endCall();
+            }
+        } finally {
+            onClose?.();
         }
-        onClose?.();
     };
 
     // Always read fresh state for visibility check (don't rely on stale internal state)

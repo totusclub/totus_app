@@ -449,6 +449,33 @@ await check('iOS, opening the app: CallKit call that already ended on the server
   assert.ok(!ended.includes('k3'), 'connected call untouched');
 });
 
+out('Outgoing call (Аккаунт / чат -> поддержка): end from the call window');
+for (const os of ['android', 'ios']) {
+  await check(`${os}: support answers, "Завершить" -> call ended, media closed, server told`, async () => {
+    const {V, M} = await fresh({os});
+    await V.initVoipAndCallKeep('client-1');
+    if (os === 'ios') M.voipListeners.register?.('ios-voip-token');
+    await sleep(40);
+    const starting = V.startOutgoingVoiceCallByLoyaltyId('0978 6356 3712 8057', 'Поддержка Totus').catch(() => {});
+    await sleep(40);
+    const id = V.getCallState().callUUID;
+    assert.equal(V.getCallState().state, 'calling');
+    for (const cb of M.socketHandlers.answer || []) cb({callId: id, answer: {type: 'answer', sdp: 'v=0 a'}});
+    for (const cb of M.socketHandlers['call-state'] || []) cb({callId: id, state: 'answered'});
+    await starting;
+    await sleep(20);
+    assert.equal(V.getCallState().state, 'answered');
+    V.endCall();
+    await sleep(30);
+    assert.equal(V.getCallState().state, 'idle');
+    assert.equal(V.getCallState().callUUID, null);
+    assert.ok(M.peers.every(p => p.closed), 'media closed');
+    assert.ok(posted(M, 'end', id).length >= 1, 'server told');
+    await sleep(400);
+    assert.equal(V.getCallState().state, 'idle', 'nothing brings the call back');
+  });
+}
+
 console.log = quiet.log;
 console.warn = quiet.warn;
 console.error = quiet.error;
