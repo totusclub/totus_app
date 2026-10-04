@@ -14,6 +14,8 @@ import android.media.AudioManager
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -44,6 +46,8 @@ object TotusCallManager {
 
   const val INCOMING_CHANNEL_ID = "totus_incoming_calls_v1"
   const val ONGOING_CHANNEL_ID = "totus_ongoing_calls_v1"
+  /** Incoming call after the user silenced it with a side key: no sound, no heads-up. */
+  const val SILENCED_CHANNEL_ID = "totus_incoming_silenced_v1"
   const val INCOMING_NOTIFICATION_ID = 41001
   const val ONGOING_NOTIFICATION_ID = 41002
   private const val INCOMING_TIMEOUT_MS = 65_000L
@@ -61,6 +65,11 @@ object TotusCallManager {
   @Volatile private var incomingCallId: String? = null
   @Volatile private var incomingCallerName: String = ""
   @Volatile private var incomingNotificationShown = false
+  /** Ringtone / notification sound started for the current incoming call. */
+  @Volatile private var alerting = false
+  /** The user silenced the current incoming call (volume / power key): it keeps "ringing" silently. */
+  @Volatile private var silenced = false
+  private val mainHandler = Handler(Looper.getMainLooper())
   @Volatile private var mainActivityVisible = false
   @Volatile var ongoingServiceRunning = false
   private var mainActivityRef: WeakReference<Activity>? = null
@@ -79,34 +88,84 @@ object TotusCallManager {
 
   fun showIncoming(context: Context, callId: String, callerName: String) {
     val app = context.applicationContext
-    var alreadyAlerting = false
+    var isNew = false
     var nameChanged = false
     synchronized(lock) {
       if (finishedCallIds.contains(callId)) {
         return
       }
-      alreadyAlerting = incomingCallId == callId && (incomingNotificationShown || ringtone != null || vibrator != null)
-      nameChanged = callerName.isNotBlank() && callerName != incomingCallerName
-      if (incomingCallId != callId) {
+      isNew = incomingCallId != callId
+      if (isNew) {
         incomingCallerName = ""
+        alerting = false
+        silenced = false
       }
+      nameChanged = callerName.isNotBlank() && callerName != incomingCallerName
       incomingCallId = callId
       if (callerName.isNotBlank()) {
         incomingCallerName = callerName
       }
     }
-    if (alreadyAlerting) {
+    if (!isNew) {
       if (nameChanged && incomingNotificationShown) {
-        postIncomingNotification(app, false)
+        postIncomingNotification(app, silenced)
       }
       return
     }
-    if (mainActivityVisible) {
-      startInAppRinging(app)
+    // Self-managed Telecom call: the system then handles the side keys like for a normal call
+    // (volume / power while ringing -> Connection.onSilence). Our UI starts in onShowIncomingCallUi;
+    // if Telecom refuses or does not answer in time, the UI starts directly.
+    if (TotusTelecom.addIncomingCall(app, callId, incomingCallerName)) {
+      mainHandler.postDelayed({
+        if (incomingCallId == callId && !alerting) {
+          Log.w(TAG, "Telecom did not show the incoming call in time, showing it directly")
+          startAlerting(app, callId)
+        }
+      }, 2500L)
     } else {
-      postIncomingNotification(app, false)
+      startAlerting(app, callId)
     }
   }
+
+  /** Ringing starts: in-app ringtone if the app is on screen, otherwise the call notification. */
+  fun startAlerting(context: Context, callId: String) {
+    val app = context.applicationContext
+    synchronized(lock) {
+      if (incomingCallId != callId || alerting) {
+        return
+      }
+      alerting = true
+    }
+    if (mainActivityVisible) {
+      if (!silenced) {
+        startInAppRinging(app)
+      }
+    } else {
+      postIncomingNotification(app, silenced)
+    }
+  }
+
+  /**
+   * Side key while ringing (Telecom Connection.onSilence, or power key with the app on screen):
+   * stop the sound and vibration; the call keeps waiting for Answer / Decline.
+   */
+  fun silenceIncoming(context: Context) {
+    val app = context.applicationContext
+    synchronized(lock) {
+      if (incomingCallId == null || silenced) {
+        return
+      }
+      silenced = true
+    }
+    stopInAppRinging()
+    if (incomingNotificationShown) {
+      // Cancelling stops the insistent notification sound; the call stays in the shade, silent.
+      cancelIncomingNotification(app)
+      postIncomingNotification(app, true)
+    }
+  }
+
+  fun isRinging(): Boolean = incomingCallId != null && alerting && !silenced
 
   /** callId == null: dismiss whatever incoming call is shown. */
   fun dismissIncoming(context: Context, callId: String?) {
@@ -121,6 +180,8 @@ object TotusCallManager {
         return
       }
       incomingCallId = null
+      alerting = false
+      silenced = false
     }
     cancelIncomingNotification(context.applicationContext)
     stopInAppRinging()
@@ -147,7 +208,7 @@ object TotusCallManager {
     if (!silent) {
       try {
         val person = Person.Builder().setName(name).setImportant(true).build()
-        val builder = baseIncomingBuilder(context, name, fullScreen)
+        val builder = baseIncomingBuilder(context, name, fullScreen, INCOMING_CHANNEL_ID)
           .setFullScreenIntent(fullScreen, true)
           .setStyle(NotificationCompat.CallStyle.forIncomingCall(person, decline, answer))
           .addPerson(person)
@@ -165,7 +226,7 @@ object TotusCallManager {
     if (notification == null) {
       // Silent (screen turned off with the power button while ringing) or CallStyle failed:
       // plain notification with the same two actions, no full-screen intent.
-      notification = baseIncomingBuilder(context, name, fullScreen)
+      notification = baseIncomingBuilder(context, name, fullScreen, if (silent) SILENCED_CHANNEL_ID else INCOMING_CHANNEL_ID)
         .setSilent(silent)
         .addAction(0, context.getString(R.string.totus_call_action_decline), decline)
         .addAction(0, context.getString(R.string.totus_call_action_answer), answer)
@@ -176,8 +237,8 @@ object TotusCallManager {
     }
   }
 
-  private fun baseIncomingBuilder(context: Context, name: String, contentIntent: PendingIntent): NotificationCompat.Builder =
-    NotificationCompat.Builder(context, INCOMING_CHANNEL_ID)
+  private fun baseIncomingBuilder(context: Context, name: String, contentIntent: PendingIntent, channelId: String): NotificationCompat.Builder =
+    NotificationCompat.Builder(context, channelId)
       .setSmallIcon(R.drawable.ic_totus_phone_white_24)
       .setContentTitle(name)
       .setContentText(context.getString(R.string.totus_call_incoming_text))
@@ -241,6 +302,17 @@ object TotusCallManager {
       )
       channel.enableVibration(true)
       channel.vibrationPattern = VIBRATION_PATTERN
+      channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+      nm.createNotificationChannel(channel)
+    }
+    if (nm.getNotificationChannel(SILENCED_CHANNEL_ID) == null) {
+      val channel = NotificationChannel(
+        SILENCED_CHANNEL_ID,
+        context.getString(R.string.totus_call_channel_silenced),
+        NotificationManager.IMPORTANCE_LOW,
+      )
+      channel.setSound(null, null)
+      channel.enableVibration(false)
       channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
       nm.createNotificationChannel(channel)
     }
@@ -338,17 +410,23 @@ object TotusCallManager {
       return
     }
     val context = activity.applicationContext
+    if (!alerting) {
+      return // Telecom has not shown the call yet (onShowIncomingCallUi starts alerting)
+    }
     if (visible) {
       cancelIncomingNotification(context)
-      if (ringtone == null && vibrator == null) {
+      if (!silenced && ringtone == null && vibrator == null) {
         startInAppRinging(context)
       }
     } else {
       stopInAppRinging()
       val power = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
       val screenOn = power?.isInteractive ?: true
-      // Power button while ringing = silence (like the system dialer); the call stays in the shade.
-      postIncomingNotification(context, !screenOn)
+      if (!screenOn) {
+        // Power button while ringing = silence (like the system dialer); the call stays in the shade.
+        silenced = true
+      }
+      postIncomingNotification(context, silenced)
     }
   }
 
@@ -363,6 +441,7 @@ object TotusCallManager {
     setLockScreenMode(activity, true)
     if (action == CALL_ACTION_ANSWER) {
       dismissIncoming(activity.applicationContext, callId)
+      TotusTelecom.setActive(callId)
     }
     synchronized(lock) {
       pendingAction = mapOf("action" to action, "callId" to callId, "callerName" to name)
@@ -471,11 +550,54 @@ object TotusCallManager {
   fun stopAll(context: Context) {
     dismissIncoming(context, null)
     stopOngoing(context)
+    TotusTelecom.disconnectAll()
     synchronized(lock) {
       pendingAction = null
     }
     mainActivityRef?.get()?.let { setLockScreenMode(it, false) }
   }
+
+  // ------------------------------------------------------------------ actions from Telecom / notifications
+
+  /** Runs the JS task "TotusVoipActionTask" (index.js): tells the server, also with the app closed. */
+  fun startActionTask(context: Context, jsAction: String, callId: String) {
+    val app = context.applicationContext
+    try {
+      val serviceIntent = Intent(app, TotusVoipActionTaskService::class.java)
+        .putExtra("action", jsAction)
+        .putExtra("callId", callId)
+      app.startService(serviceIntent)
+      com.facebook.react.HeadlessJsTaskService.acquireWakeLockNow(app)
+    } catch (e: Exception) {
+      Log.w(TAG, "action task start failed", e)
+    }
+  }
+
+  /** "Отклонить" (notification) or reject from the system (Telecom, e.g. a headset). */
+  fun declineIncoming(context: Context, callId: String) {
+    dismissIncoming(context, callId)
+    TotusTelecom.disconnect(callId, android.telecom.DisconnectCause.REJECTED)
+    startActionTask(context, "com.totus.com.voip.REJECT", callId)
+  }
+
+  /** "Завершить" (ongoing notification) or hang-up from the system (side key, headset). */
+  fun hangUp(context: Context, callId: String) {
+    stopOngoing(context)
+    TotusTelecom.disconnect(callId, android.telecom.DisconnectCause.LOCAL)
+    startActionTask(context, "com.totus.com.voip.END", callId)
+  }
+
+  /** Answer from the system (Bluetooth headset, car, watch): handled by JS like "Ответить". */
+  fun answerFromSystem(context: Context, callId: String, callerName: String) {
+    dismissIncoming(context, callId)
+    TotusTelecom.setActive(callId)
+    synchronized(lock) {
+      pendingAction = mapOf("action" to CALL_ACTION_ANSWER, "callId" to callId, "callerName" to callerName)
+    }
+    onPendingActionAvailable?.invoke()
+  }
+
+  fun isIncomingCall(callId: String): Boolean = incomingCallId == callId
 
   fun canUseFullScreenIntent(context: Context): Boolean {
     if (Build.VERSION.SDK_INT < 34) {

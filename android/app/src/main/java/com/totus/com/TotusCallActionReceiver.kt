@@ -4,8 +4,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
-import com.facebook.react.HeadlessJsTaskService
 
 /**
  * "Отклонить" on the incoming-call notification and "Завершить" on the ongoing-call
@@ -16,25 +14,9 @@ import com.facebook.react.HeadlessJsTaskService
 class TotusCallActionReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     val callId = intent.getStringExtra(TotusCallManager.EXTRA_CALL_ID) ?: return
-    val jsAction = when (intent.action) {
-      ACTION_DECLINE -> {
-        TotusCallManager.dismissIncoming(context, callId)
-        "com.totus.com.voip.REJECT"
-      }
-      ACTION_HANGUP -> {
-        TotusCallManager.stopOngoing(context)
-        "com.totus.com.voip.END"
-      }
-      else -> return
-    }
-    try {
-      val serviceIntent = Intent(context, TotusVoipActionTaskService::class.java)
-        .putExtra("action", jsAction)
-        .putExtra("callId", callId)
-      context.startService(serviceIntent)
-      HeadlessJsTaskService.acquireWakeLockNow(context)
-    } catch (e: Exception) {
-      Log.w("TotusCall", "action task start failed", e)
+    when (intent.action) {
+      ACTION_DECLINE -> TotusCallManager.declineIncoming(context, callId)
+      ACTION_HANGUP -> TotusCallManager.hangUp(context, callId)
     }
   }
 

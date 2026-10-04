@@ -13,6 +13,7 @@
     <string name="totus_call_incoming_text">Входящий звонок</string>
     <string name="totus_call_ongoing_text">Идёт звонок</string>
     <string name="totus_call_channel_incoming">Входящие звонки</string>
+    <string name="totus_call_channel_silenced">Входящие звонки без звука</string>
     <string name="totus_call_channel_ongoing">Текущий звонок</string>
     <string name="totus_call_action_answer">Ответить</string>
     <string name="totus_call_action_decline">Отклонить</string>

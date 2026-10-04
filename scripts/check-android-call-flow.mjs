@@ -5,7 +5,8 @@
 // Owner tests 04.10.2026 (Samsung Galaxy A15, Android 16):
 //  1. app open: answered, media connected, the call could not be ended;
 //  2. app killed: answered, no connection;
-//  3. two call screens (Samsung Telecom + CallModal), permissions at first launch.
+//  3. two call screens (Samsung Telecom + CallModal), permissions at first launch;
+//  4. (05.10) the ringing could not be silenced with the side keys (volume / power).
 // Expected now: CallKeep native is never touched on Android; ringing goes to the native Totus
 // call UI (NativeModules.TotusCall); the microphone is asked only on "Ответить" / "Позвонить";
 // "Сбросить" during the answer stops it (no "answered" call coming back, no /answer sent);
@@ -76,6 +77,22 @@ await check('native: CallStyle + full-screen intent, Answer opens MainActivity, 
   assert.ok(/super\.onCreate\(null\)/.test(a));
   const app = read('android/app/src/main/java/com/totusclubapp/MainApplication.kt');
   assert.ok(/add\(TotusCallPackage\(\)\)/.test(app));
+});
+
+await check('side keys: self-managed Telecom call -> volume / power while ringing silence it', () => {
+  const t = read('android/app/src/main/java/com/totus/com/TotusConnectionService.kt');
+  assert.ok(/PhoneAccount\.CAPABILITY_SELF_MANAGED/.test(t), 'self-managed account (no system call screen)');
+  assert.ok(/PROPERTY_SELF_MANAGED/.test(t));
+  assert.ok(/override fun onShowIncomingCallUi\(\)[\s\S]*startAlerting/.test(t), 'our UI starts from Telecom');
+  assert.ok(/override fun onSilence\(\)[\s\S]*silenceIncoming/.test(t), 'volume / power key -> silence');
+  assert.ok(/override fun onReject\(\)/.test(t) && /override fun onDisconnect\(\)/.test(t));
+  const k = read('android/app/src/main/java/com/totus/com/TotusCallManager.kt');
+  assert.ok(/TotusTelecom\.addIncomingCall\(/.test(k), 'incoming registered in Telecom');
+  assert.ok(/fun silenceIncoming\(/.test(k) && /SILENCED_CHANNEL_ID/.test(k), 'silenced call stays visible, without sound');
+  assert.ok(/postDelayed\(/.test(k), 'UI starts even if Telecom does not answer');
+  const m = read('android/app/src/main/AndroidManifest.xml');
+  assert.ok(/MANAGE_OWN_CALLS/.test(m));
+  assert.ok(/\.TotusConnectionService"\s+android:permission="android\.permission\.BIND_TELECOM_CONNECTION_SERVICE"/.test(m));
 });
 
 if (!process.features || !process.features.typescript || typeof module.registerHooks !== 'function') {

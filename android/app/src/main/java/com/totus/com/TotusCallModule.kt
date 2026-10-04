@@ -40,6 +40,9 @@ class TotusCallModule(private val reactContext: ReactApplicationContext) :
       TotusCallManager.showIncoming(reactContext, callId, callerName ?: "")
     } else {
       TotusCallManager.dismissIncoming(reactContext, callId)
+      // Answered in the app (or the call left the ringing state): the Telecom call is active;
+      // an ended call is disconnected right after by stopAll().
+      TotusTelecom.setActive(callId)
     }
   }
 
