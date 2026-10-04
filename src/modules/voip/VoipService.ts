@@ -1,6 +1,6 @@
 import {AppState, AppStateStatus, Platform, PermissionsAndroid} from 'react-native';
 import VoipPushNotification from 'react-native-voip-push-notification';
-import RNCallKeep, {IOptions} from 'react-native-callkeep';
+import RNCallKeepNative, {IOptions} from 'react-native-callkeep';
 import InCallManager from 'react-native-incall-manager';
 import io from 'socket.io-client';
 import NetInfo, {NetInfoState} from '@react-native-community/netinfo';
@@ -8,6 +8,32 @@ import messaging, {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
 import {VOIP_BASE_URL} from '../../config/server';
+import {ensureAndroidMicPermission} from './androidCallPermissions';
+
+// Android (owner decision 04.10.2026): the system Telecom screen of CallKeep is not used — Totus
+// shows its own incoming-call notification / ringing (androidCallUi.ts, TotusCallManager.kt) and
+// the CallModal. Every CallKeep call on Android goes to this no-op stub: no "Phone Accounts"
+// alert, no READ_PHONE_* / CALL_PHONE prompts, no Samsung getDefaultOutgoingPhoneAccount crash,
+// no second (system) call that can be left ringing. iOS keeps the real CallKit module.
+const ANDROID_CALLKEEP_STUB: any = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      if (typeof prop !== 'string' || prop === 'then') {
+        return undefined;
+      }
+      if (prop === 'addEventListener') {
+        return () => ({remove() {}});
+      }
+      if (prop === 'getInitialEvents') {
+        return async () => [];
+      }
+      return () => Promise.resolve(undefined);
+    },
+  },
+);
+const RNCallKeep: typeof RNCallKeepNative =
+  Platform.OS === 'android' ? (ANDROID_CALLKEEP_STUB as typeof RNCallKeepNative) : RNCallKeepNative;
 // JWT для voip (SECURITY_JWT_PLAN_RU.md, волна 5): Bearer в HTTP и токен в handshake Socket.io.
 import {voipFetch, voipSocketAuth, setVoipAccessToken} from '../api/voipAuth';
 import {
@@ -396,7 +422,8 @@ function getAndroidMessaging(): ReturnType<typeof messaging> | null {
 }
 
 export async function ensureAndroidTelecomReady(): Promise<void> {
-  if (Platform.OS !== 'android') {
+  // Android: Telecom / CallKeep is not used any more (see ANDROID_CALLKEEP_STUB).
+  if (Platform.OS !== 'android' || RNCallKeep === ANDROID_CALLKEEP_STUB) {
     return;
   }
   if (isAndroidTelecomReady) {
@@ -648,55 +675,6 @@ const generateUUID = () =>
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
-
-async function requestAndroidCallPermissions(): Promise<boolean> {
-  if (Platform.OS !== 'android') {
-    return true;
-  }
-  try {
-    const permissions = [
-      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-      PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
-      PermissionsAndroid.PERMISSIONS.CAMERA,
-    ] as any;
-    if (Platform.Version >= 31) {
-      permissions.push(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
-    }
-    if (Platform.Version >= 33) {
-      permissions.push(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
-    }
-
-    const result = await PermissionsAndroid.requestMultiple(permissions);
-    const recordAudioGranted =
-      result[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] ===
-      PermissionsAndroid.RESULTS.GRANTED;
-    const readPhoneGranted =
-      result[PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE] ===
-      PermissionsAndroid.RESULTS.GRANTED;
-    const bluetoothGranted =
-      Platform.Version < 31 ||
-      result[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] ===
-        PermissionsAndroid.RESULTS.GRANTED;
-
-    // For VoIP WebRTC calls, RECORD_AUDIO is mandatory.
-    // READ_PHONE_STATE is useful for telecom integration but should not block call answer.
-    if (!readPhoneGranted) {
-      console.warn(
-        'Android READ_PHONE_STATE denied - continuing with limited CallKeep features',
-      );
-    }
-    if (!bluetoothGranted) {
-      console.warn(
-        'Android BLUETOOTH_CONNECT denied - Bluetooth headset routing may be limited',
-      );
-    }
-
-    return recordAudioGranted;
-  } catch (e) {
-    console.warn('Failed to request Android call permissions', e);
-    return false;
-  }
-}
 
 type AndroidIncomingNotification = {
   callUUID: string;
@@ -1138,6 +1116,7 @@ function ensureSocketConnected() {
     // end the CallKeep call and reset local state.
     if (payload?.state === 'ended' && callId) {
       console.log('Remote hangup received for call', callId);
+      markAndroidCallCancelled(callId);
       currentCallState = 'ended';
       connectionState = 'disconnected';
       pushNativeConnectionStatus();
@@ -1220,6 +1199,8 @@ function ensureSocketConnected() {
       pushNativeConnectionStatus();
       callerName = incomingCallerName || fromLoyaltyId || fromDeviceId || 'Incoming call';
       console.log('Incoming call offer cached from socket - callerName:', callerName);
+      ensureNativeConnectionStatusSync();
+      pushNativeConnectionStatus();
     }
   });
 
@@ -2731,6 +2712,10 @@ export async function startOutgoingVoiceCall(
     androidTelemetry('outgoing_blocked_busy');
     return;
   }
+  // Android: the microphone is asked only now, on "Позвонить".
+  if (Platform.OS === 'android' && !(await ensureAndroidMicPermission())) {
+    throw new Error('Нет доступа к микрофону');
+  }
   // Clean up any existing call completely before starting new one
   if (activeCallUUID || incomingCallUUID || currentCallState !== 'idle') {
     console.log('🧹 Cleaning up previous call before starting new one...');
@@ -3218,9 +3203,8 @@ export async function initVoipAndCallKeep(loyaltyId?: string) {
       hasAndroid: !!(callKeepSetupOptions as any)?.android,
       alertTitle: (callKeepSetupOptions as any)?.android?.alertTitle || null,
     });
-    if (Platform.OS === 'android') {
-      await requestAndroidCallPermissions();
-    }
+    // Android: no permission prompts at app start (owner decision 03.10.2026): the microphone
+    // is asked on "Позвонить" / "Ответить" (androidCallPermissions.ts); CallKeep is a stub.
     RNCallKeep.setup(callKeepSetupOptions);
     telecomDebug('setup_called');
     RNCallKeep.setAvailable(true);
@@ -3634,7 +3618,7 @@ export async function initVoipAndCallKeep(loyaltyId?: string) {
 
     if (Platform.OS === 'android') {
       activateAndroidAudioSession('answerCall-event');
-      const hasPermissions = await requestAndroidCallPermissions();
+      const hasPermissions = await ensureAndroidMicPermission();
       if (!hasPermissions) {
         // Do not force-reject incoming call when answering from background/killed state.
         // Runtime permission prompt can fail in headless flow; continue best-effort.
@@ -3829,6 +3813,10 @@ export async function startOutgoingVoiceCallByLoyaltyId(
   if (isAnotherCallInProgress()) {
     androidTelemetry('outgoing_loyalty_blocked_busy');
     return;
+  }
+  // Android: the microphone is asked only now, on "Позвонить".
+  if (Platform.OS === 'android' && !(await ensureAndroidMicPermission())) {
+    throw new Error('Нет доступа к микрофону');
   }
   // Validate prerequisites
   if (!targetLoyaltyId) {
@@ -4449,6 +4437,7 @@ function pushNativeConnectionStatus(): void {
     status.isConnected,
     isIncoming,
     isOutgoing,
+    callerName,
   ).catch(e => {
     if (Math.random() < 0.05) {
       console.warn('Failed to push native connection status', e);
@@ -4747,6 +4736,24 @@ export function setMute(muted: boolean): void {
 // Answer incoming call (programmatically trigger answer logic)
 // Process pending answer when app opens after answering from CallKeep
 // Shared function to handle answering a call (used by both CallKeep event and programmatic calls)
+// Android: the user hung up / declined (or the remote side ended) while the answer was still
+// running. Earlier every await of the answer re-set "answered" and the call came back after
+// "Сбросить". The answer now stops at the next step instead. iOS: no-op.
+const androidCancelledCallIds = new Set<string>();
+function markAndroidCallCancelled(callId: string | null | undefined): void {
+  if (Platform.OS === 'android' && callId) {
+    androidCancelledCallIds.add(callId);
+  }
+}
+function isAndroidCallCancelled(callId: string): boolean {
+  return Platform.OS === 'android' && androidCancelledCallIds.has(callId);
+}
+function throwIfAndroidCallCancelled(callId: string): void {
+  if (isAndroidCallCancelled(callId)) {
+    throw new Error(`Call ${callId} was ended while answering`);
+  }
+}
+
 async function handleAnswerCall(callUUID: string): Promise<void> {
   if (!answerGate.begin(callUUID)) {
     console.log('📞 Answer already running or done for call, skip duplicate:', callUUID);
@@ -4785,6 +4792,7 @@ async function handleAnswerCallOnce(callUUID: string): Promise<void> {
   // This ensures WebRTC and other services are ready
   await new Promise(resolve => setTimeout(resolve, 500));
   
+  throwIfAndroidCallCancelled(callUUID);
   // Re-confirm state after delay (in case something tried to change it)
   if (currentCallState !== 'answered' || activeCallUUID !== callUUID) {
     activeCallUUID = callUUID;
@@ -4814,6 +4822,7 @@ async function handleAnswerCallOnce(callUUID: string): Promise<void> {
         remoteOffer = await fetchRemoteOfferWithRetry(callUUID);
       }
 
+      throwIfAndroidCallCancelled(callUUID);
       // Re-confirm state before starting WebRTC (state should already be 'answered' from above)
       if (currentCallState !== 'answered' || activeCallUUID !== callUUID) {
         activeCallUUID = callUUID;
@@ -4826,6 +4835,7 @@ async function handleAnswerCallOnce(callUUID: string): Promise<void> {
       await startVoiceCall(callUUID, remoteOffer, 'callee');
       console.log('✅ WebRTC voice call started for incoming call', callUUID);
       
+      throwIfAndroidCallCancelled(callUUID);
       // CRITICAL: Ensure state is still 'answered' after WebRTC setup
       // This is a defensive check in case startVoiceCall or any async operation changed it
       if (currentCallState !== 'answered' || activeCallUUID !== callUUID) {
@@ -4860,6 +4870,7 @@ async function handleAnswerCallOnce(callUUID: string): Promise<void> {
         throw new Error('Local description not set after creating answer');
       }
       
+      throwIfAndroidCallCancelled(callUUID);
       console.log('📤 Sending answer to backend for call:', callUUID);
       console.log('   Answer type:', localDesc.type);
       console.log('   Answer SDP length:', localDesc.sdp?.length || 0);
@@ -4973,6 +4984,13 @@ async function handleAnswerCallOnce(callUUID: string): Promise<void> {
       }
     }
   } catch (e) {
+    if (isAndroidCallCancelled(callUUID)) {
+      console.log('📞 Answer stopped: the call was ended meanwhile', callUUID);
+      if (!activeCallUUID || activeCallUUID === callUUID) {
+        endVoiceCall();
+      }
+      throw e;
+    }
     console.error('❌ Failed to start WebRTC call on answer:', e);
     try {
       RNCallKeep.endCall(callUUID);
@@ -5003,6 +5021,13 @@ async function processPendingAnswer(callUUID: string): Promise<void> {
     answerGate.finish(callUUID, true);
   } catch (e) {
     answerGate.finish(callUUID, false);
+    if (isAndroidCallCancelled(callUUID)) {
+      console.log('processPendingAnswer: stopped, the call was ended meanwhile', callUUID);
+      if (!activeCallUUID || activeCallUUID === callUUID) {
+        endVoiceCall();
+      }
+      throw e;
+    }
     // Do not leave a frozen "answered" screen: end the call the same way handleAnswerCall does.
     try {
       RNCallKeep.endCall(callUUID);
@@ -5070,6 +5095,7 @@ async function processPendingAnswerOnce(callUUID: string): Promise<void> {
   }
   
   try {
+    throwIfAndroidCallCancelled(callUUID);
     // State is already set above, but ensure it's still 'answered'
     if (currentCallState !== 'answered') {
       currentCallState = 'answered';
@@ -5089,6 +5115,7 @@ async function processPendingAnswerOnce(callUUID: string): Promise<void> {
     await startVoiceCall(callUUID, remoteOffer, 'callee');
     console.log('processPendingAnswer: WebRTC voice call started');
     
+    throwIfAndroidCallCancelled(callUUID);
     // Ensure state is still 'answered' after WebRTC setup
     if (currentCallState !== 'answered') {
       currentCallState = 'answered';
@@ -5151,16 +5178,17 @@ export async function answerCall(callUUID: string): Promise<void> {
   
   try {
     if (Platform.OS === 'android') {
-      await startAndroidCallForegroundService(actualCallUUID, 'Active call');
-      activateAndroidAudioSession('answerCall-modal');
-      const hasPermissions = await requestAndroidCallPermissions();
-      if (!hasPermissions) {
-        // Avoid failing/ending accepted call in killed/background flow.
-        // Continue and let connection proceed if possible.
-        console.warn(
-          'Android answerCall: RECORD_AUDIO permission not granted, continuing best-effort',
-        );
+      // Microphone first (asked only now, on "Ответить"). Without it there is no conversation:
+      // decline cleanly instead of an "answered" call without sound.
+      const hasMic = await ensureAndroidMicPermission();
+      if (!hasMic) {
+        console.warn('Android answerCall: RECORD_AUDIO not granted, declining the call');
+        isAnsweringProgrammatically = false;
+        rejectCall(actualCallUUID);
+        return;
       }
+      activateAndroidAudioSession('answerCall-modal');
+      // The microphone foreground service starts in startVoiceCall (the app is on screen).
     }
 
     // STEP 1: Call answerIncomingCall() FIRST - This notifies CallKeep that we're answering
@@ -5239,11 +5267,58 @@ export async function answerCall(callUUID: string): Promise<void> {
   }
 }
 
+// Android: "Отклонить" / "Завершить" can come from a notification while the app is closed
+// (TotusVoipActionTask in a fresh JS context: no device token in memory yet). Take the FCM token
+// if needed; index.js awaits waitForAndroidCallActions() so the request is not cut off.
+let androidCallActionsInFlight: Promise<void> = Promise.resolve();
+function notifyServerAndroid(callId: string, kind: 'reject' | 'end'): void {
+  const run = async () => {
+    let deviceId = currentDeviceId;
+    if (!deviceId) {
+      try {
+        deviceId = (await getAndroidMessaging()?.getToken()) || null;
+      } catch (e) {
+        console.warn(`[android] ${kind}: FCM token not available`, e);
+      }
+    }
+    if (!deviceId) {
+      console.warn(`[android] ${kind}: no device id, server not notified`);
+      return;
+    }
+    try {
+      await voipFetch(`${BASE_URL}/api/calls/${callId}/${kind}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({deviceId}),
+      });
+      console.log(`[android] ${kind} sent for call`, callId);
+    } catch (e) {
+      console.warn(`[android] ${kind} request failed`, e);
+    }
+  };
+  androidCallActionsInFlight = androidCallActionsInFlight.then(run, run);
+}
+
+export function waitForAndroidCallActions(): Promise<void> {
+  return androidCallActionsInFlight;
+}
+
+/** Android cold start from "Ответить" in the notification: caller name for the CallModal. */
+export function setAndroidPendingCallerName(callId: string, name: string | null | undefined): void {
+  if (Platform.OS !== 'android' || !name) {
+    return;
+  }
+  if (!callerName || activeCallUUID === callId || incomingCallUUID === callId) {
+    callerName = name;
+  }
+}
+
 // Reject incoming call
 export function rejectCall(callUUID: string): void {
   try {
     androidTelemetry('callkeep_reject', {});
     console.log('📞 Rejecting call:', callUUID);
+    markAndroidCallCancelled(callUUID);
     
     // Update state immediately
     currentCallState = 'rejected';
@@ -5278,7 +5353,10 @@ export function rejectCall(callUUID: string): void {
     }
     
     // Inform backend that call was rejected (not just ended)
-    if (currentDeviceId) {
+    if (Platform.OS === 'android') {
+      nativeStopVoipService().catch(() => {});
+      notifyServerAndroid(callUUID, 'reject');
+    } else if (currentDeviceId) {
       voipFetch(`${BASE_URL}/api/calls/${callUUID}/reject`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -5419,6 +5497,7 @@ export function directSoundTest(): void {
 
 export function endCall(): void {
   const callId = activeCallUUID || incomingCallUUID;
+  markAndroidCallCancelled(callId);
   currentCallState = 'ended';
   activeCallUUID = null;
   incomingCallUUID = null;
@@ -5445,7 +5524,12 @@ export function endCall(): void {
     console.warn('endCall: media cleanup failed', e);
   }
 
-  if (currentDeviceId && callId) {
+  if (Platform.OS === 'android') {
+    nativeStopVoipService().catch(() => {});
+    if (callId) {
+      notifyServerAndroid(callId, 'end');
+    }
+  } else if (currentDeviceId && callId) {
     voipFetch(`${BASE_URL}/api/calls/${callId}/end`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
