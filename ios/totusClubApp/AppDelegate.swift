@@ -36,6 +36,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
 
     // PushKit before React Native starts, so a VoIP push can wake the closed app.
     let registry = PKPushRegistry(queue: .main)
+    // The only registry of the process: JS registerVoipToken() no longer creates a second one
+    // (react-native-voip-push-notification made a local registry that was released right away).
+    VoipPushHelper.useAppRegistryOnly(registry)
     registry.delegate = self
     registry.desiredPushTypes = [.voIP]
     voipRegistry = registry
@@ -134,7 +137,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
   // This method is called when the push registry receives an incoming push
   // Forward to the library's native module via Objective-C helper
   func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
-    print("📱 PKPushRegistry: didReceiveIncomingPushWith payload for type: \(type.rawValue)")
+    // NSLog (not print): visible in Console.app for a TestFlight build, closed iPhone included.
+    NSLog("[TotusVoIP] VoIP push received (app state %ld)", UIApplication.shared.applicationState.rawValue)
 
     // Extract call information from payload
     var callId: String? = nil
@@ -174,13 +178,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
       print("   - callerName: \(callerName ?? "nil")")
       print("   - hasVideo: \(hasVideo)")
 
-      // Post notification for VoIPPushModule
-      NotificationCenter.default.post(
-        name: NSNotification.Name("VoIPPushReceived"),
-        object: nil,
-        userInfo: dictionaryPayload
-      )
-
       // Cancel push (calling_api_v2, CALL_END_SYNC_RU.md): the call was answered on another
       // device, hung up, declined or missed. End the CallKit call with the same UUID — a
       // closed iPhone has no JS to do it. The incoming-call path below is unchanged.
@@ -195,6 +192,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
         ) {
           completion()
         }
+        postVoIPPushReceived(dictionaryPayload)
         return
       }
 
@@ -211,16 +209,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
         hasVideo: hasVideo,
         payload: dictionaryPayload
       ) {
-        print("   ✅ CallKeep reported successfully")
         completion()
       }
+      // Only after the CallKit report: nothing may run between the push and the report.
+      postVoIPPushReceived(dictionaryPayload)
     } else {
-      print("   ⚠️ Invalid payload format — still report CallKit so iOS does not kill the process")
-      NotificationCenter.default.post(
-        name: NSNotification.Name("VoIPPushReceived"),
-        object: nil,
-        userInfo: [:]
-      )
+      NSLog("[TotusVoIP] VoIP push payload is not a dictionary — still reporting a call to CallKit")
       let fallbackId = UUID().uuidString
       CallKeepHelper.reportIncomingCall(
         fallbackId,
@@ -231,7 +225,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
       ) {
         completion()
       }
+      postVoIPPushReceived([:])
     }
+  }
+
+  /// Push contents for VoIPPushModule (JS event). Called only after the CallKit report.
+  private func postVoIPPushReceived(_ userInfo: [String: Any]) {
+    NotificationCenter.default.post(
+      name: NSNotification.Name("VoIPPushReceived"),
+      object: nil,
+      userInfo: userInfo
+    )
   }
 
   // This method is called when the push registry is invalidated

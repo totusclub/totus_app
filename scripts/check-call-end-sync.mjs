@@ -556,15 +556,15 @@ await check('iOS CallKeepHelper: PushKit completion runs while the call is still
   assert.ok(/\+ \(void\)reportCallEnded:\(NSString \*\)callId/.test(h));
   const body = m.slice(m.indexOf('+ (void)reportCallEnded:'), m.lastIndexOf('@end'));
   const exist = body.slice(body.indexOf('if (existing) {'), body.indexOf('NSString *placeholderId'));
-  assert.ok(exist.indexOf('completion();') >= 0 && exist.indexOf('completion();') < exist.indexOf('endCallWithUUID:safeCallId'),
+  assert.ok(exist.indexOf('completion();') >= 0 && exist.indexOf('completion();') < exist.indexOf('endCallKitCall:safeCallId'),
     'existing call: completion before the end');
-  assert.ok(/dispatch_async\(dispatch_get_main_queue\(\), \^\{\s*\[RNCallKeep endCallWithUUID:safeCallId/.test(exist), 'end on the next run-loop turn');
+  assert.ok(/dispatch_async\(dispatch_get_main_queue\(\), \^\{\s*\[self endCallKitCall:safeCallId/.test(exist), 'end on the next run-loop turn');
   assert.ok(/existing\.hasConnected && \[reason isEqualToString:@"answered_elsewhere"\]/.test(exist), 'answered call kept on answered_elsewhere');
   assert.ok(!/reportIncomingCall:safeCallId/.test(body), 'an ended call UUID is never reported again');
   const ph = body.slice(body.indexOf('NSString *placeholderId'));
   assert.ok(/placeholderId = \[\[NSUUID UUID\] UUIDString\]/.test(ph), 'placeholder gets a new UUID');
   assert.ok(/\[self reportIncomingCall:placeholderId/.test(ph), 'no call in CallKit: a placeholder is reported');
-  assert.ok(ph.indexOf('completion();') >= 0 && ph.indexOf('completion();') < ph.indexOf('endCallWithUUID:placeholderId'),
+  assert.ok(ph.indexOf('completion();') >= 0 && ph.indexOf('completion();') < ph.indexOf('endCallKitCall:placeholderId'),
     'placeholder: completion before the end');
   for (const [r, v] of [['answered_elsewhere', 4], ['rejected', 5], ['missed', 3]]) {
     assert.ok(new RegExp(`"${r}"[^]*?return ${v};`).test(m), r);
@@ -582,7 +582,9 @@ await check('iOS: CallKit provider is set up natively at launch, before PushKit 
   assert.ok(/\[RNCallKeep setup:options\]/.test(fn), 'react-native-callkeep native setup');
   const js = read('src/modules/voip/VoipService.ts');
   const jsName = (js.match(/ios:\s*\{\s*appName:\s*'([^']+)'/) || [])[1];
-  assert.ok(jsName && fn.includes(`@"appName": @"${jsName}"`), 'same appName as JS CALLKEEP_OPTIONS');
+  const opts = m.slice(m.indexOf('+ (NSDictionary *)callKitOptions'), m.indexOf('+ (void)setupCallKitNatively'));
+  assert.ok(/\[self callKitOptions\]/.test(fn), 'setup uses the shared CallKit options');
+  assert.ok(jsName && opts.includes(`@"appName": @"${jsName}"`), 'same appName as JS CALLKEEP_OPTIONS');
   const report = m.slice(m.indexOf('+ (void)reportIncomingCall:'), m.indexOf('// RNCallKeep endCallWithUUID'));
   assert.ok(!/getBridge/.test(report), 'reporting a call does not touch the React Native bridge');
   assert.ok(/\+ \(void\)setupCallKitNatively;/.test(read('ios/totusClubApp/CallKeepHelper.h')));
