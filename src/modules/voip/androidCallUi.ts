@@ -70,6 +70,27 @@ export function stopAndroidCallUi(): void {
   }
 }
 
+/**
+ * The call ended on another device / by the caller (FCM call_ended, server check): only this
+ * call's ringing, notification and Telecom call. The id is remembered natively, so a late
+ * incoming push of the same call does not ring again.
+ */
+export function endAndroidRemoteCall(callId: string): void {
+  const m = native();
+  if (!m || !callId) {
+    return;
+  }
+  try {
+    if (typeof m.endRemote === 'function') {
+      m.endRemote(String(callId));
+    } else {
+      m.dismissIncoming(String(callId));
+    }
+  } catch (e) {
+    console.warn('[android-call-ui] endRemote failed', e);
+  }
+}
+
 export async function consumeAndroidCallAction(): Promise<AndroidCallAction | null> {
   const m = native();
   if (!m) {

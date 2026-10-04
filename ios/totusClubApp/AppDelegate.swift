@@ -176,6 +176,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
         userInfo: dictionaryPayload
       )
 
+      // Cancel push (calling_api_v2, CALL_END_SYNC_RU.md): the call was answered on another
+      // device, hung up, declined or missed. End the CallKit call with the same UUID — a
+      // closed iPhone has no JS to do it. The incoming-call path below is unchanged.
+      if (dictionaryPayload["type"] as? String) == "call_ended" {
+        let reason = dictionaryPayload["reason"] as? String
+        print("   📴 Call ended elsewhere: \(callId ?? "nil") (\(reason ?? "-"))")
+        CallKeepHelper.reportCallEnded(
+          callId ?? UUID().uuidString,
+          reason: reason,
+          callerName: dictionaryPayload["callerName"] as? String,
+          payload: dictionaryPayload
+        ) {
+          completion()
+        }
+        return
+      }
+
       // Always report CallKit before PushKit completion — even if payload keys are missing.
       // Missing report + completion() = iOS terminates the app (killed-state VoIP crash).
       let reportCallId = callId ?? UUID().uuidString

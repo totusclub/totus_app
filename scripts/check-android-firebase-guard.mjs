@@ -128,7 +128,7 @@ const LOCAL_STUBS = {
     export const voipSocketAuth = cb => cb({ token: 't' });
     export const setVoipAccessToken = () => {};`,
   'modules/voip/AndroidCallForegroundService': `export const startAndroidCallForegroundService = async () => {}; export const stopAndroidCallForegroundService = async () => {};`,
-  'modules/voip/NativeVoipOrchestrator': `export const nativeStopVoipService = () => {}; export const nativeUpdateConnectionStatus = () => {};`,
+  'modules/voip/NativeVoipOrchestrator': `export const nativeStopVoipService = () => {}; export const nativeUpdateConnectionStatus = () => {}; export const nativeEndRemoteCall = () => {};`,
   'modules/voip/AndroidPowerManager': `export const ensureAndroidBatteryOptimizationHandled = async () => {}; export const maybePromptAndroidVoipPowerSetup = async () => {};`,
 };
 module.registerHooks({

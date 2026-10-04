@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <CallKit/CallKit.h>
 #import "RNCallKeep.h"
 #import <React/RCTBridge.h>
 #import <React/RCTRootView.h>
@@ -141,6 +142,66 @@ static RCTBridge *storedBridge = nil;
     if (completion) {
         completion();
     }
+}
+
+// RNCallKeep endCallWithUUID:reason: -> CXCallEndedReason:
+// 2 remoteEnded, 3 unanswered (missed / caller cancelled), 4 answeredElsewhere, 5 declinedElsewhere.
++ (int)callKitEndReason:(NSString *)reason {
+    if ([reason isEqualToString:@"answered_elsewhere"]) {
+        return 4;
+    }
+    if ([reason isEqualToString:@"rejected"]) {
+        return 5;
+    }
+    if ([reason isEqualToString:@"missed"] || [reason isEqualToString:@"caller_cancel"]) {
+        return 3;
+    }
+    return 2;
+}
+
++ (void)reportCallEnded:(NSString *)callId
+                 reason:(NSString *)reason
+             callerName:(NSString *)callerName
+                payload:(NSDictionary *)payload
+             completion:(void (^)(void))completion {
+    NSLog(@"📞 CallKeepHelper: call ended elsewhere: %@ (%@)", callId, reason ?: @"-");
+    NSString *safeCallId = (callId.length > 0) ? callId : [[NSUUID UUID] UUIDString];
+    int endReason = [self callKitEndReason:reason ?: @""];
+
+    // A call this iPhone has answered itself is not ended by "answered elsewhere"
+    // (the server does not send that to the answering phone; this is only a safety net).
+    BOOL keepCall = NO;
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:safeCallId];
+    if (uuid) {
+        CXCallObserver *observer = [[CXCallObserver alloc] init];
+        for (CXCall *call in observer.calls) {
+            if ([call.UUID isEqual:uuid] && call.hasConnected && !call.hasEnded &&
+                [reason isEqualToString:@"answered_elsewhere"]) {
+                keepCall = YES;
+            }
+        }
+    }
+
+    void (^finish)(void) = ^{
+        if (!keepCall && [RNCallKeep respondsToSelector:@selector(endCallWithUUID:reason:)]) {
+            [RNCallKeep endCallWithUUID:safeCallId reason:endReason];
+            NSLog(@"✅ CallKit call ended (reason %d): %@", endReason, safeCallId);
+        }
+        if (completion) {
+            completion();
+        }
+    };
+
+    // PushKit: every VoIP push must report a call to CallKit, otherwise iOS kills the app.
+    // If this call is still ringing, the report fails as a duplicate (harmless) and the call is
+    // ended right after; if CallKit no longer has it, it is reported and ended at once.
+    NSMutableDictionary *safePayload = payload ? [payload mutableCopy] : [NSMutableDictionary dictionary];
+    [self reportIncomingCall:safeCallId
+                      handle:@"totus"
+                  callerName:(callerName.length > 0 ? callerName : @"Totus")
+                    hasVideo:NO
+                     payload:safePayload
+                  completion:finish];
 }
 
 @end

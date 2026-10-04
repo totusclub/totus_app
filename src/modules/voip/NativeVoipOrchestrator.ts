@@ -1,5 +1,10 @@
 /** Native call UI sync (Android: androidCallUi.ts / TotusCallManager.kt). No-ops on iOS. */
-import {stopAndroidCallUi, syncAndroidIncomingCall} from './androidCallUi';
+import {endAndroidRemoteCall, stopAndroidCallUi, syncAndroidIncomingCall} from './androidCallUi';
+
+/** Android: the call ended elsewhere — only this call's ringing / notification / Telecom call. */
+export function nativeEndRemoteCall(callId: string): void {
+  endAndroidRemoteCall(callId);
+}
 
 export async function nativeStopVoipService(): Promise<void> {
   stopAndroidCallUi();

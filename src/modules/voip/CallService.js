@@ -9,6 +9,7 @@ import {
   queuePendingAnswerFromBackground,
   getCallState,
   setAndroidPendingCallerName,
+  handleRemoteCallEnded,
 } from './VoipService';
 import {consumeAndroidCallAction, onAndroidCallActionAvailable} from './androidCallUi';
 import {ensureAndroidMicPermission} from './androidCallPermissions';
@@ -32,11 +33,24 @@ function isSupportMessage(data) {
 // Любой пуш хаба уведомлений (data.type задан, не звонок): в foreground показываем
 // баннер через notifee (pushService), в фоне ничего не делаем — `notification` рисует система.
 function isHubNotificationMessage(data) {
-  return Boolean(data) && Boolean(data.type) && !isIncomingCallMessage(data);
+  return Boolean(data) && Boolean(data.type) && !isIncomingCallMessage(data) && !isCallEndedMessage(data);
+}
+
+// Отменяющий push звонка (calling_api_v2, CALL_END_SYNC_RU.md): звонок закончился на другом
+// устройстве / у звонящего. data: {type: 'call_ended', callId, reason}. Не входящий и не баннер.
+function isCallEndedMessage(data) {
+  return Boolean(data) && data.type === 'call_ended';
+}
+
+function handleCallEndedMessage(data) {
+  handleRemoteCallEnded(data.callId || data.callUUID || data.uuid || null, data.reason || null);
 }
 
 function isIncomingCallMessage(data) {
   if (!data) {
+    return false;
+  }
+  if (isCallEndedMessage(data)) {
     return false;
   }
   if (data.type === 'incoming_call') {
@@ -81,6 +95,10 @@ export function registerAndroidCallBackgroundHandlers() {
   try {
     messaging().setBackgroundMessageHandler(async remoteMessage => {
       const data = remoteMessage?.data;
+      if (isCallEndedMessage(data)) {
+        handleCallEndedMessage(data);
+        return;
+      }
       if (isSupportMessage(data) || isHubNotificationMessage(data)) {
         return;
       }
@@ -91,6 +109,10 @@ export function registerAndroidCallBackgroundHandlers() {
 
     messaging().onMessage(async remoteMessage => {
       const data = remoteMessage?.data;
+      if (isCallEndedMessage(data)) {
+        handleCallEndedMessage(data);
+        return;
+      }
       if (isSupportMessage(data)) {
         DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
         if (!isSupportChatScreenOpen()) {
@@ -221,6 +243,11 @@ export async function handleIncomingPush(message, source = 'unknown') {
       hasCallId: Boolean(data?.callId || data?.callUUID || data?.uuid),
     });
     if (!data) return;
+
+    if (isCallEndedMessage(data)) {
+      handleCallEndedMessage(data);
+      return;
+    }
 
     if (isSupportMessage(data) || isHubNotificationMessage(data)) {
       // Background: OS already displays notification payload. Foreground path is onMessage.
