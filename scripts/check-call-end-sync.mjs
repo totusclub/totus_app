@@ -68,7 +68,7 @@ const MOCKS = {
     export default new Proxy({}, { get: (_, k) => (...a) => {
       M().callKeep.push([String(k), ...a]);
       if (k === 'getCalls') return Promise.resolve(M().ckCalls);
-      if (k === 'getInitialEvents') return Promise.resolve([]);
+      if (k === 'getInitialEvents') return Promise.resolve(M().initialEvents || []);
       if (k === 'addEventListener') { (M().ckListeners[a[0]] ||= []).push(a[1]); return { remove() {} }; }
       return Promise.resolve(true);
     } });`,
@@ -410,7 +410,7 @@ async function initIos(V) {
   await sleep(40);
 }
 await check('VoIP push call_ended while JS runs: state reset, CallKit told "answered elsewhere", nothing sent', async () => {
-  const {V, M} = await fresh({os: 'ios'});
+  const {V, M} = await fresh({os: 'ios', appState: 'active'});
   await initIos(V);
   M.voipListeners.notification({type: 'incoming_call', callId: 'i1', callerName: 'Тест'});
   assert.equal(V.getCallState().state, 'ringing');
@@ -477,6 +477,82 @@ for (const os of ['android', 'ios']) {
   });
 }
 
+out('iOS: answer on Android / answer from the lock screen (owner 05.10, after #26)');
+const AND_ID = '7a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d';
+const ringingCk = id => [{callUUID: id.toUpperCase(), hasConnected: false, hasEnded: false, outgoing: false}];
+await check('iPhone not on screen, answered on Android: the ringing CallKit call is left to the cancel push (no repeated incoming)', async () => {
+  // Before: JS ended CallKit on the socket 'ended', the cancel VoIP push then found no call and
+  // AppDelegate had to show a placeholder incoming call and end it — "the iPhone rings again".
+  const {V, M} = await fresh({os: 'ios', ckCalls: ringingCk(AND_ID)});
+  await initIos(V);
+  for (const cb of M.socketHandlers['call-state'] || []) cb({callId: AND_ID, state: 'ended', reason: 'answered_elsewhere'});
+  await sleep(20);
+  assert.equal(ck(M, 'reportEndCallWithUUID').filter(c => c[1] === AND_ID).length, 0, 'not ended before the cancel push');
+  assert.notEqual(V.getCallState().state, 'ringing');
+  M.ckCalls = []; // the cancel push ended it natively (CallKeepHelper.reportCallEnded, same UUID)
+  await sleep(90); // 3 s wait (scaled)
+  assert.equal(ck(M, 'reportEndCallWithUUID').filter(c => c[1] === AND_ID).length, 0);
+  assert.equal(ck(M, 'endCall').filter(c => c[1] === AND_ID).length, 0);
+  assert.equal(posted(M, 'end', AND_ID).length + posted(M, 'reject', AND_ID).length, 0, 'nothing sent');
+});
+await check('iPhone not on screen, cancel push lost: JS ends the ringing CallKit call after 3 s', async () => {
+  const {V, M} = await fresh({os: 'ios', ckCalls: ringingCk(AND_ID)});
+  await initIos(V);
+  for (const cb of M.socketHandlers['call-state'] || []) cb({callId: AND_ID, state: 'ended', reason: 'answered_elsewhere'});
+  await sleep(90);
+  assert.ok(ck(M, 'reportEndCallWithUUID').some(c => c[1] === AND_ID && c[2] === 4), 'ended as answered elsewhere');
+});
+await check('app on screen: the CallKit call is ended at once (the cancel push then shows nothing)', async () => {
+  const {V, M} = await fresh({os: 'ios', appState: 'active', ckCalls: ringingCk(AND_ID)});
+  await initIos(V);
+  for (const cb of M.socketHandlers['call-state'] || []) cb({callId: AND_ID, state: 'ended', reason: 'answered_elsewhere'});
+  await sleep(20);
+  assert.ok(ck(M, 'reportEndCallWithUUID').some(c => c[1] === AND_ID && c[2] === 4));
+});
+await check('iPhone not on screen, a call in progress ended by the other side: CallKit ends at once', async () => {
+  const {V, M} = await fresh({os: 'ios', ckCalls: [{callUUID: AND_ID.toUpperCase(), hasConnected: true, hasEnded: false, outgoing: false}]});
+  await initIos(V);
+  for (const cb of M.socketHandlers['call-state'] || []) cb({callId: AND_ID, state: 'ended', reason: 'hangup'});
+  await sleep(20);
+  assert.ok(ck(M, 'reportEndCallWithUUID').some(c => c[1] === AND_ID), 'no 3 s of a dead conversation on screen');
+});
+await check('answer in CallKit for a call JS saw only in CallKit: the call window shows the caller, not «Неизвестный»', async () => {
+  const {V, M} = await fresh({os: 'ios'});
+  await initIos(V);
+  for (const cb of M.ckListeners.didDisplayIncomingCall || []) cb({callUUID: 'f00d0000-0000-4000-8000-000000000001', localizedCallerName: 'Totus', payload: {placeholderFor: AND_ID}});
+  for (const cb of M.ckListeners.didDisplayIncomingCall || []) cb({callUUID: AND_ID, localizedCallerName: 'Поддержка Totus', payload: {}});
+  for (const cb of M.ckListeners.answerCall || []) cb({callUUID: AND_ID});
+  await sleep(10);
+  assert.equal(V.getCallState().state, 'answered');
+  assert.equal(V.getCallState().callerName, 'Поддержка Totus');
+});
+await check('answer on the lock screen before JS started: the name comes from the CallKit event queue', async () => {
+  const {V, M} = await fresh({os: 'ios'});
+  M.initialEvents = [
+    {name: 'RNCallKeepDidDisplayIncomingCall', data: {callUUID: AND_ID, localizedCallerName: 'Поддержка Totus', payload: {}}},
+    {name: 'RNCallKeepPerformAnswerCallAction', data: {callUUID: AND_ID}},
+  ];
+  await initIos(V);
+  await sleep(40);
+  assert.equal(V.getCallState().state, 'answered');
+  assert.equal(V.getCallState().callUUID, AND_ID);
+  assert.equal(V.getCallState().callerName, 'Поддержка Totus');
+});
+await check('no name from CallKit: the call window takes the caller name from the server', async () => {
+  const {V, M} = await fresh({os: 'ios', calls: {[AND_ID]: {state: 'ringing', callerName: 'Оператор'}}});
+  M.initialEvents = [{name: 'RNCallKeepPerformAnswerCallAction', data: {callUUID: AND_ID}}];
+  await initIos(V);
+  await sleep(150);
+  assert.equal(V.getCallState().callUUID, AND_ID);
+  assert.equal(V.getCallState().callerName, 'Оператор');
+});
+await check('Android: caller names from CallKit / server are not applied (Android flow unchanged)', async () => {
+  const {V, M} = await fresh({calls: {a9: {state: 'ringing', callerName: 'Сервер'}}});
+  await initAndroid(V);
+  await ringing(V, 'a9');
+  assert.equal(V.getCallState().callerName, 'Тест');
+});
+
 out('iOS: support call while the iPhone is in the background / closed (05.10)');
 const UP = id => id.toUpperCase(); // CallKit getCalls() returns upper-case UUIDs
 const SUP = '5e1f0c2a-7d3b-4c6e-9a1f-2b3c4d5e6f70';
@@ -516,14 +592,14 @@ await check('declined on Android while the iPhone app is open: window and CallKi
   assert.equal(posted(M, 'end', SUP).length + posted(M, 'reject', SUP).length, 0, 'nothing sent for a call ended elsewhere');
 });
 await check('ended elsewhere, JS never knew the call (only CallKit): CallKit ends', async () => {
-  const {V, M} = await fresh({os: 'ios'});
+  const {V, M} = await fresh({os: 'ios', appState: 'active'});
   await initIos(V);
   for (const cb of M.socketHandlers['call-state'] || []) cb({callId: SUP, state: 'ended', reason: 'answered_elsewhere'});
   await sleep(20);
   assert.ok(ck(M, 'reportEndCallWithUUID').some(c => c[1] === SUP && c[2] === 4));
 });
 await check('CallKit still shows the call after reportEndCall: ended by CXEndCallAction, no /end, current state untouched', async () => {
-  const {V, M} = await fresh({os: 'ios', ckCalls: [{callUUID: UP(SUP), hasConnected: false, hasEnded: false, outgoing: false}]});
+  const {V, M} = await fresh({os: 'ios', appState: 'active', ckCalls: [{callUUID: UP(SUP), hasConnected: false, hasEnded: false, outgoing: false}]});
   await initIos(V);
   for (const cb of M.socketHandlers['call-state'] || []) cb({callId: SUP, state: 'ended', reason: 'hangup'});
   await sleep(80); // 1.5 s check (scaled)
@@ -546,7 +622,7 @@ await check('iOS AppDelegate: VoIP push call_ended ends the CallKit call; incomi
   const block = ad.slice(cancel, incoming);
   assert.ok(/CallKeepHelper\.reportCallEnded\(/.test(block));
   assert.ok(/completion\(\)/.test(block) && /return\n/.test(block));
-  assert.ok(/PKPushRegistry\(queue: \.main\)/.test(ad), 'registry still created at launch');
+  assert.ok(/PKPushRegistry\(queue: voipPushQueue\)/.test(ad), 'registry still created at launch (own queue)');
 });
 await check('iOS CallKeepHelper: PushKit completion runs while the call is still in CallKit, the end comes after', async () => {
   // iOS 13+: at completion the app must have a call in CallKit; ending it before completion makes
@@ -575,7 +651,7 @@ await check('iOS: CallKit provider is set up natively at launch, before PushKit 
   // iOS killed the app launched in the background by the VoIP push because no call was reported.
   const ad = read('ios/totusClubApp/AppDelegate.swift');
   const setup = ad.indexOf('CallKeepHelper.setupCallKitNatively()');
-  const registry = ad.indexOf('PKPushRegistry(queue: .main)');
+  const registry = ad.indexOf('PKPushRegistry(queue: voipPushQueue)');
   assert.ok(setup > 0 && registry > setup, 'CallKit set up before the PushKit registry');
   const m = read('ios/totusClubApp/CallKeepHelper.m');
   const fn = m.slice(m.indexOf('+ (void)setupCallKitNatively'), m.indexOf('+ (void)reportIncomingCall:'));

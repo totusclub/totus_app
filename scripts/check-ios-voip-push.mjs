@@ -74,7 +74,7 @@ check('AppDelegate: every push branch reports to CallKit before anything else is
 check('AppDelegate: PushKit completion runs only from the CallKit report callbacks', () => {
   const h = body(ad, 'func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith');
   const calls = [...h.matchAll(/completion\(\)/g)].length;
-  const inCallbacks = [...h.matchAll(/\) \{\s*completion\(\)\s*\}/g)].length;
+  const inCallbacks = [...h.matchAll(/\) \{\s*completion\(\)\n/g)].length;
   assert.equal(calls, 3);
   assert.equal(inCallbacks, 3, 'completion() only inside the CallKeepHelper callbacks');
   const post = body(ad, 'private func postVoIPPushReceived');
@@ -141,6 +141,39 @@ check('One PKPushRegistry: created at launch, the library no longer creates its 
   assert.ok(/pushTokenForType:PKPushTypeVoIP/.test(t), 'token read from the app registry otherwise');
   const d = body(vm, '+ (void)didUpdatePushCredentials:(PKPushCredentials *)credentials forType:(PKPushType)type');
   assert.ok(/totusLastCredentials = credentials;/.test(d) && /\[RNVoipPushNotificationManager didUpdatePushCredentials:credentials forType:type\]/.test(d));
+});
+check('Cancel push with no CallKit call: nothing shown in the foreground / during another call (no repeated incoming)', () => {
+  // Owner 05.10: answered on Android -> the iPhone showed an incoming call again and ended it.
+  // Apple DTS: a VoIP push needs no new call while the app is in the foreground or on a call.
+  const e = body(m, '+ (void)reportCallEnded:(NSString *)callId');
+  const skip = e.indexOf('if ([self isAppInForeground] || otherLiveCall) {');
+  const placeholder = e.indexOf('NSString *placeholderId');
+  assert.ok(skip > 0 && placeholder > skip, 'foreground / other call checked before the placeholder');
+  const branch = e.slice(skip, placeholder);
+  assert.ok(/completion\(\);[^]*return;/.test(branch) && !/reportIncomingCall/.test(branch), 'completion only, no report');
+  assert.ok(/if \(call\.hasEnded\) \{\s*continue;/.test(e) && /otherLiveCall = YES;/.test(e), 'live calls counted');
+  const t = body(m, '+ (void)trackForegroundState');
+  for (const n of ['UIApplicationWillEnterForegroundNotification', 'UIApplicationDidBecomeActiveNotification', 'UIApplicationDidEnterBackgroundNotification']) {
+    assert.ok(t.includes(n), n);
+  }
+  assert.ok(/atomic_store\(&totusAppInForeground/.test(t) && /atomic_load\(&totusAppInForeground\)/.test(m), 'atomic: read on the PushKit queue');
+  assert.ok(/\[self trackForegroundState\];/.test(body(m, '+ (void)setupCallKitNatively')), 'tracked from launch');
+});
+check('AppDelegate: React Native starts in the background only after CallKit has the incoming call', () => {
+  const h = body(ad, 'func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith');
+  const starts = [...h.matchAll(/startReactNativeAfterCallKitReport\(\)/g)].map(x => x.index);
+  assert.equal(starts.length, 1, 'only the incoming-call branch');
+  const report = h.lastIndexOf('CallKeepHelper.reportIncomingCall(\n        reportCallId', starts[0]);
+  const done = h.indexOf('completion()', report);
+  assert.ok(report > 0 && done > report && starts[0] > done, 'inside the report callback, after completion()');
+  assert.ok(h.indexOf('== "call_ended"') < report, 'not for the cancel push');
+  const a = body(ad, 'fileprivate func startReactNativeAfterCallKitReport()');
+  assert.ok(/incomingCallReported = true/.test(a));
+  assert.ok(/rootViewFactory\.view\(\s*withModuleName: "totusClubApp"/.test(a), 'no window yet: JS without a window');
+  const s = body(ad, 'func startReactNativeIfNeeded()');
+  assert.ok(/if let rootView = backgroundRootView/.test(s) && /window\.rootViewController = rootViewController/.test(s), 'same JS shown when opened');
+  assert.ok(/applicationState == \.background && !appDelegate\.incomingCallReported/.test(ad), 'scene in background: start only after the report');
+  assert.ok(/func sceneDidBecomeActive[^]*startReactNativeIfNeeded\(\)/.test(ad), 'opening the app still starts / shows JS');
 });
 check('JS and Android untouched: JS still registers the token and reads CallKeep events as before', () => {
   const js = read('src/modules/voip/VoipService.ts');

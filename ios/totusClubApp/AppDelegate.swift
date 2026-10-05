@@ -26,6 +26,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
   /// crash) and the lock-screen call never appeared.
   private let voipPushQueue = DispatchQueue(label: "com.totus.voip.push")
   private var didStartReactNative = false
+  /// An incoming call is already in CallKit: React Native may start in the background now.
+  fileprivate var incomingCallReported = false
+  /// React Native root view started for an incoming call before any window existed.
+  private var backgroundRootView: UIView?
   fileprivate var reactLaunchOptions: [UIApplication.LaunchOptionsKey: Any] = [:]
 
   func application(
@@ -74,7 +78,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
   /// Starts the JS bundle once. A locked/background launch must not call this until
   /// CallKit has been given the incoming call.
   func startReactNativeIfNeeded() {
-    guard !didStartReactNative, let window, let factory = reactNativeFactory else {
+    guard let window, let factory = reactNativeFactory else {
+      return
+    }
+    // JS was already started in the background for an incoming call (no window then):
+    // show that same root view — one JS instance, the call keeps running.
+    if let rootView = backgroundRootView, let delegate = reactNativeDelegate {
+      backgroundRootView = nil
+      let rootViewController = delegate.createRootViewController()
+      delegate.setRootView(rootView, toRootViewController: rootViewController)
+      window.rootViewController = rootViewController
+      window.makeKeyAndVisible()
+      storeBridgeSoon(from: window)
+      return
+    }
+    guard !didStartReactNative else {
       return
     }
     didStartReactNative = true
@@ -83,6 +101,34 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
       in: window,
       launchOptions: reactLaunchOptions
     )
+    storeBridgeSoon(from: window)
+  }
+
+  /// After CallKit has the incoming call (never before): start React Native in the background, as
+  /// totus_support_app does. Otherwise an answer on the lock screen / from the banner reaches no
+  /// JS — no WebRTC, no sound — until the user opens the app, and the app then shows a call window
+  /// for a call it only learns about at that moment.
+  fileprivate func startReactNativeAfterCallKitReport() {
+    incomingCallReported = true
+    guard !didStartReactNative, let factory = reactNativeFactory else {
+      return
+    }
+    if window != nil {
+      NSLog("[TotusVoIP] incoming call in CallKit — starting React Native in the background")
+      startReactNativeIfNeeded()
+      return
+    }
+    // No scene yet (iOS connects it only when the app is opened): JS without a window.
+    didStartReactNative = true
+    backgroundRootView = factory.rootViewFactory.view(
+      withModuleName: "totusClubApp",
+      initialProperties: nil,
+      launchOptions: reactLaunchOptions
+    )
+    NSLog("[TotusVoIP] incoming call in CallKit — React Native started without a window")
+  }
+
+  private func storeBridgeSoon(from window: UIWindow) {
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
       guard let rootVC = window.rootViewController else {
         print("⚠️ Could not store bridge in CallKeepHelper, will try to get it dynamically")
@@ -256,6 +302,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
         payload: dictionaryPayload
       ) {
         completion()
+        DispatchQueue.main.async {
+          self.startReactNativeAfterCallKitReport()
+        }
       }
       // Only after the CallKit report: nothing may run between the push and the report.
       postVoIPPushReceived(dictionaryPayload)
@@ -337,7 +386,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     // Locked phone: iOS connects this scene while the VoIP push is still being
     // reported. Loading the JS bundle here blocks launch and the call UI never shows.
-    if UIApplication.shared.applicationState == .background {
+    if UIApplication.shared.applicationState == .background && !appDelegate.incomingCallReported {
       NSLog("[TotusVoIP] locked/background launch — CallKit before React Native")
     } else {
       appDelegate.startReactNativeIfNeeded()

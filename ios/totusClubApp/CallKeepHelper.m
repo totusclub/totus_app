@@ -2,6 +2,8 @@
 #import <UIKit/UIKit.h>
 #import <CallKit/CallKit.h>
 #import <objc/runtime.h>
+#import <stdatomic.h>
+#import <stdbool.h>
 #import "RNCallKeep.h"
 #import <React/RCTBridge.h>
 #import <React/RCTRootView.h>
@@ -36,6 +38,8 @@
 static RCTBridge *storedBridge = nil;
 // Only if react-native-callkeep has no provider at all (see +callKitProvider).
 static CXProvider *fallbackProvider = nil;
+// App on screen (foreground, active or inactive). Read from the PushKit queue, written on main.
+static atomic_bool totusAppInForeground = false;
 
 @implementation CallKeepHelper
 
@@ -151,6 +155,32 @@ static CXProvider *fallbackProvider = nil;
     });
 }
 
+// Apple (DTS, PushKit policy): a VoIP push does not have to report a new call while the app is in
+// the foreground or already has a call. The cancel push uses this to skip the placeholder call.
++ (void)trackForegroundState {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+        [center addObserverForName:UIApplicationWillEnterForegroundNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+            atomic_store(&totusAppInForeground, true);
+        }];
+        [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+            atomic_store(&totusAppInForeground, true);
+        }];
+        [center addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+            atomic_store(&totusAppInForeground, false);
+        }];
+        if ([NSThread isMainThread]) {
+            atomic_store(&totusAppInForeground,
+                         [UIApplication sharedApplication].applicationState != UIApplicationStateBackground);
+        }
+    });
+}
+
++ (BOOL)isAppInForeground {
+    return atomic_load(&totusAppInForeground);
+}
+
 + (void)setupCallKitNatively {
     // A VoIP push can launch the closed app in the background without React Native (it starts
     // only with the UI scene). The CallKit provider must exist, with its delegate, before the push
@@ -158,6 +188,7 @@ static CXProvider *fallbackProvider = nil;
     // incoming call appears on the lock screen / in the background. Same options as JS
     // (VoipService CALLKEEP_OPTIONS); the JS RNCallKeep.setup() is then a no-op.
     [self ensureCallKeepInitialized];
+    [self trackForegroundState];
     NSDictionary *options = [self callKitOptions];
     if ([RNCallKeep respondsToSelector:@selector(setup:)]) {
         [RNCallKeep setup:options];
@@ -321,13 +352,17 @@ static CXProvider *fallbackProvider = nil;
     // killed it and, after a few such pushes, stopped delivering VoIP pushes to the app at all
     // (no incoming calls on the iPhone). Now: complete first, end right after.
     CXCall *existing = nil;
+    BOOL otherLiveCall = NO;
     NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:safeCallId];
-    if (uuid) {
-        CXCallObserver *observer = [[CXCallObserver alloc] init];
-        for (CXCall *call in observer.calls) {
-            if ([call.UUID isEqual:uuid] && !call.hasEnded) {
-                existing = call;
-            }
+    CXCallObserver *observer = [[CXCallObserver alloc] init];
+    for (CXCall *call in observer.calls) {
+        if (call.hasEnded) {
+            continue;
+        }
+        if (uuid && [call.UUID isEqual:uuid]) {
+            existing = call;
+        } else {
+            otherLiveCall = YES;
         }
     }
 
@@ -348,10 +383,24 @@ static CXProvider *fallbackProvider = nil;
         return;
     }
 
-    // CallKit no longer has the call (already ended by the app) or never showed it: PushKit
-    // still needs a reported call. A UUID of an ended call cannot be reported again, so a
-    // placeholder with a new UUID is reported, the push is completed, and the placeholder is
-    // ended on the next run-loop turn.
+    // CallKit no longer has the call: the app already ended it (socket 'ended' came first — e.g.
+    // answered on Android) or never showed it. Apple does not require a report while the app is in
+    // the foreground or already has a call — then nothing is shown. Before, a placeholder was
+    // reported here every time: after an answer on Android the iPhone showed an incoming call
+    // again and ended it a moment later.
+    if ([self isAppInForeground] || otherLiveCall) {
+        NSLog(@"[TotusVoIP] cancel push for %@: no CallKit call, app %@ — nothing to show",
+              safeCallId, otherLiveCall ? @"has another call" : @"in foreground");
+        if (completion) {
+            completion();
+        }
+        return;
+    }
+
+    // In the background with no call PushKit still needs a reported call. A UUID of an ended call
+    // cannot be reported again, so a placeholder with a new UUID is reported, the push is
+    // completed, and the placeholder is ended on the next run-loop turn. (JS on iOS leaves a
+    // ringing call to this push when the app is not on screen, so this path is rare.)
     NSString *placeholderId = [[NSUUID UUID] UUIDString];
     NSMutableDictionary *safePayload = payload ? [payload mutableCopy] : [NSMutableDictionary dictionary];
     safePayload[@"placeholderFor"] = safeCallId;
