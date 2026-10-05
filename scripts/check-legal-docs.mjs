@@ -11,6 +11,7 @@
 //       офлайн-копия политики собирается из PRIVACY_POLICY_SECTIONS;
 //   (d) загрузка GET {SERVER_BASE_URL}/api/pages/slug/:slug: 404 / сеть / кэш сессии;
 //   (e) по исходникам: «Аккаунт» ведёт на «Документы», маршруты зарегистрированы.
+//   (f) в текстах документов нет сокращений и прежнего оператора (требование владельца 05.10.2026).
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -266,6 +267,52 @@ await check('document screen: CMS + WebView + link routing + retry + offline fal
   }
   const header = read('src/screens/legal/LegalHeader.tsx');
   assert.ok(header.includes('name="simpleArrow"') && header.includes('StyleSheet.hairlineWidth'), 'same header');
+});
+
+// ---------------------------------------------------------------- (f) wording
+// Требование владельца (05.10.2026): в пользовательских текстах нет сокращения
+// персональных данных (писать полностью), нет прежнего оператора и заглушек
+// вместо документов. Список слов — FORBIDDEN_WORDS.
+// Слова собраны из частей, чтобы этот файл не находил сам себя.
+console.log('wording');
+const FORBIDDEN_WORDS = [
+  ['П' + 'Дн', new RegExp('П' + 'Дн', 'u'), 'писать «персональных данных»'],
+  ['Арле' + 'кино', new RegExp('арле' + 'кино', 'iu'), 'прежний оператор'],
+  ['Arle' + 'kino', new RegExp('arle' + 'kino', 'iu'), 'прежний оператор'],
+  ['Ско' + 'ро', new RegExp('ско' + 'ро', 'iu'), 'заглушка вместо документа'],
+];
+const WORDING_FILES = [
+  'src/content/legalDocs.ts',
+  'src/component/account/Account.tsx',
+  'scripts/check-legal-docs.mjs',
+  ...fs
+    .readdirSync(path.join(root, 'src/screens/legal'))
+    .filter(name => /\.(ts|tsx)$/.test(name))
+    .sort()
+    .map(name => `src/screens/legal/${name}`),
+];
+await check('no abbreviations, former operator or «coming soon» in legal screens, list and Account', () => {
+  const hits = [];
+  for (const rel of WORDING_FILES) {
+    read(rel).split('\n').forEach((line, i) => {
+      for (const [word, re, why] of FORBIDDEN_WORDS) {
+        if (re.test(line)) {
+          hits.push(`${rel}:${i + 1} «${word}» (${why})`);
+        }
+      }
+    });
+  }
+  assert.ok(WORDING_FILES.length >= 10, `files scanned: ${WORDING_FILES.length}`);
+  assert.deepEqual(hits, [], hits.join('; '));
+});
+await check('exactly 7 documents with full titles and captions (no abbreviations)', async () => {
+  const m = await load('src/content/legalDocs.ts');
+  assert.equal(m.LEGAL_DOCS.length, 7);
+  for (const d of m.LEGAL_DOCS) {
+    for (const [word, re] of FORBIDDEN_WORDS) {
+      assert.ok(!re.test(d.title) && !re.test(d.short), `${d.slug}: «${word}»`);
+    }
+  }
 });
 
 console.log(`\n${passed} passed, ${failed} failed${skipped ? `, ${skipped} skipped` : ''}`);
