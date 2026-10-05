@@ -1017,6 +1017,58 @@ function normalizeCallId(id: unknown): string {
 // CallKit 'endCall' по ним не должно ещё раз сбрасывать состояние и слать /end.
 const appEndedCallKitCalls = new Set<string>();
 const CALLKIT_END_CHECK_MS = 1500;
+// iOS, приложение не на экране: звонящий CallKit-вызов снимает отменяющий VoIP push сервера
+// (AppDelegate -> CallKeepHelper.reportCallEnded, тот же UUID). Если JS снимал его раньше push,
+// push находил пустой CallKit и по правилу PushKit показывал «входящий» ещё раз и сразу его
+// завершал (владелец 05.10: ответ на Android -> iPhone «звонит» повторно). Push не пришёл за это
+// время — снимаем сами.
+const CALLKIT_CANCEL_PUSH_WAIT_MS = 3000;
+
+// iOS: имя звонящего по id звонка. Звонок, пришедший только VoIP push-ем, JS видит впервые при
+// ответе из CallKit — без имени окно звонка показывало «Неизвестный». Источники: событие
+// CallKit didDisplayIncomingCall (живое и из очереди getInitialEvents) и GET /api/calls/:id.
+const knownCallerNames = new Map<string, string>();
+const KNOWN_CALLER_NAMES_MAX = 50;
+
+function rememberCallerName(callId: unknown, name: unknown): void {
+  const id = normalizeCallId(callId);
+  const value = typeof name === 'string' ? name.trim() : '';
+  // 'Incoming call' — подпись AppDelegate, когда имени в push нет.
+  if (!id || !value || value === 'Incoming call') {
+    return;
+  }
+  knownCallerNames.delete(id);
+  knownCallerNames.set(id, value);
+  if (knownCallerNames.size > KNOWN_CALLER_NAMES_MAX) {
+    const oldest = knownCallerNames.keys().next().value;
+    if (oldest) {
+      knownCallerNames.delete(oldest);
+    }
+  }
+}
+
+/** iOS: у текущего звонка нет имени — взять известное (CallKit / сервер). */
+function applyKnownCallerName(callId: unknown): void {
+  if (Platform.OS !== 'ios' || callerName) {
+    return;
+  }
+  const value = knownCallerNames.get(normalizeCallId(callId));
+  if (value) {
+    callerName = value;
+  }
+}
+
+/** iOS: имена из очереди событий CallKeep (вызовы, показанные до старта JS). */
+function rememberCallerNamesFromCallKeepEvents(events: unknown): void {
+  if (Platform.OS !== 'ios' || !Array.isArray(events)) {
+    return;
+  }
+  for (const event of events as any[]) {
+    if (event?.name === 'RNCallKeepDidDisplayIncomingCall' && !event?.data?.payload?.placeholderFor) {
+      rememberCallerName(event?.data?.callUUID, event?.data?.localizedCallerName);
+    }
+  }
+}
 
 /**
  * iOS: звонок закончился не на этом устройстве — CallKit должен закрыться полностью.
@@ -1028,6 +1080,39 @@ function endCallKitCall(callId: string, reason: number): void {
     return;
   }
   const id = normalizeCallId(callId);
+  appEndedCallKitCalls.add(id);
+  if (AppState.currentState !== 'active') {
+    // Не на экране: звонящий (не отвеченный) вызов снимает отменяющий push; разговор — сразу.
+    Promise.resolve((RNCallKeep as any).getCalls?.())
+      .then((calls: any[]) => {
+        const call = (calls || []).find(c => normalizeCallId(c?.callUUID) === id && !c?.hasEnded);
+        if (!call || call.hasConnected || call.outgoing) {
+          // Нет в CallKit (ничего не изменится) или разговор / исходящий — завершить сразу.
+          reportEndCallKitNow(id, reason);
+          return;
+        }
+        console.log('CallKit ringing call: left to the cancel VoIP push', id);
+        setTimeout(() => {
+          Promise.resolve((RNCallKeep as any).getCalls?.())
+            .then((left: any[]) => {
+              if ((left || []).some(c => normalizeCallId(c?.callUUID) === id && !c?.hasEnded)) {
+                console.warn('No cancel push for the ringing CallKit call, ending it', id);
+                reportEndCallKitNow(id, reason);
+              } else {
+                appEndedCallKitCalls.delete(id);
+              }
+            })
+            .catch(() => reportEndCallKitNow(id, reason));
+        }, CALLKIT_CANCEL_PUSH_WAIT_MS);
+      })
+      .catch(() => reportEndCallKitNow(id, reason));
+    return;
+  }
+  reportEndCallKitNow(id, reason);
+}
+
+/** reportEndCall сейчас; если через 1,5 с вызов всё ещё в CallKit — запасной CXEndCallAction. */
+function reportEndCallKitNow(id: string, reason: number): void {
   appEndedCallKitCalls.add(id);
   try {
     RNCallKeep.reportEndCallWithUUID(id, reason);
@@ -1766,6 +1851,12 @@ async function fetchRemoteOfferWithRetry(
       lastStatus = resp.status;
       if (resp.ok) {
         const data = await resp.json();
+        if (Platform.OS === 'ios' && data?.callerName) {
+          rememberCallerName(callUUID, data.callerName);
+          if (normalizeCallId(activeCallUUID) === normalizeCallId(callUUID)) {
+            applyKnownCallerName(callUUID);
+          }
+        }
         if (data?.state === 'ended' || data?.state === 'rejected' || data?.state === 'missed') {
           // do not build a connection for a call the server already finished
           finishedState = data.state;
@@ -1826,6 +1917,7 @@ function schedulePendingAnswer(callUUID: string | null, delayMs: number, source:
   activeCallUUID = callUUID;
   incomingCallUUID = null;
   currentCallState = 'answered';
+  applyKnownCallerName(callUUID);
   setTimeout(() => {
     if (activeCallUUID !== callUUID && pendingAnswerCallUUID !== callUUID) {
       return; // call ended meanwhile
@@ -1868,6 +1960,7 @@ function recoverCallKeepInitialEvents(source: string): void {
   }
   Promise.resolve(callKeepAny.getInitialEvents())
     .then((events: any[]) => {
+      rememberCallerNamesFromCallKeepEvents(events);
       const {answerUUID, endedUUIDs, audioActivated} = summarizeInitialCallKeepEvents(events);
       if (typeof callKeepAny.clearInitialEvents === 'function') {
         callKeepAny.clearInitialEvents();
@@ -3969,6 +4062,7 @@ export async function initVoipAndCallKeep(loyaltyId?: string) {
     currentCallState = 'answered';
     lastAcceptedCallUUID = callUUID;
     lastAcceptedAtMs = Date.now();
+    applyKnownCallerName(callUUID);
     console.log('✅ Call state set to answered immediately for callUUID:', callUUID);
     
     // Stop incoming ringtone when user answers
@@ -4137,7 +4231,14 @@ export async function initVoipAndCallKeep(loyaltyId?: string) {
     notifyWebRtcAudioSession(false, 'callkit');
   });
 
-  RNCallKeep.addEventListener('didDisplayIncomingCall', ({callUUID, error}) => {
+  RNCallKeep.addEventListener('didDisplayIncomingCall', ({callUUID, error, localizedCallerName, payload}: any) => {
+    if (Platform.OS === 'ios') {
+      // Имя для окна звонка, если на этот вызов ответят из CallKit (заглушку не запоминаем).
+      if (!payload?.placeholderFor) {
+        rememberCallerName(callUUID, localizedCallerName);
+      }
+      return;
+    }
     if (Platform.OS !== 'android') {
       return;
     }
