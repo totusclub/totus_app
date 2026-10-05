@@ -283,6 +283,8 @@ const FORBIDDEN_WORDS = [
 ];
 const WORDING_FILES = [
   'src/content/legalDocs.ts',
+  // Офлайн-копия политики (показывается, когда CMS недоступна).
+  'src/content/privacyPolicy.ts',
   'src/component/account/Account.tsx',
   'scripts/check-legal-docs.mjs',
   ...fs
@@ -291,7 +293,7 @@ const WORDING_FILES = [
     .sort()
     .map(name => `src/screens/legal/${name}`),
 ];
-await check('no abbreviations, former operator or «coming soon» in legal screens, list and Account', () => {
+await check('no abbreviations, former operator or «coming soon» in legal screens, list, offline policy and Account', () => {
   const hits = [];
   for (const rel of WORDING_FILES) {
     read(rel).split('\n').forEach((line, i) => {
@@ -302,7 +304,7 @@ await check('no abbreviations, former operator or «coming soon» in legal scree
       }
     });
   }
-  assert.ok(WORDING_FILES.length >= 10, `files scanned: ${WORDING_FILES.length}`);
+  assert.ok(WORDING_FILES.length >= 11, `files scanned: ${WORDING_FILES.length}`);
   assert.deepEqual(hits, [], hits.join('; '));
 });
 await check('exactly 7 documents with full titles and captions (no abbreviations)', async () => {
