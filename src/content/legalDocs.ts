@@ -5,6 +5,9 @@
  * (GET {SERVER_BASE_URL}/api/pages/slug/:slug — тот же источник, что и сайт),
  * поэтому документ обновляется из админки без релиза приложения.
  * Здесь только список: slug (как на сайте totus.club/<slug>), название и подпись.
+ * Порядок списка — порядок на экране; «Реквизиты и контакты» всегда последним.
+ * Ссылки между документами (/tour-offer, /payment и т. п.) открываются в приложении
+ * для любого slug из этого списка (src/screens/legal/legalLinks.ts).
  *
  * Только «стираемый» TypeScript (без enum и т. п.): scripts/check-legal-docs.mjs
  * запускает файл на чистом Node.
@@ -17,6 +20,12 @@ export type LegalDocSlug =
   | 'ads-consent'
   | 'cookie-settings'
   | 'recommendations'
+  // Пачка 2: туры и размещение
+  | 'tour-offer'
+  | 'hotel-booking'
+  | 'cancellation'
+  | 'tourist-memo'
+  | 'payment'
   | 'requisites';
 
 export type LegalDoc = {
@@ -57,6 +66,32 @@ export const LEGAL_DOCS: readonly LegalDoc[] = [
     slug: 'recommendations',
     title: 'Правила применения рекомендательных технологий',
     short: 'Как формируются подборки и рекомендации',
+  },
+  // Туры и размещение
+  {
+    slug: 'tour-offer',
+    title: 'Оферта о заключении договора о реализации туристского продукта',
+    short: 'Условия покупки тура',
+  },
+  {
+    slug: 'hotel-booking',
+    title: 'Условия бронирования размещения',
+    short: 'Бронирование отелей и проживания',
+  },
+  {
+    slug: 'cancellation',
+    title: 'Изменение, отмена и возврат',
+    short: 'Как изменить или отменить заказ',
+  },
+  {
+    slug: 'tourist-memo',
+    title: 'Памятка туристу',
+    short: 'Что важно знать перед поездкой',
+  },
+  {
+    slug: 'payment',
+    title: 'Оплата и возврат денег',
+    short: 'Способы оплаты и возврат средств',
   },
   {
     slug: 'requisites',

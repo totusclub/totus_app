@@ -5,7 +5,7 @@
  */
 import type {LegalDocSlug} from '../../content/legalDocs';
 
-/** Список из 7 документов. */
+/** Список документов (src/content/legalDocs.ts). */
 export const LEGAL_DOCUMENTS_ROUTE = 'legalDocuments';
 /** Один документ (HTML из CMS). */
 export const LEGAL_DOCUMENT_ROUTE = 'legalDocument';

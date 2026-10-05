@@ -6,7 +6,8 @@
  * (часть свойств не реализована), поэтому адрес разбирается вручную.
  *
  * Правила:
- * - `/terms`, `consent`, `https://totus.club/privacy-policy` (один из 7 slug) —
+ * - `/terms`, `consent`, `https://totus.club/privacy-policy`, `/tour-offer`, `/payment`
+ *   (любой slug из списка LEGAL_DOCS, src/content/legalDocs.ts) —
  *   открыть этот документ внутри приложения;
  * - `#раздел`, сам документ (baseUrl), about:blank — остаться (якорь / первая загрузка);
  * - прочие http(s), mailto:, tel: — во внешнем браузере / приложении (Linking);

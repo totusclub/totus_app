@@ -1,11 +1,12 @@
-// Check: экран «Документы» — 7 юридических документов ООО «ТОТУСКЛАБ» из CMS.
+// Check: экран «Документы» — 12 юридических документов ООО «ТОТУСКЛАБ» из CMS.
 //
 // Run: node scripts/check-legal-docs.mjs   (Node >= 22.18, no npm install)
 //
 // Было: в приложении один документ — зашитая в код старая политика (src/content/privacyPolicy.ts).
 // Ожидается:
-//   (a) список из 7 документов (slug, название) — src/content/legalDocs.ts;
-//   (b) ссылки внутри документа: /terms, https://totus.club/consent -> документ в приложении,
+//   (a) список из 12 документов (slug, название) — src/content/legalDocs.ts:
+//       7 из пачки 1 и 5 из пачки 2 (туры и размещение) перед «Реквизиты и контакты», который последний;
+//   (b) ссылки внутри документа: /terms, https://totus.club/consent, /tour-offer, /payment -> документ в приложении,
 //       прочие http(s)/mailto/tel -> внешний браузер, #якорь -> остаться, javascript: -> ничего;
 //   (c) HTML-обёртка для WebView: контент CMS не портится, тёмная тема -> тёмный фон,
 //       офлайн-копия политики собирается из PRIVACY_POLICY_SECTIONS;
@@ -70,22 +71,43 @@ const EXPECTED = [
   ['ads-consent', 'Согласие на получение рекламы'],
   ['cookie-settings', 'Политика использования файлов cookie'],
   ['recommendations', 'Правила применения рекомендательных технологий'],
+  // Пачка 2 — туры и размещение (05.10.2026): перед «Реквизиты и контакты», в этом порядке.
+  ['tour-offer', 'Оферта о заключении договора о реализации туристского продукта'],
+  ['hotel-booking', 'Условия бронирования размещения'],
+  ['cancellation', 'Изменение, отмена и возврат'],
+  ['tourist-memo', 'Памятка туристу'],
+  ['payment', 'Оплата и возврат денег'],
   ['requisites', 'Реквизиты и контакты'],
 ];
+const BATCH_2 = ['tour-offer', 'hotel-booking', 'cancellation', 'tourist-memo', 'payment'];
 
 // ---------------------------------------------------------------- (a) list
 console.log('legalDocs.ts');
-await check('7 documents: slugs and titles as on the site, in order', async () => {
+await check('12 documents: slugs and full titles as on the site, in order', async () => {
   const m = await load('src/content/legalDocs.ts');
   assert.deepEqual(m.LEGAL_DOCS.map(d => [d.slug, d.title]), EXPECTED);
   for (const d of m.LEGAL_DOCS) {
     assert.ok(typeof d.short === 'string' && d.short.trim().length > 0, `short for ${d.slug}`);
   }
-  assert.equal(new Set(m.LEGAL_DOCS.map(d => d.slug)).size, 7, 'unique slugs');
+  assert.equal(new Set(m.LEGAL_DOCS.map(d => d.slug)).size, 12, 'unique slugs');
+  assert.deepEqual(m.LEGAL_DOC_SLUGS, EXPECTED.map(([slug]) => slug), 'LEGAL_DOC_SLUGS follows the list');
+});
+await check('batch 2: 5 new documents right before «Реквизиты и контакты», which stays last', async () => {
+  const m = await load('src/content/legalDocs.ts');
+  const slugs = m.LEGAL_DOCS.map(d => d.slug);
+  assert.equal(slugs[slugs.length - 1], 'requisites', '«Реквизиты и контакты» last');
+  assert.deepEqual(slugs.slice(-6, -1), BATCH_2, 'batch 2 order, right before requisites');
+  assert.deepEqual(slugs.slice(0, 6), ['terms', 'privacy-policy', 'consent', 'ads-consent', 'cookie-settings', 'recommendations'], 'batch 1 order kept');
+  for (const slug of BATCH_2) {
+    assert.equal(m.isLegalDocSlug(slug), true, slug);
+    assert.equal(m.findLegalDoc(slug).title, EXPECTED.find(([s]) => s === slug)[1], `full title for ${slug}`);
+  }
 });
 await check('isLegalDocSlug / findLegalDoc', async () => {
   const m = await load('src/content/legalDocs.ts');
   assert.equal(m.isLegalDocSlug('consent'), true);
+  assert.equal(m.isLegalDocSlug('tour-offer'), true);
+  assert.equal(m.isLegalDocSlug('tour'), false);
   assert.equal(m.isLegalDocSlug('about'), false);
   assert.equal(m.isLegalDocSlug(undefined), false);
   assert.equal(m.findLegalDoc('requisites').title, 'Реквизиты и контакты');
@@ -94,7 +116,7 @@ await check('isLegalDocSlug / findLegalDoc', async () => {
 
 // ---------------------------------------------------------------- (b) links
 console.log('legalLinks.ts');
-await check('links to the 7 documents open inside the app', async () => {
+await check('links to the batch-1 documents open inside the app', async () => {
   const {resolveLegalLink: r, LEGAL_HTML_BASE_URL: base} = await load('src/screens/legal/legalLinks.ts');
   const internal = slug => ({kind: 'internal', slug});
   assert.deepEqual(r('/terms'), internal('terms'));
@@ -106,6 +128,28 @@ await check('links to the 7 documents open inside the app', async () => {
   // относительная ссылка "recommendations", разрешённая WebView от baseUrl
   assert.deepEqual(r(base + 'recommendations'), internal('recommendations'));
   assert.deepEqual(r('requisites'), internal('requisites'));
+});
+await check('links to the 5 batch-2 documents (/tour-offer, /payment, ...) open inside the app', async () => {
+  const {resolveLegalLink: r, LEGAL_HTML_BASE_URL: base} = await load('src/screens/legal/legalLinks.ts');
+  const internal = slug => ({kind: 'internal', slug});
+  for (const slug of BATCH_2) {
+    assert.deepEqual(r(`/${slug}`), internal(slug), `/${slug}`);
+    assert.deepEqual(r(`https://totus.club/${slug}`), internal(slug), `https://totus.club/${slug}`);
+    assert.deepEqual(r(`https://www.totus.club/${slug}/`), internal(slug), `www, trailing slash`);
+    assert.deepEqual(r(`https://totus.club/${slug}?from=app#p3`), internal(slug), 'query and hash');
+    // относительная ссылка, разрешённая WebView от baseUrl, и как есть
+    assert.deepEqual(r(base + slug), internal(slug), `baseUrl + ${slug}`);
+    assert.deepEqual(r(slug), internal(slug), `relative ${slug}`);
+  }
+  assert.deepEqual(r('/TOUR-OFFER'), internal('tour-offer'), 'case-insensitive');
+  assert.deepEqual(r('/tour-offers').kind, 'external', 'unknown slug -> site in browser');
+  assert.deepEqual(r('https://example.com/payment').kind, 'external', 'foreign host');
+  // Ссылки из HTML документа CMS: href вида /tour-offer, /payment
+  const cmsHtml = '<p>См. <a href="/tour-offer">оферту</a>, <a href="/hotel-booking">условия бронирования</a>, ' +
+    '<a href="/cancellation">изменение и отмену</a>, <a href="/tourist-memo">памятку</a> и ' +
+    '<a href="/payment">оплату</a>; <a href="/requisites">реквизиты</a>.</p>';
+  const hrefs = [...cmsHtml.matchAll(/href="([^"]+)"/g)].map(m => m[1]);
+  assert.deepEqual(hrefs.map(h => r(h)), [...BATCH_2, 'requisites'].map(internal));
 });
 await check('anchors and the document itself stay in the WebView', async () => {
   const {resolveLegalLink: r, LEGAL_HTML_BASE_URL: base} = await load('src/screens/legal/legalLinks.ts');
@@ -307,9 +351,9 @@ await check('no abbreviations, former operator or «coming soon» in legal scree
   assert.ok(WORDING_FILES.length >= 11, `files scanned: ${WORDING_FILES.length}`);
   assert.deepEqual(hits, [], hits.join('; '));
 });
-await check('exactly 7 documents with full titles and captions (no abbreviations)', async () => {
+await check('exactly 12 documents with full titles and captions (no abbreviations)', async () => {
   const m = await load('src/content/legalDocs.ts');
-  assert.equal(m.LEGAL_DOCS.length, 7);
+  assert.equal(m.LEGAL_DOCS.length, 12);
   for (const d of m.LEGAL_DOCS) {
     for (const [word, re] of FORBIDDEN_WORDS) {
       assert.ok(!re.test(d.title) && !re.test(d.short), `${d.slug}: «${word}»`);
