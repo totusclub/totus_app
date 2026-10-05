@@ -27,7 +27,6 @@ import {
   getCallState,
   cleanupVoipOnLogout,
 } from '../../modules/voip/VoipService';
-import { CallModal } from '../../component/UI/callModal';
 import { getUserById } from '../../modules/api/users';
 import { useLayout } from '../../hooks/useLayout';
 import { TabletColumns } from '../../component/UI/tablet';
@@ -222,6 +221,8 @@ type CallSupportModalProps = {
   onClose: () => void;
   onCallPhone: () => void;
   onCallApp: () => void;
+  /** iOS: the sheet has finished closing (Modal onDismiss). */
+  onDismissed?: () => void;
 };
 
 const CallSupportModal: React.FC<CallSupportModalProps> = ({
@@ -229,6 +230,7 @@ const CallSupportModal: React.FC<CallSupportModalProps> = ({
   onClose,
   onCallPhone,
   onCallApp,
+  onDismissed,
 }) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -238,7 +240,8 @@ const CallSupportModal: React.FC<CallSupportModalProps> = ({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}>
+      onRequestClose={onClose}
+      onDismiss={onDismissed}>
       <View style={confirmStyles.root}>
         <TouchableOpacity
           style={[confirmStyles.overlay, { backgroundColor: theme.overlay }]}
@@ -344,25 +347,13 @@ const AccountScreen = () => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [supportModalVisible, setSupportModalVisible] = useState(false);
-  const [callModalVisible, setCallModalVisible] = useState(false);
+  // iOS: resolves when the support sheet has finished closing (see closeSupportSheet).
+  const supportSheetClosedRef = React.useRef<(() => void) | null>(null);
   const [showCallingSupport, setShowCallingSupport] = React.useState(true);
   const { theme, isDark, toggleTheme } = useTheme();
   const { isTablet } = useLayout();
   const supportUnread = useSelector((state: RootState) => state.supportChat?.unreadCount ?? 0);
   const notificationsUnread = useSelector((state: RootState) => state.notifications?.unread ?? 0);
-
-  // Monitor call state to auto-close CallModal when call ends
-  useEffect(() => {
-    if (!callModalVisible) return;
-    const interval = setInterval(() => {
-      const state = getCallState();
-      if (state.state === 'ended' || state.state === 'rejected') {
-        setTimeout(() => setCallModalVisible(false), 2000);
-        clearInterval(interval);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [callModalVisible]);
 
   // access 0 = show calling support, access 1 = hide
   useEffect(() => {
@@ -475,8 +466,27 @@ const AccountScreen = () => {
     });
   };
 
+  // The call window must not open while this sheet is still closing: on iOS a modal presented
+  // during another modal's dismissal is not shown. Android closes the sheet at once.
+  const closeSupportSheet = () =>
+    new Promise<void>((resolve) => {
+      if (Platform.OS !== 'ios' || !supportModalVisible) {
+        setSupportModalVisible(false);
+        resolve();
+        return;
+      }
+      const done = () => {
+        clearTimeout(timer);
+        supportSheetClosedRef.current = null;
+        resolve();
+      };
+      const timer = setTimeout(done, 700);
+      supportSheetClosedRef.current = done;
+      setSupportModalVisible(false);
+    });
+
   const handleCallSupportApp = async () => {
-    setSupportModalVisible(false);
+    await closeSupportSheet();
 
     const deviceId = getCurrentDeviceId();
     if (!deviceId) {
@@ -494,8 +504,10 @@ const AccountScreen = () => {
     }
 
     try {
+      // The call window is the global one in App.tsx (same as the support chat). This screen used
+      // to open its own second CallModal after the answer, on top of the global one: the visible
+      // window did not react to any tap (end call, mute, speaker, minimize).
       await startOutgoingVoiceCallByLoyaltyId(SUPPORT_LOYALTY_ID, SUPPORT_DISPLAY_NAME);
-      setCallModalVisible(true);
     } catch (e: any) {
       console.error('❌ Failed to call support:', e);
       const errorMessage = e?.message || 'Неизвестная ошибка';
@@ -813,20 +825,7 @@ const AccountScreen = () => {
         onClose={() => setSupportModalVisible(false)}
         onCallPhone={handleCallSupportPhone}
         onCallApp={handleCallSupportApp}
-      />
-
-      {/* Active call UI */}
-      <CallModal
-        visible={callModalVisible}
-        onClose={() => {
-          const state = getCallState();
-          if (state.state === 'ended' || state.state === 'rejected' || state.state === 'idle') {
-            setCallModalVisible(false);
-          }
-        }}
-        onMinimize={() => {
-          setCallModalVisible(false);
-        }}
+        onDismissed={() => supportSheetClosedRef.current?.()}
       />
     </View>
   );

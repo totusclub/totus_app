@@ -47,6 +47,59 @@ target 'totusClubApp' do
       :mac_catalyst_enabled => false,
     )
 
+    # The codegen script treats the parent of the ios folder as the app root.
+    # The Xcode copy lives in ~/Developer/totus-open, so that parent has no
+    # package.json. Point the script at this repository instead.
+    app_root = File.expand_path('..', __dir__)
+    installer.pods_project.targets.each do |target|
+      target.shell_script_build_phases.each do |phase|
+        script = phase.shell_script
+        next unless script&.include?('RCT_SCRIPT_APP_PATH=')
+        phase.shell_script = script.sub(
+          'RCT_SCRIPT_APP_PATH="$RCT_SCRIPT_POD_INSTALLATION_ROOT/.."',
+          %(RCT_SCRIPT_APP_PATH="#{app_root}")
+        )
+      end
+    end
+
+    # Xcode 27 rejects deployment targets below 15.0. Privacy bundles keep the
+    # older version from their podspec unless it is raised here.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        if current.nil? || current.to_f < 15.0
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        end
+      end
+    end
+
+    # fmt 11.0.2's consteval format checks fail on Xcode 16.3 and later.
+    # C++17 turns those checks off. The headers are installed read-only.
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'fmt'
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+      end
+    end
+    Dir.glob(File.join(installer.sandbox.root, 'Target Support Files', 'fmt', 'fmt.*.xcconfig')).each do |xcconfig|
+      contents = File.read(xcconfig)
+      patched = contents.gsub('CLANG_CXX_LANGUAGE_STANDARD = c++20', 'CLANG_CXX_LANGUAGE_STANDARD = c++17')
+      File.write(xcconfig, patched) if patched != contents
+    end
+
+    # Support-file groups sit inside each pod's source group, so their paths are
+    # relative to node_modules. Opened from another directory, that walks up to
+    # Developer/ios/Pods and the xcconfig files are missing. Anchor them on the
+    # Pods project instead.
+    installer.pods_project.main_group.recursive_children.each do |object|
+      next unless object.respond_to?(:path) && object.respond_to?(:source_tree)
+      path = object.path
+      next unless path&.include?('Target Support Files/')
+      relative = path.split('Target Support Files/', 2).last
+      object.path = "Target Support Files/#{relative}"
+      object.source_tree = 'SOURCE_ROOT'
+    end
+
     # Static umbrella Pods_*.framework is linked as -lPods-* (looks for .a) and fails.
     # Individual pods are already linked via OTHER_LDFLAGS in the Pods xcconfig.
     installer.aggregate_targets.each do |aggregate_target|

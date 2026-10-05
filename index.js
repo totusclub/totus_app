@@ -7,16 +7,24 @@ import App from './App';
 import {name as appName} from './app.json';
 import {
   answerCall as handleVoipAnswerCall,
-  endCall as handleVoipEndCall,
   handleIncomingPush,
   handleBackgroundCallKeepEvent,
   registerAndroidCallBackgroundHandlers,
+  registerAndroidCallActionHandlers,
   queuePendingAnswerFromBackground,
 } from './src/modules/voip/CallService';
+import {
+  endCall as voipEndCall,
+  rejectCall as voipRejectCall,
+  getCallState as getVoipCallState,
+  waitForAndroidCallActions,
+} from './src/modules/voip/VoipService';
 import notifee from '@notifee/react-native';
 import {handleNotifeeBackgroundEvent} from './src/modules/push/pushService';
 
 registerAndroidCallBackgroundHandlers();
+// Android: "Ответить" / full-screen incoming / ongoing call from the Totus call notifications.
+registerAndroidCallActionHandlers();
 
 // Тап по уведомлению notifee в фоне/после закрытия: data → AsyncStorage push:pendingPress,
 // обработка (deep link) — в PushBridge при следующем активном состоянии.
@@ -76,8 +84,23 @@ AppRegistry.registerHeadlessTask(
       await handleVoipAnswerCall(callId);
       return;
     }
-    if ((action === 'com.totus.com.voip.REJECT' || action === 'com.totus.com.voip.END') && callId) {
-      handleVoipEndCall(callId);
+    // Android notification actions (TotusCallActionReceiver): "Отклонить" / "Завершить".
+    if (action === 'com.totus.com.voip.REJECT' && callId) {
+      voipRejectCall(callId);
+      await waitForAndroidCallActions();
+      return;
+    }
+    if (action === 'com.totus.com.voip.END' && callId) {
+      const state = getVoipCallState();
+      if (state.callUUID && state.callUUID !== callId) {
+        return; // another call is active now
+      }
+      if (state.state === 'ringing') {
+        voipRejectCall(callId);
+      } else {
+        voipEndCall();
+      }
+      await waitForAndroidCallActions();
     }
   },
 );

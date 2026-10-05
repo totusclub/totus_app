@@ -788,28 +788,35 @@ export function initPushHandlers(): void {
     }
   });
 
-  // Тап по системному уведомлению FCM (фон → открытие).
-  unsubscribeOpened = messaging().onNotificationOpenedApp(remoteMessage => {
-    const data = remoteMessage?.data as Record<string, unknown> | undefined;
-    if (isHubMessage(data)) handleNotificationPress(data as PushMessageData);
-  });
-
-  // Смена FCM-токена → перерегистрация в хабе.
-  unsubscribeTokenRefresh = messaging().onTokenRefresh(() => {
-    void registerPushDevice();
-  });
-
-  // iOS: foreground-сообщения (звонки идут через PushKit и сюда не приходят).
-  // Android: onMessage регистрирует CallService.js и передаёт нам не-звонковые пуши.
-  if (Platform.OS === 'ios') {
-    unsubscribeIosMessage = messaging().onMessage(async remoteMessage => {
+  try {
+    // Тап по системному уведомлению FCM (фон → открытие).
+    unsubscribeOpened = messaging().onNotificationOpenedApp(remoteMessage => {
       const data = remoteMessage?.data as Record<string, unknown> | undefined;
-      if (!isHubMessage(data)) return;
-      if (data?.type === 'support_message') {
-        DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
-      }
-      await displayForegroundNotification(remoteMessage);
+      if (isHubMessage(data)) handleNotificationPress(data as PushMessageData);
     });
+
+    // Смена FCM-токена → перерегистрация в хабе.
+    unsubscribeTokenRefresh = messaging().onTokenRefresh(() => {
+      void registerPushDevice();
+    });
+
+    // iOS: foreground-сообщения (звонки идут через PushKit и сюда не приходят).
+    // Android: onMessage регистрирует CallService.js и передаёт нам не-звонковые пуши.
+    if (Platform.OS === 'ios') {
+      unsubscribeIosMessage = messaging().onMessage(async remoteMessage => {
+        const data = remoteMessage?.data as Record<string, unknown> | undefined;
+        if (!isHubMessage(data)) return;
+        if (data?.type === 'support_message') {
+          DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
+        }
+        await displayForegroundNotification(remoteMessage);
+      });
+    }
+  } catch (e) {
+    console.warn(
+      '[firebase] Default app is not configured. Add android/app/google-services.json and rebuild.',
+      e instanceof Error ? e.message : e,
+    );
   }
 }
 

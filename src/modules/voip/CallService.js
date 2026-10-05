@@ -1,6 +1,5 @@
-import {DeviceEventEmitter, Platform} from 'react-native';
+import {AppState, DeviceEventEmitter, Platform} from 'react-native';
 import messaging from '@react-native-firebase/messaging';
-import RNCallKeep from 'react-native-callkeep';
 import {
   initVoipAndCallKeep,
   handleAndroidIncomingCallNotification,
@@ -8,7 +7,12 @@ import {
   endCall as voipEndCall,
   rejectCall as voipRejectCall,
   queuePendingAnswerFromBackground,
+  getCallState,
+  setAndroidPendingCallerName,
+  handleRemoteCallEnded,
 } from './VoipService';
+import {consumeAndroidCallAction, onAndroidCallActionAvailable} from './androidCallUi';
+import {ensureAndroidMicPermission} from './androidCallPermissions';
 import {
   displayForegroundNotification,
   isSupportChatScreenOpen,
@@ -29,11 +33,24 @@ function isSupportMessage(data) {
 // Любой пуш хаба уведомлений (data.type задан, не звонок): в foreground показываем
 // баннер через notifee (pushService), в фоне ничего не делаем — `notification` рисует система.
 function isHubNotificationMessage(data) {
-  return Boolean(data) && Boolean(data.type) && !isIncomingCallMessage(data);
+  return Boolean(data) && Boolean(data.type) && !isIncomingCallMessage(data) && !isCallEndedMessage(data);
+}
+
+// Отменяющий push звонка (calling_api_v2, CALL_END_SYNC_RU.md): звонок закончился на другом
+// устройстве / у звонящего. data: {type: 'call_ended', callId, reason}. Не входящий и не баннер.
+function isCallEndedMessage(data) {
+  return Boolean(data) && data.type === 'call_ended';
+}
+
+function handleCallEndedMessage(data) {
+  handleRemoteCallEnded(data.callId || data.callUUID || data.uuid || null, data.reason || null);
 }
 
 function isIncomingCallMessage(data) {
   if (!data) {
+    return false;
+  }
+  if (isCallEndedMessage(data)) {
     return false;
   }
   if (data.type === 'incoming_call') {
@@ -48,21 +65,6 @@ function ensureAndroidVoipReady(loyaltyId) {
   }
   initVoipAndCallKeep(loyaltyId);
   androidVoipInitialized = true;
-}
-
-function bringAndroidAppToForeground(reason) {
-  if (Platform.OS !== 'android') {
-    return;
-  }
-  try {
-    const callKeepAny = RNCallKeep;
-    if (typeof callKeepAny?.backToForeground === 'function') {
-      callKeepAny.backToForeground();
-      console.log(`Android: app moved to foreground (${reason})`);
-    }
-  } catch (e) {
-    console.warn('Android: failed to bring app to foreground', e);
-  }
 }
 
 function normalizeIncomingPayload(data) {
@@ -90,33 +92,49 @@ export function registerAndroidCallBackgroundHandlers() {
     return;
   }
 
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-    const data = remoteMessage?.data;
-    if (isSupportMessage(data) || isHubNotificationMessage(data)) {
-      return;
-    }
-    if (isIncomingCallMessage(data)) {
-      await displayIncomingCall(data);
-    }
-  });
-
-  messaging().onMessage(async remoteMessage => {
-    const data = remoteMessage?.data;
-    if (isSupportMessage(data)) {
-      DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
-      if (!isSupportChatScreenOpen()) {
-        await displayForegroundNotification(remoteMessage);
+  try {
+    messaging().setBackgroundMessageHandler(async remoteMessage => {
+      const data = remoteMessage?.data;
+      if (isCallEndedMessage(data)) {
+        handleCallEndedMessage(data);
+        return;
       }
-      return;
-    }
-    if (isHubNotificationMessage(data)) {
-      await displayForegroundNotification(remoteMessage);
-      return;
-    }
-    if (isIncomingCallMessage(data)) {
-      await displayIncomingCall(data);
-    }
-  });
+      if (isSupportMessage(data) || isHubNotificationMessage(data)) {
+        return;
+      }
+      if (isIncomingCallMessage(data)) {
+        await displayIncomingCall(data);
+      }
+    });
+
+    messaging().onMessage(async remoteMessage => {
+      const data = remoteMessage?.data;
+      if (isCallEndedMessage(data)) {
+        handleCallEndedMessage(data);
+        return;
+      }
+      if (isSupportMessage(data)) {
+        DeviceEventEmitter.emit(SUPPORT_PUSH_EVENT, data);
+        if (!isSupportChatScreenOpen()) {
+          await displayForegroundNotification(remoteMessage);
+        }
+        return;
+      }
+      if (isHubNotificationMessage(data)) {
+        await displayForegroundNotification(remoteMessage);
+        return;
+      }
+      if (isIncomingCallMessage(data)) {
+        await displayIncomingCall(data);
+      }
+    });
+  } catch (e) {
+    console.warn(
+      '[firebase] Default app is not configured. Add android/app/google-services.json and rebuild.',
+      e?.message || e,
+    );
+    return;
+  }
 
   androidMessagingHandlersRegistered = true;
 }
@@ -141,28 +159,9 @@ export async function displayIncomingCall(data) {
   }
   ensureAndroidVoipReady();
 
-  // Explicit Android incoming UI trigger requested for CallKeep.
-  let didShowNativeIncoming = false;
-  try {
-    RNCallKeep.displayIncomingCall(
-      normalized.uuid,
-      normalized.handle || 'Unknown',
-      normalized.callerName || 'Incoming Call',
-      'generic',
-      true,
-    );
-    didShowNativeIncoming = true;
-  } catch (e) {
-    console.warn('Android: failed to show native incoming call UI', e);
-  }
-
-  // Fallback for devices/ROMs where incoming CallKeep UI is not shown:
-  // bring the app to foreground so custom modal can be shown.
-  if (!didShowNativeIncoming) {
-    bringAndroidAppToForeground('incoming-call-fallback');
-  }
-
-  // Keep VoIP/WebRTC state synchronized with native CallKeep UI.
+  // Android (owner decision 04.10.2026): no system Telecom screen. Setting the "ringing" state
+  // syncs the native Totus call UI: notification with full-screen intent when the app is not on
+  // screen (killed / background / lock screen), ringtone + CallModal when it is.
   await handleAndroidIncomingCallNotification({
     ...data,
     uuid: normalized.uuid,
@@ -217,11 +216,9 @@ export async function handleBackgroundCallKeepEvent(message) {
     eventName === 'RNCallKeepPerformAnswerCallAction' ||
     eventName === 'answerCall'
   ) {
-    // In killed/locked state, avoid duplicating native answer flow.
-    // Queue answer explicitly so JS side always continues WebRTC flow.
+    // Legacy CallKeep event (CallKeep is not used on Android any more).
     ensureAndroidVoipReady();
     queuePendingAnswerFromBackground(callUUID);
-    bringAndroidAppToForeground('background-answer-event');
     return;
   }
 
@@ -247,6 +244,11 @@ export async function handleIncomingPush(message, source = 'unknown') {
     });
     if (!data) return;
 
+    if (isCallEndedMessage(data)) {
+      handleCallEndedMessage(data);
+      return;
+    }
+
     if (isSupportMessage(data) || isHubNotificationMessage(data)) {
       // Background: OS already displays notification payload. Foreground path is onMessage.
       return;
@@ -263,3 +265,104 @@ export async function handleIncomingPush(message, source = 'unknown') {
 /** Re-export for index.js headless answer flow. */
 export {queuePendingAnswerFromBackground};
 
+// ---------------------------------------------------------------------------
+// Android: actions from the Totus call notifications that open the app
+// ("Ответить", full-screen incoming over the lock screen, tap on the ongoing call).
+// "Отклонить" / "Завершить" do not open the app: TotusVoipActionTask (index.js).
+// ---------------------------------------------------------------------------
+let androidCallActionsRegistered = false;
+let androidCallActionRunning = false;
+
+function waitForAppActive(timeoutMs) {
+  if (AppState.currentState === 'active') {
+    return Promise.resolve(true);
+  }
+  return new Promise(resolve => {
+    let done = false;
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active' && !done) {
+        done = true;
+        sub.remove();
+        resolve(true);
+      }
+    });
+    setTimeout(() => {
+      if (!done) {
+        done = true;
+        sub.remove();
+        resolve(AppState.currentState === 'active');
+      }
+    }, timeoutMs);
+  });
+}
+
+async function handleAndroidCallAction(action) {
+  if (!action || !action.callId) {
+    return;
+  }
+  ensureAndroidVoipReady();
+  const {callId, callerName} = action;
+  setAndroidPendingCallerName(callId, callerName);
+  if (action.action !== 'answer') {
+    // 'show' / 'open': the CallModal follows the call state by itself.
+    return;
+  }
+  const state = getCallState();
+  if (state.callUUID === callId && state.state === 'answered') {
+    return; // already answering / answered
+  }
+  // The permission prompt needs the activity on screen.
+  await waitForAppActive(5000);
+  const hasMic = await ensureAndroidMicPermission();
+  if (!hasMic) {
+    console.warn('[android-call] answer: no microphone permission, declining', callId);
+    voipRejectCall(callId);
+    return;
+  }
+  const fresh = getCallState();
+  if (fresh.state === 'ringing' && fresh.callUUID === callId) {
+    await voipAnswerCall(callId);
+  } else {
+    // JS was restarted (no ringing state in memory): answer through the pending-answer path
+    // (offer from the server, socket, device id).
+    queuePendingAnswerFromBackground(callId);
+  }
+}
+
+async function drainAndroidCallActions() {
+  if (androidCallActionRunning) {
+    return;
+  }
+  androidCallActionRunning = true;
+  try {
+    for (let i = 0; i < 3; i++) {
+      const action = await consumeAndroidCallAction();
+      if (!action) {
+        break;
+      }
+      try {
+        await handleAndroidCallAction(action);
+      } catch (e) {
+        console.warn('[android-call] action failed', action.action, e?.message || e);
+      }
+    }
+  } finally {
+    androidCallActionRunning = false;
+  }
+}
+
+export function registerAndroidCallActionHandlers() {
+  if (Platform.OS !== 'android' || androidCallActionsRegistered) {
+    return;
+  }
+  androidCallActionsRegistered = true;
+  onAndroidCallActionAvailable(() => {
+    drainAndroidCallActions();
+  });
+  AppState.addEventListener('change', state => {
+    if (state === 'active') {
+      drainAndroidCallActions();
+    }
+  });
+  drainAndroidCallActions();
+}
