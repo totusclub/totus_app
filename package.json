@@ -12,7 +12,7 @@
     "start": "react-native start",
     "start:clean": "react-native start --reset-cache",
     "test": "jest",
-    "check": "node scripts/check-mic-permission.mjs && node scripts/check-voip-answer-recovery.mjs && node scripts/check-legal-docs.mjs"
+    "check": "node scripts/check-mic-permission.mjs && node scripts/check-voip-answer-recovery.mjs && node scripts/check-android-firebase-guard.mjs && node scripts/check-android-call-flow.mjs && node scripts/check-call-end-sync.mjs && node scripts/check-call-modal-owner.mjs && node scripts/check-ios-voip-push.mjs && node scripts/check-android-sdk36.mjs"
   },
   "dependencies": {
     "@notifee/react-native": "^9.1.8",
@@ -47,7 +47,7 @@
     "react-native-masked-text": "^1.13.0",
     "react-native-modal": "^14.0.0-rc.1",
     "react-native-safe-area-context": "^5.6.2",
-    "react-native-screens": "^4.18.0",
+    "react-native-screens": "4.18.0",
     "react-native-skeleton-placeholder": "^5.2.4",
     "react-native-sound-player": "^0.14.5",
     "react-native-svg": "^15.14.0",
