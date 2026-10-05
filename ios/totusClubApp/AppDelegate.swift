@@ -20,6 +20,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
   /// the app closed the push could be lost and the call never rang (totus_support_app
   /// has done this since PR #1 and rings from the closed state).
   private var voipRegistry: PKPushRegistry?
+  /// Not the main queue. A locked iPhone launches the app in the background and
+  /// SceneDelegate used to load the JS bundle on the main thread before this push
+  /// could run. iOS then killed the process inside UIApplicationMain (the TestFlight
+  /// crash) and the lock-screen call never appeared.
+  private let voipPushQueue = DispatchQueue(label: "com.totus.voip.push")
+  private var didStartReactNative = false
+  fileprivate var reactLaunchOptions: [UIApplication.LaunchOptionsKey: Any] = [:]
 
   func application(
     _ application: UIApplication,
@@ -35,7 +42,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
     CallKeepHelper.setupCallKitNatively()
 
     // PushKit before React Native starts, so a VoIP push can wake the closed app.
-    let registry = PKPushRegistry(queue: .main)
+    let registry = PKPushRegistry(queue: voipPushQueue)
     // The only registry of the process: JS registerVoipToken() no longer creates a second one
     // (react-native-voip-push-notification made a local registry that was released right away).
     VoipPushHelper.useAppRegistryOnly(registry)
@@ -62,6 +69,39 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
     // JS may still call registerVoipToken(); that is harmless.
 
     return true
+  }
+
+  /// Starts the JS bundle once. A locked/background launch must not call this until
+  /// CallKit has been given the incoming call.
+  func startReactNativeIfNeeded() {
+    guard !didStartReactNative, let window, let factory = reactNativeFactory else {
+      return
+    }
+    didStartReactNative = true
+    factory.startReactNative(
+      withModuleName: "totusClubApp",
+      in: window,
+      launchOptions: reactLaunchOptions
+    )
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+      guard let rootVC = window.rootViewController else {
+        print("⚠️ Could not store bridge in CallKeepHelper, will try to get it dynamically")
+        return
+      }
+      if let rootView = rootVC.view as? RCTRootView {
+        CallKeepHelper.setBridge(rootView.bridge)
+        print("✅ Bridge stored in CallKeepHelper (from RCTRootView)")
+        return
+      }
+      for subview in rootVC.view.subviews {
+        if let rootView = subview as? RCTRootView {
+          CallKeepHelper.setBridge(rootView.bridge)
+          print("✅ Bridge stored in CallKeepHelper (from subview)")
+          return
+        }
+      }
+      print("⚠️ Could not store bridge in CallKeepHelper, will try to get it dynamically")
+    }
   }
 
   // MARK: - Deep links (totus://)
@@ -115,6 +155,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
   // This method is called when the VoIP push token is updated
   // Forward to the library's native module via Objective-C helper
   func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
+    DispatchQueue.main.async {
+      self.forwardVoipToken(pushCredentials, type: type)
+    }
+  }
+
+  private func forwardVoipToken(_ pushCredentials: PKPushCredentials, type: PKPushType) {
     print("📱 PKPushRegistry: didUpdate pushCredentials for type: \(type.rawValue)")
 
     // Log token for debugging (first 32 chars)
@@ -138,7 +184,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
   // Forward to the library's native module via Objective-C helper
   func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
     // NSLog (not print): visible in Console.app for a TestFlight build, closed iPhone included.
-    NSLog("[TotusVoIP] VoIP push received (app state %ld)", UIApplication.shared.applicationState.rawValue)
+    NSLog("[TotusVoIP] VoIP push received")
 
     // Extract call information from payload
     var callId: String? = nil
@@ -230,16 +276,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
   }
 
   /// Push contents for VoIPPushModule (JS event). Called only after the CallKit report.
+  /// Hop to the main queue: the push itself is handled off main so a locked launch
+  /// can show CallKit before the JS bundle loads.
   private func postVoIPPushReceived(_ userInfo: [String: Any]) {
-    NotificationCenter.default.post(
-      name: NSNotification.Name("VoIPPushReceived"),
-      object: nil,
-      userInfo: userInfo
-    )
+    DispatchQueue.main.async {
+      NotificationCenter.default.post(
+        name: NSNotification.Name("VoIPPushReceived"),
+        object: nil,
+        userInfo: userInfo
+      )
+    }
   }
 
   // This method is called when the push registry is invalidated
   func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
+    DispatchQueue.main.async {
+      self.forwardVoipTokenInvalidated(type)
+    }
+  }
+
+  private func forwardVoipTokenInvalidated(_ type: PKPushType) {
     print("📱 PKPushRegistry: didInvalidatePushTokenFor type: \(type.rawValue)")
     print("   ⚠️ VoIP push token invalidated - system will automatically re-register")
 
@@ -264,7 +320,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   ) {
     guard let windowScene = scene as? UIWindowScene,
           let appDelegate = UIApplication.shared.delegate as? AppDelegate,
-          let factory = appDelegate.reactNativeFactory
+          appDelegate.reactNativeFactory != nil
     else {
       return
     }
@@ -277,12 +333,15 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     if let url = connectionOptions.urlContexts.first?.url {
       launchOptions[.url] = url
     }
+    appDelegate.reactLaunchOptions = launchOptions
 
-    factory.startReactNative(
-      withModuleName: "totusClubApp",
-      in: window,
-      launchOptions: launchOptions
-    )
+    // Locked phone: iOS connects this scene while the VoIP push is still being
+    // reported. Loading the JS bundle here blocks launch and the call UI never shows.
+    if UIApplication.shared.applicationState == .background {
+      NSLog("[TotusVoIP] locked/background launch — CallKit before React Native")
+    } else {
+      appDelegate.startReactNativeIfNeeded()
+    }
 
     if let url = connectionOptions.urlContexts.first?.url {
       _ = RCTLinkingManager.application(UIApplication.shared, open: url, options: [:])
@@ -294,26 +353,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         restorationHandler: { _ in }
       )
     }
+  }
 
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-      guard let rootVC = window.rootViewController else {
-        print("⚠️ Could not store bridge in CallKeepHelper, will try to get it dynamically")
-        return
-      }
-      if let rootView = rootVC.view as? RCTRootView {
-        CallKeepHelper.setBridge(rootView.bridge)
-        print("✅ Bridge stored in CallKeepHelper (from RCTRootView)")
-        return
-      }
-      for subview in rootVC.view.subviews {
-        if let rootView = subview as? RCTRootView {
-          CallKeepHelper.setBridge(rootView.bridge)
-          print("✅ Bridge stored in CallKeepHelper (from subview)")
-          return
-        }
-      }
-      print("⚠️ Could not store bridge in CallKeepHelper, will try to get it dynamically")
+  func sceneDidBecomeActive(_ scene: UIScene) {
+    guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else {
+      return
     }
+    appDelegate.startReactNativeIfNeeded()
   }
 
   func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {

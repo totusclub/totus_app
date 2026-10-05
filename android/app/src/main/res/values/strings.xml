@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">totusClubApp</string>
+    <string name="app_name">Totus Club</string>
     <string name="totus_incoming_connection_hint">Установка соединения...</string>
     <string name="totus_incoming_title">Входящий звонок</string>
     <string name="totus_incoming_subtitle">Входящий вызов</string>

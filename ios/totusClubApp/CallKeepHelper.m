@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <CallKit/CallKit.h>
+#import <objc/runtime.h>
 #import "RNCallKeep.h"
 #import <React/RCTBridge.h>
 #import <React/RCTRootView.h>
@@ -10,6 +11,25 @@
 @interface RNCallKeep (TotusPrivate)
 - (void)sendEventWithNameWrapper:(NSString *)name body:(id)body;
 - (NSString *)getIncomingCallErrorCode:(NSError *)error;
+- (instancetype)totus_init;
+@end
+
+@implementation RNCallKeep (TotusInitOnce)
+
+// allocWithZone does not call init. Until init runs, the answer queue is nil, so an
+// answer from the killed app is discarded. JS then opens with no call modal and no
+// WebRTC connection. The bridge calls init again later; the second call must not
+// reset the queue that already holds the answer.
+- (instancetype)totus_init {
+    static RNCallKeep *initialized = nil;
+    if (initialized == self) {
+        return self;
+    }
+    RNCallKeep *result = [self totus_init];
+    initialized = result;
+    return result;
+}
+
 @end
 
 // Store bridge reference for access when app is closed
@@ -117,12 +137,27 @@ static CXProvider *fallbackProvider = nil;
     };
 }
 
++ (void)ensureCallKeepInitialized {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class cls = [RNCallKeep class];
+        Method original = class_getInstanceMethod(cls, @selector(init));
+        Method replacement = class_getInstanceMethod(cls, @selector(totus_init));
+        if (original && replacement) {
+            method_exchangeImplementations(original, replacement);
+        }
+        (void)[[RNCallKeep alloc] init];
+        NSLog(@"[TotusVoIP] RNCallKeep initialized before CallKit so a killed-app answer is kept");
+    });
+}
+
 + (void)setupCallKitNatively {
     // A VoIP push can launch the closed app in the background without React Native (it starts
     // only with the UI scene). The CallKit provider must exist, with its delegate, before the push
     // is handled: otherwise the call is never reported, iOS kills the app ("0xbaadca11") and no
     // incoming call appears on the lock screen / in the background. Same options as JS
     // (VoipService CALLKEEP_OPTIONS); the JS RNCallKeep.setup() is then a no-op.
+    [self ensureCallKeepInitialized];
     NSDictionary *options = [self callKitOptions];
     if ([RNCallKeep respondsToSelector:@selector(setup:)]) {
         [RNCallKeep setup:options];
