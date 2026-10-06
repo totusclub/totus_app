@@ -215,8 +215,15 @@ const OrderDetailsScreen: React.FC = () => {
                     .filter((tourist: any) => tourist && typeof tourist === 'object')
                     .map((tourist: any, index: number) => (
                     <View key={tourist.id ?? index}>
-                      <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>{tourist.name} {tourist.surname},  {tourist.birthday} , До: {tourist.passport_expires_on}</AppText>
-                      <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>паспорт: {tourist.passport || ''}</AppText>
+                      {tourist.birthday === undefined && tourist.passport === undefined && tourist.passport_expires_on === undefined ? (
+                        // Card from the light list (GET /user/orders?view=list): names only until the full order loads.
+                        <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>{tourist.name} {tourist.surname}</AppText>
+                      ) : (
+                        <>
+                          <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>{tourist.name} {tourist.surname},  {tourist.birthday} , До: {tourist.passport_expires_on}</AppText>
+                          <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>паспорт: {tourist.passport || ''}</AppText>
+                        </>
+                      )}
                     </View>
                   ))}
                 </View>
