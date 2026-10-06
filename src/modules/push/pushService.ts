@@ -699,7 +699,8 @@ function toOrderId(value: unknown): string | number | null {
 
 /**
  * Deep link по data.route (API.md §2). Навигация — через корневой navigationRef
- * (экран 'tab' → вкладка → вложенный экран), как OrdersStackScreen/orderDetails из чата;
+ * (экран 'tab' → вкладка → вложенный экран); заказ — экран orderDetails поверх текущего
+ * (src/navigation/historyNavigation.ts), «Назад» — туда, где был пользователь.
  * `initial: false` — чтобы под экраном оставался корень вкладки (назад → список/аккаунт).
  */
 export function handleNotificationPress(data: PushMessageData | null | undefined): void {
@@ -712,16 +713,14 @@ export function handleNotificationPress(data: PushMessageData | null | undefined
     case 'documents':
     case 'order_request':
       if (orderId != null) {
-        navigateRoot('tab', {
-          screen: 'OrdersStackScreen',
-          params: {screen: 'orderDetails', params: {orderId}, initial: false},
-        });
+        // Заказ поверх текущего экрана (в «Заказах» — поверх списка): «Назад» — туда, где был пользователь.
+        navigateRoot('orderDetails', {orderId});
       } else {
-        navigateRoot('tab', {screen: 'OrdersStackScreen', params: {screen: 'orders'}});
+        navigateRoot('tab', {screen: 'OrdersStackScreen', params: {screen: 'orders', pop: true}});
       }
       break;
     case 'orders':
-      navigateRoot('tab', {screen: 'OrdersStackScreen', params: {screen: 'orders'}});
+      navigateRoot('tab', {screen: 'OrdersStackScreen', params: {screen: 'orders', pop: true}});
       break;
     case 'support_chat':
       navigateRoot('tab', {
