@@ -211,7 +211,9 @@ const OrderDetailsScreen: React.FC = () => {
               <View style={[styles.section, styles.sectionSpacing, { borderBottomColor: theme.divider }]}>
                 <AppText style={[styles.sectionTitle, { color: theme.text }]}>Туристы</AppText>
                 <View style={styles.touristsList}>
-                  {(order.package?.tourists ?? []).map((tourist: any, index: number) => (
+                  {(Array.isArray(order.package?.tourists) ? (order.package?.tourists as any[]) : [])
+                    .filter((tourist: any) => tourist && typeof tourist === 'object')
+                    .map((tourist: any, index: number) => (
                     <View key={tourist.id ?? index}>
                       <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>{tourist.name} {tourist.surname},  {tourist.birthday} , До: {tourist.passport_expires_on}</AppText>
                       <AppText style={[styles.sectionSubtitle, { color: theme.textTertiary }]}>паспорт: {tourist.passport || ''}</AppText>

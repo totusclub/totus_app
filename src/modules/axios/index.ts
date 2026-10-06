@@ -10,9 +10,21 @@ export const instance = axios.create({
   baseURL: 'https://api.totus.club',
 });
 
+/**
+ * What goes to the log for a response body. console.log works in release builds too and
+ * serializes the whole object on the JS thread: /user/orders (every order with its full
+ * Level.Travel package) froze the orders screen and could run out of memory on Android.
+ * Release: only the shape; debug: lists as a count, the rest as before.
+ */
 function summarizeApiPayload(data: unknown): unknown {
   if (!data || typeof data !== 'object') {
     return data;
+  }
+  if (Array.isArray(data)) {
+    return `[${data.length} items]`;
+  }
+  if (!__DEV__) {
+    return `{${Object.keys(data as Record<string, unknown>).slice(0, 10).join(', ')}}`;
   }
   const record = data as Record<string, unknown>;
   if (Array.isArray(record.hotels)) {

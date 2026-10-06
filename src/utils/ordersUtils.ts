@@ -198,6 +198,38 @@ export const getPaymentMethodLabel = (order?: Order): string => {
   return 'Банковская карта';
 };
 
+// Formatters are created once: on Android (Hermes) every `new Intl.DateTimeFormat` is expensive,
+// and the orders list used to create four per card on every render.
+let dayMonthFormatter: Intl.DateTimeFormat | null = null;
+let weekdayFormatter: Intl.DateTimeFormat | null = null;
+
+function getDayMonthFormatter(): Intl.DateTimeFormat {
+  if (!dayMonthFormatter) {
+    dayMonthFormatter = new Intl.DateTimeFormat('ru-RU', {day: 'numeric', month: 'long'});
+  }
+  return dayMonthFormatter;
+}
+
+function getWeekdayFormatter(): Intl.DateTimeFormat {
+  if (!weekdayFormatter) {
+    weekdayFormatter = new Intl.DateTimeFormat('ru-RU', {weekday: 'short'});
+  }
+  return weekdayFormatter;
+}
+
+/**
+ * `Intl.DateTimeFormat#format` throws RangeError on an invalid date; inside a list item that
+ * crashes the whole app. Invalid / unparsable values → null (the caller shows a placeholder).
+ */
+function formatDateSafe(date: Date, formatter: () => Intl.DateTimeFormat): string | null {
+  if (!(date instanceof Date) || !Number.isFinite(date.getTime())) return null;
+  try {
+    return formatter().format(date);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Format order date from timestamp or date string
  */
@@ -205,10 +237,7 @@ export const formatOrderDate = (value?: number | string) => {
   if (!value) return '—';
 
   const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-  }).format(date);
+  return formatDateSafe(date, getDayMonthFormatter) ?? '—';
 };
 
 /**
@@ -219,19 +248,14 @@ export const formatPeriod = (pkg: any) => {
   const end = pkg?.dates_info?.end_date;
   if (!start || !end) return '';
 
-  const formatter = new Intl.DateTimeFormat('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-  });
-  const weekdayFormatter = new Intl.DateTimeFormat('ru-RU', {
-    weekday: 'short',
-  });
-
   const startDate = new Date(start);
   const endDate = new Date(end);
-  return `${formatter.format(startDate)}, ${weekdayFormatter.format(
-    startDate,
-  )} – ${formatter.format(endDate)}, ${weekdayFormatter.format(endDate)}`;
+  const startDay = formatDateSafe(startDate, getDayMonthFormatter);
+  const endDay = formatDateSafe(endDate, getDayMonthFormatter);
+  if (!startDay || !endDay) return '';
+  const startWeekday = formatDateSafe(startDate, getWeekdayFormatter) ?? '';
+  const endWeekday = formatDateSafe(endDate, getWeekdayFormatter) ?? '';
+  return `${startDay}, ${startWeekday} – ${endDay}, ${endWeekday}`;
 };
 
 /**
@@ -247,12 +271,8 @@ export const formatDeparture = (pkg: any) => {
     pkg?.departure?.name ||
     '';
 
-  const formatter = new Intl.DateTimeFormat('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-  });
-
-  return `Вылет: ${city || '—'}, ${departureDate ? formatter.format(new Date(departureDate)) : ''}`;
+  const day = departureDate ? formatDateSafe(new Date(departureDate), getDayMonthFormatter) ?? '' : '';
+  return `Вылет: ${city || '—'}, ${day}`;
 };
 
 /**

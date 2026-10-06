@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -19,6 +19,31 @@ import { getOrdersUsers } from '../../modules/api/levelTravelApi';
 import type { Order } from '../../types';
 import { sortOrdersNewestFirst } from '../../utils/ordersUtils';
 
+/** The request is not cancelled, but the screen stops waiting (no endless spinner on a bad network). */
+const ORDERS_LOAD_TIMEOUT_MS = 30000;
+
+/**
+ * Last loaded list of this app session (memory only, never AsyncStorage: full Level.Travel
+ * packages are large). Reopening the tab / screen shows it at once and refreshes in background.
+ */
+let lastOrders: { userId: string; orders: Order[] } | null = null;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('orders_timeout')), ms);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 const OrdersScreen = () => {
   const { theme } = useTheme();
   // iPad only: order cards in a 2/3-column grid; on phone everything below is a passthrough.
@@ -34,29 +59,61 @@ const OrdersScreen = () => {
   const auth = useSelector((state: RootState) => state.auth);
   const accessToken = auth.accessToken;
   const user = auth.user as { id?: string | number } | null;
-  const [orders, setOrders] = useState<Order[]>([]);
+  // The list depends on WHO is logged in, not on the token string: a token refresh used to
+  // start a second, parallel /user/orders request.
+  const isLoggedIn = Boolean(accessToken);
+  const userId = user?.id != null && user.id !== '' ? String(user.id) : null;
+  const cached = lastOrders && userId && lastOrders.userId === userId ? lastOrders.orders : null;
+  const [orders, setOrders] = useState<Order[]>(cached ?? []);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    if (!accessToken || !user?.id) {
-      setOrders([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await getOrdersUsers(Number(user.id));
-      setOrders(Array.isArray(data) ? sortOrdersNewestFirst(data) : []);
-    } catch {
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken, user?.id]);
+  const requestSeq = useRef(0);
+  const mounted = useRef(true);
+  const ordersRef = useRef<Order[]>(orders);
+  ordersRef.current = orders;
 
   useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const load = useCallback(async () => {
+    const seq = ++requestSeq.current;
+    if (!isLoggedIn || !userId) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+    // Spinner only when there is nothing to show yet; otherwise the list stays and updates.
+    const hasShownList =
+      ordersRef.current.length > 0 || (lastOrders != null && lastOrders.userId === userId);
+    if (!hasShownList) setLoading(true);
+    try {
+      const data = await withTimeout(getOrdersUsers(Number(userId)), ORDERS_LOAD_TIMEOUT_MS);
+      if (!mounted.current || seq !== requestSeq.current) return; // a newer request owns the list
+      const next = Array.isArray(data) ? sortOrdersNewestFirst(data) : [];
+      lastOrders = { userId, orders: next };
+      setOrders(next);
+    } catch {
+      if (!mounted.current || seq !== requestSeq.current) return;
+      // Keep the list that is already on screen; empty only when nothing was loaded before (as before).
+      if (!hasShownList) setOrders([]);
+    } finally {
+      if (mounted.current && seq === requestSeq.current) setLoading(false);
+    }
+  }, [isLoggedIn, userId]);
+
+  useEffect(() => {
+    if (!isLoggedIn) lastOrders = null; // logout: never show the previous user's orders
     void load();
-  }, [load]);
+  }, [load, isLoggedIn]);
+
+  const keyExtractor = useCallback(
+    (item: Order, index: number) => String((item as any)?.id ?? (item as any)?.order_id ?? index),
+    [],
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -92,8 +149,11 @@ const OrdersScreen = () => {
           key={isTablet ? `cols-${columns}` : undefined}
           {...tabletListProps}
           data={orders}
-          keyExtractor={(item, index) => String((item as any)?.id ?? index)}
+          keyExtractor={keyExtractor}
           renderItem={({ item }) => wrapTablet(<OrderListItem order={item} />)}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={7}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.brand} />
           }

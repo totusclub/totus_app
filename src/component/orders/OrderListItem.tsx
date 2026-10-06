@@ -249,4 +249,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OrderListItem;
+// The list re-renders on refresh / layout changes; a card only changes when its order object does.
+export default React.memo(OrderListItem);
