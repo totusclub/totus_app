@@ -110,7 +110,7 @@ const OrderDetailsSections: React.FC<OrderDetailsSectionsProps> = ({
             <View style={[styles.divider, { backgroundColor: theme.divider }]} />
             <InfoRow
               label="Питание"
-              value={pkg.pansion_description}
+              value={pkg?.pansion_description}
             />
           </View>
         </View>
