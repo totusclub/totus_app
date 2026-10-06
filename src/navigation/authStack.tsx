@@ -160,6 +160,14 @@ const AccountStackScreen = () => {
       <Stack.Screen name="verification" component={VerificationScreen} />
       <Stack.Screen name="account" component={AccountScreen} />
       <Stack.Screen name="favorites" component={FavoritesScreen} />
+      {/* «Избранное» из «Аккаунта»: отель и бронирование в этом же стеке — «Назад» возвращает по шагам
+          (раньше переход к отелю отсюда некуда было выполнить: маршрута hotel в стеке не было). */}
+      <Stack.Screen name="hotel" component={HotelScreen} />
+      <Stack.Screen name="tickets" component={TicketsScreen} />
+      <Stack.Screen name="ticketDetails" component={TicketDetailsScreen} />
+      <Stack.Screen name="booking" component={BookingScreen} />
+      <Stack.Screen name="checkout" component={CheckoutScreen} />
+      <Stack.Screen name="pendingPayment" component={PendingPaymentScreen} />
       {/* «Документы» ООО «ТОТУСКЛАБ» из CMS; старый маршрут privacyPolicy открывает документ privacy-policy */}
       <Stack.Screen name={LEGAL_DOCUMENTS_ROUTE} component={LegalDocumentsScreen} />
       <Stack.Screen name={LEGAL_DOCUMENT_ROUTE} component={LegalDocumentScreen} />
@@ -228,6 +236,8 @@ const TabBar = () => {
 
   return (
     <Tab.Navigator
+      // «Назад» на корне вкладки — на вкладку, с которой пришли (история), а не всегда на «Поиск».
+      backBehavior="history"
       screenListeners={({ route }) => ({
         // Remember tab on leave — so AI ← returns here (not always Home).
         blur: () => {
@@ -362,6 +372,9 @@ const AuthStack = () => {
       <Stack.Screen name="checkout" component={CheckoutScreen} />
       <Stack.Screen name="pendingPayment" component={PendingPaymentScreen} />
       <Stack.Screen name="hotelFromAi" component={HotelScreen} />
+      {/* Заказ, открытый не из списка «Заказы» (чат Милы, оплата, поддержка, push): поверх вкладок,
+          «Назад» — на экран, с которого пришли (src/navigation/historyNavigation.ts). */}
+      <Stack.Screen name="orderDetails" component={OrderDetailsScreen} />
       <Stack.Screen name="tab" component={TabBar} />
     </Stack.Navigator>
   );

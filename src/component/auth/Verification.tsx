@@ -11,6 +11,7 @@ import { jwtDecode } from 'jwt-decode';
 import { useTheme } from '../../hooks/useTheme';
 import { maybePromptAndroidVoipPowerSetup } from '../../modules/voip/AndroidPowerManager';
 import { TabletCentered } from '../UI/tablet';
+import { returnAfterLogin } from '../../navigation/historyNavigation';
 
 type VerificationRouteParams = {
   email: string;
@@ -85,7 +86,7 @@ export const Verification: React.FC = () => {
                 },
               });
             } else {
-              navigation.navigate(returnTo, returnParams || {});
+              returnAfterLogin(navigation, returnTo, returnParams || {});
             }
           } else {
             navigation.navigate('tab', {

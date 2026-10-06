@@ -31,10 +31,14 @@ export default function TotusAiChatScreen(): React.JSX.Element {
   );
 
   const handleBack = useCallback(() => {
-    // Do NOT use parent.goBack() — tab backBehavior sends to Home (first route).
     void useAssistantStore.getState().flushPersist();
-    const returnTab = getAiReturnTab();
     const parent = navigation.getParent();
+    // Tabs keep history (backBehavior="history"): back to the tab and screen the user came from.
+    if (parent?.canGoBack?.()) {
+      parent.goBack();
+      return;
+    }
+    const returnTab = getAiReturnTab();
     if (parent) {
       parent.navigate(returnTab);
       return;

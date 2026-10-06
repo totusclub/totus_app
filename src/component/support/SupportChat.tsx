@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
+import {openOrderDetails} from '../../navigation/historyNavigation';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {AppText} from '../UI';
 import {useTheme} from '../../hooks/useTheme';
@@ -133,13 +134,10 @@ const SupportChat: React.FC = () => {
     [send],
   );
 
-  // Карточка заказа → детали заказа (OrdersStackScreen/orderDetails принимает orderId).
+  // Карточка заказа → детали заказа поверх чата: «Назад» возвращает в чат.
   const handleOpenOrder = useCallback(
     (orderId: number | string) => {
-      navigation.navigate('OrdersStackScreen', {
-        screen: 'orderDetails',
-        params: {orderId},
-      });
+      openOrderDetails(navigation, orderId);
     },
     [navigation],
   );

@@ -21,6 +21,7 @@ import {
 } from '../../utils/sbpPayment';
 import { TabletCentered } from '../UI/tablet';
 import TotusBookingSuccess from './TotusBookingSuccess';
+import { backToCheckout, openOrdersList } from '../../navigation/historyNavigation';
 import {
   getTotusBooking,
   isTotusInternalOrderId,
@@ -139,7 +140,7 @@ export const PendingPayment: React.FC = () => {
   useEffect(() => {
     if (status !== 'paid' || isInternalOrder) return;
     const t = setTimeout(() => {
-      navigation.navigate('OrdersStackScreen' as any, { screen: 'orders' });
+      openOrdersList(navigation, { leaveFlow: true });
     }, 1200);
     return () => clearTimeout(t);
   }, [status, navigation, isInternalOrder]);
@@ -235,7 +236,7 @@ export const PendingPayment: React.FC = () => {
       navigation.goBack();
       return;
     }
-    navigation.navigate('OrdersStackScreen', { screen: 'orders' });
+    openOrdersList(navigation);
   }, [navigation]);
 
   return (
@@ -313,9 +314,7 @@ export const PendingPayment: React.FC = () => {
               title="К заказу"
               size="large"
               type="outline"
-              onPress={() =>
-                navigation.navigate('checkout', { order_id: orderId })
-              }
+              onPress={() => backToCheckout(navigation, { order_id: orderId })}
             />
           </>
         )}
@@ -339,9 +338,7 @@ export const PendingPayment: React.FC = () => {
               title="К заказу"
               size="large"
               type="outline"
-              onPress={() =>
-                navigation.navigate('checkout', { order_id: orderId })
-              }
+              onPress={() => backToCheckout(navigation, { order_id: orderId })}
             />
           </>
         )}

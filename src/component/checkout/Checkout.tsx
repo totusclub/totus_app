@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, Alert, Linking } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { openOrdersList } from '../../navigation/historyNavigation';
 import { AppButton, AppHeader, AppText } from '../UI';
 import { createPay, getOrder } from '../../modules/api/levelTravelApi';
 import type { Order } from '../../types/orders';
@@ -182,9 +183,7 @@ export const Checkout: React.FC = () => {
             title="Мои заказы"
             type="outline"
             size="large"
-            onPress={() =>
-              navigation.navigate('OrdersStackScreen', { screen: 'orders' })
-            }
+            onPress={() => openOrdersList(navigation)}
           />
           </TabletCentered>
         </View>
