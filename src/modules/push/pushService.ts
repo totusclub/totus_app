@@ -549,6 +549,75 @@ export async function displayForegroundNotification(
   }
 }
 
+/** Сколько ждать системное уведомление FCM, прежде чем показать его самим (Android, фон / закрыто). */
+export const SYSTEM_PUSH_GRACE_MS = 1500;
+
+/** Уже показано: наше (`hub-<id>`) или системное FCM с тем же заголовком и текстом. */
+async function isHubNotificationShown(notificationId: string, title: string, body: string): Promise<boolean> {
+  try {
+    const shown = await notifee.getDisplayedNotifications();
+    return shown.some(item => {
+      if (notificationId && (item.id === `hub-${notificationId}` || item.notification?.id === `hub-${notificationId}`)) {
+        return true;
+      }
+      return item.notification?.title === title && item.notification?.body === body;
+    });
+  } catch (e) {
+    // Не смогли проверить — не показываем, чтобы не было дубля системного уведомления.
+    warn('getDisplayedNotifications failed', e);
+    return true;
+  }
+}
+
+/**
+ * Android, приложение в фоне или полностью закрыто: setBackgroundMessageHandler (headless JS —
+ * тот же путь, по которому в закрытое приложение приходит входящий звонок).
+ * Обычно уведомление уже нарисовала система по FCM `notification` — тогда ничего не делаем.
+ * Если системного уведомления нет и через SYSTEM_PUSH_GRACE_MS, показываем то же уведомление
+ * через notifee: тот же канал, заголовок, текст и data; тап → тот же deep link
+ * (notifee.onBackgroundEvent → push:pendingPress / getInitialNotification).
+ * Сообщения без `notification` (silent, служебные) не показываем.
+ * Возвращает true, если уведомление показали сами.
+ */
+export async function displayBackgroundHubNotification(
+  remoteMessage: FirebaseMessagingTypes.RemoteMessage | {data?: Record<string, unknown>; notification?: {title?: string; body?: string}} | null | undefined,
+): Promise<boolean> {
+  if (Platform.OS !== 'android') return false;
+  if (!remoteMessage?.notification) return false;
+  const data = (remoteMessage.data || {}) as PushMessageData;
+  const title = remoteMessage.notification.title || (data.title ? String(data.title) : '') || 'Totus Club';
+  const body = remoteMessage.notification.body || (data.body ? String(data.body) : '');
+  if (!body) return false;
+  const notificationId =
+    data.notificationId != null && String(data.notificationId) !== '' ? String(data.notificationId) : '';
+
+  await sleep(SYSTEM_PUSH_GRACE_MS);
+  if (AppState.currentState === 'active') {
+    // Пока ждали, приложение открыли — баннер покажет foreground-путь, сокет и центр уведомлений.
+    return false;
+  }
+  if (await isHubNotificationShown(notificationId, title, body)) return false;
+
+  try {
+    await ensureAndroidChannels();
+    await notifee.displayNotification({
+      ...(notificationId ? {id: `hub-${notificationId}`} : {}),
+      title,
+      body,
+      data: toStringMap(data),
+      android: {
+        channelId: channelForType(data.type),
+        pressAction: {id: 'default'},
+      },
+    });
+    log('background push shown by the app (no system notification)', String(data.type || ''));
+    return true;
+  } catch (e) {
+    warn('background displayNotification failed', e);
+    return false;
+  }
+}
+
 /**
  * Local support banner while the app is open (hub skips FCM when the user socket is live).
  * Background / killed → system FCM after the socket disconnects.

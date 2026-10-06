@@ -62,9 +62,11 @@ export async function voipFetch(url: string, init: RequestInit = {}): Promise<Re
 /**
  * Опция `auth` для io(): функциональная форма вызывается socket.io-client при каждом
  * (ре)коннекте, поэтому обновлённый после refresh токен подхватывается сам.
+ * client: 'app' — сокет мобильного приложения: хаб уведомлений не считает его «пользователь на
+ * экране» (сокет звонков живёт и в фоне); «на экране» сообщает только сокет чата (supportSocket.ts).
  */
 export function voipSocketAuth(cb: (data: Record<string, unknown>) => void): void {
   getVoipAccessToken()
-    .then(token => cb(token ? {token} : {}))
-    .catch(() => cb({}));
+    .then(token => cb(token ? {token, client: 'app'} : {client: 'app'}))
+    .catch(() => cb({client: 'app'}));
 }

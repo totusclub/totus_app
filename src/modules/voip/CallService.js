@@ -14,6 +14,7 @@ import {
 import {consumeAndroidCallAction, onAndroidCallActionAvailable} from './androidCallUi';
 import {ensureAndroidMicPermission} from './androidCallPermissions';
 import {
+  displayBackgroundHubNotification,
   displayForegroundNotification,
   isSupportChatScreenOpen,
 } from '../push/pushService';
@@ -100,6 +101,9 @@ export function registerAndroidCallBackgroundHandlers() {
         return;
       }
       if (isSupportMessage(data) || isHubNotificationMessage(data)) {
+        // Фон / закрытое приложение: уведомление рисует система по FCM `notification`. Если его
+        // нет (закрытое приложение на части прошивок) — показываем то же самое сами, без дубля.
+        await displayBackgroundHubNotification(remoteMessage);
         return;
       }
       if (isIncomingCallMessage(data)) {
