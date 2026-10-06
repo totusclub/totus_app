@@ -8,6 +8,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../../modules/store';
 import { addFavorite, removeFavorite, isFavorite as checkIsFavorite } from '../../../modules/api/favorites';
 import { useHotelDetails } from '../../../modules/hooks/useHotelDetails';
+import { favoriteImagesForSave } from '../../../utils/favoriteHotel';
 
 const HotelHeader: React.FC = () => {
   const { theme } = useTheme();
@@ -99,6 +100,9 @@ const HotelHeader: React.FC = () => {
           tags: hotel.tags || [],
           address: hotel.address,
           ...hotel, // Include all other hotel properties
+          // Переносимые картинки ({uri} https): их понимают и сайт, и приложение; require-заглушки
+          // этой сборки и объекты без адреса не сохраняем.
+          images: favoriteImagesForSave(hotel.images),
         } : {
           id: hotelIdNum,
           name: routeParams?.hotel?.name || 'Отель',
