@@ -10,9 +10,17 @@
 //   - пользователь авторизован и приложение активно (AppState) → connect (holder «app»);
 //   - приложение ушло в фон → pause (форс-disconnect), иначе хаб считает сокет живым и не шлёт FCM;
 //   - логаут → disconnectSupportSocket().
+//
+// Сокет живёт только пока приложение на экране, поэтому в handshake он говорит об этом серверу:
+// presence 'foreground' + deviceId установки (тот же, что в POST /api/push/devices). Хаб
+// (calling_api_v2 lib/notifications/presence.js) не шлёт push сообщения поддержки только ЭТОМУ
+// устройству — закрытый второй телефон получает его, даже если здесь чат открыт, а открытый сайт
+// или iPhone больше не отменяют push закрытому Android.
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {io, Socket} from 'socket.io-client';
 import {VOIP_BASE_URL} from '../../config/server';
 import {voipSocketAuth} from '../api/voipAuth';
+import {PUSH_STORAGE_DEVICE_ID} from '../push/pushConstants';
 
 export type SupportSocketHandler = (payload: any) => void;
 
@@ -22,9 +30,20 @@ const listeners = new Map<string, Set<SupportSocketHandler>>();
 /** true while AppState is background/inactive — block reconnect until resume. */
 let pausedForBackground = false;
 
+/** handshake.auth: токен (voipSocketAuth, client 'app') + «приложение на экране» + id установки. */
+function supportSocketAuth(cb: (data: Record<string, unknown>) => void): void {
+  voipSocketAuth(data => {
+    AsyncStorage.getItem(PUSH_STORAGE_DEVICE_ID)
+      .catch(() => null)
+      .then(deviceId => {
+        cb({...data, presence: 'foreground', ...(deviceId ? {deviceId} : {})});
+      });
+  });
+}
+
 function createSocket(): Socket {
   const s = io(VOIP_BASE_URL, {
-    auth: voipSocketAuth,
+    auth: supportSocketAuth,
     transports: ['websocket'],
     reconnection: true,
     reconnectionDelay: 1000,

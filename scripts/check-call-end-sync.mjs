@@ -111,6 +111,7 @@ const LOCAL_STUBS = {
   'modules/voip/AndroidPowerManager': `export const ensureAndroidBatteryOptimizationHandled = async () => {}; export const maybePromptAndroidVoipPowerSetup = async () => {};`,
   'modules/push/pushService': `
     export const displayForegroundNotification = async m => { globalThis.__ce.banners.push(m); };
+    export const displayBackgroundHubNotification = async m => { globalThis.__ce.banners.push(m); return false; };
     export const isSupportChatScreenOpen = () => false;`,
 };
 module.registerHooks({
