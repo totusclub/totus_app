@@ -119,18 +119,33 @@ await check('a token refresh does not start a second /user/orders (depends on lo
 });
 await check('a late answer never overwrites a newer one; no setState after leaving the screen', () => {
   assert.match(screen, /const seq = \+\+requestSeq\.current;/);
-  assert.match(screen, /if \(!mounted\.current \|\| seq !== requestSeq\.current\) return;/);
+  assert.match(screen, /const isCurrent = \(\) => mounted\.current && seq === requestSeq\.current;/);
+  assert.match(screen, /const data = await fetchOrdersList\(userId\);\s*if \(!isCurrent\(\)\) return;/);
 });
-await check('timeout: the screen stops waiting after 30 s', () => {
-  assert.match(screen, /ORDERS_LOAD_TIMEOUT_MS = 30000/);
-  assert.match(screen, /withTimeout\(getOrdersUsers\(Number\(userId\)\), ORDERS_LOAD_TIMEOUT_MS\)/);
+await check('light list: GET /user/orders?view=list (cards only; details still load the full order)', () => {
+  assert.match(screen, /get<Order\[\]>\('\/user\/orders', \{ user_id: Number\(userId\), view: 'list' \}\)/);
+  assert.ok(!/getOrdersUsers/.test(screen));
+  const det = code(read('src/component/orders/order/OrderDetails.tsx'));
+  assert.match(det, /getOrder\(Number\(orderIdParam\)\)/, 'details fetch the full order');
+  assert.match(det, /tourist\.birthday === undefined && tourist\.passport === undefined && tourist\.passport_expires_on === undefined/);
 });
-await check('reopening shows the last list at once (memory only), error keeps the shown list', () => {
+await check('a slow answer is never thrown away and never shown as «Заказов пока нет»', () => {
+  assert.ok(!/withTimeout|orders_timeout/.test(screen), 'no timeout that discards the answer');
+  assert.match(screen, /ORDERS_SLOW_MS = 15000/);
+  assert.match(screen, /Загружаем заказы — это дольше обычного/);
+  assert.match(screen, /failed \|\| !loaded \? \(/);
+  assert.match(screen, /Не удалось загрузить заказы/);
+  assert.match(screen, /setFailed\(true\);/);
+  assert.ok(!/setOrders\(\[\]\);\s*\}\s*finally/.test(screen), 'an error does not wipe the list');
+});
+await check('opening shows the saved list at once (memory, then AsyncStorage), refresh in background', () => {
   assert.match(screen, /useState<Order\[\]>\(cached \?\? \[\]\)/);
+  assert.match(screen, /await readStoredOrders\(userId\)/);
   assert.match(screen, /if \(!hasShownList\) setLoading\(true\);/);
-  assert.match(screen, /if \(!hasShownList\) setOrders\(\[\]\);/);
-  assert.match(screen, /if \(!isLoggedIn\) lastOrders = null;/, 'logout clears it');
-  assert.ok(!/AsyncStorage/.test(screen), 'large packages never go to AsyncStorage');
+  assert.match(screen, /storeOrders\(userId, next\);/);
+  assert.match(screen, /ORDERS_STORAGE_MAX_CHARS = 400000/, 'a full (old server) answer is not written to storage');
+  assert.match(screen, /if \(!isLoggedIn\) clearStoredOrders\(\);/, 'logout clears it');
+  assert.match(screen, /saved\.userId !== userId/, 'another account never sees it');
 });
 await check('list: memoized cards, small first render, same texts and navigation', () => {
   assert.match(screen, /initialNumToRender=\{6\}/);

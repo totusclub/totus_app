@@ -15,33 +15,55 @@ import OrderListItem from '../../component/orders/OrderListItem';
 import { useTheme } from '../../hooks/useTheme';
 import { useLayout } from '../../hooks/useLayout';
 import { RootState } from '../../modules/store';
-import { getOrdersUsers } from '../../modules/api/levelTravelApi';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { get } from '../../modules/axios';
 import type { Order } from '../../types';
 import { sortOrdersNewestFirst } from '../../utils/ordersUtils';
 
-/** The request is not cancelled, but the screen stops waiting (no endless spinner on a bad network). */
-const ORDERS_LOAD_TIMEOUT_MS = 30000;
+/** After this long the spinner explains itself; the request keeps going and its answer is still shown. */
+const ORDERS_SLOW_MS = 15000;
 
 /**
- * Last loaded list of this app session (memory only, never AsyncStorage: full Level.Travel
- * packages are large). Reopening the tab / screen shows it at once and refreshes in background.
+ * Last loaded list. In memory for this app session and in AsyncStorage between launches, so the
+ * screen opens with the list at once and refreshes it in background. The list comes from
+ * GET /user/orders?view=list (only the fields of a card, a few KB per order); a full answer
+ * (old server) is kept in memory only if it is too large to store.
  */
+const ORDERS_STORAGE_KEY = 'orders:list';
+const ORDERS_STORAGE_MAX_CHARS = 400000;
 let lastOrders: { userId: string; orders: Order[] } | null = null;
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('orders_timeout')), ms);
-    promise.then(
-      value => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      error => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
+async function readStoredOrders(userId: string): Promise<Order[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(ORDERS_STORAGE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as { userId?: string; orders?: unknown };
+    if (!saved || saved.userId !== userId || !Array.isArray(saved.orders)) return null;
+    return saved.orders as Order[];
+  } catch {
+    return null;
+  }
+}
+
+function storeOrders(userId: string, orders: Order[]): void {
+  try {
+    const raw = JSON.stringify({ userId, orders });
+    if (raw.length > ORDERS_STORAGE_MAX_CHARS) return;
+    AsyncStorage.setItem(ORDERS_STORAGE_KEY, raw).catch(() => undefined);
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearStoredOrders(): void {
+  lastOrders = null;
+  AsyncStorage.removeItem(ORDERS_STORAGE_KEY).catch(() => undefined);
+}
+
+/** Light list for the cards; the details screen still loads the full order (GET /orders). */
+async function fetchOrdersList(userId: string): Promise<Order[]> {
+  const response = await get<Order[]>('/user/orders', { user_id: Number(userId), view: 'list' });
+  return Array.isArray(response.data) ? response.data : [];
 }
 
 const OrdersScreen = () => {
@@ -65,7 +87,10 @@ const OrdersScreen = () => {
   const userId = user?.id != null && user.id !== '' ? String(user.id) : null;
   const cached = lastOrders && userId && lastOrders.userId === userId ? lastOrders.orders : null;
   const [orders, setOrders] = useState<Order[]>(cached ?? []);
+  const [loaded, setLoaded] = useState(Boolean(cached));
   const [loading, setLoading] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const requestSeq = useRef(0);
   const mounted = useRef(true);
@@ -81,32 +106,56 @@ const OrdersScreen = () => {
 
   const load = useCallback(async () => {
     const seq = ++requestSeq.current;
+    const isCurrent = () => mounted.current && seq === requestSeq.current;
     if (!isLoggedIn || !userId) {
       setOrders([]);
       setLoading(false);
       return;
     }
+    setFailed(false);
+    setSlow(false);
+
+    // 1. Show what we already have: memory, otherwise the list saved on the previous launch.
+    if (ordersRef.current.length === 0) {
+      const stored =
+        lastOrders && lastOrders.userId === userId ? lastOrders.orders : await readStoredOrders(userId);
+      if (!isCurrent()) return;
+      if (stored && stored.length) {
+        setOrders(stored);
+        setLoaded(true);
+      }
+    }
+    const hasShownList = ordersRef.current.length > 0 || (lastOrders != null && lastOrders.userId === userId);
     // Spinner only when there is nothing to show yet; otherwise the list stays and updates.
-    const hasShownList =
-      ordersRef.current.length > 0 || (lastOrders != null && lastOrders.userId === userId);
     if (!hasShownList) setLoading(true);
+    const slowTimer = setTimeout(() => {
+      if (isCurrent()) setSlow(true);
+    }, ORDERS_SLOW_MS);
+
+    // 2. Refresh. No timeout that throws the answer away: a slow answer is still shown when it comes.
     try {
-      const data = await withTimeout(getOrdersUsers(Number(userId)), ORDERS_LOAD_TIMEOUT_MS);
-      if (!mounted.current || seq !== requestSeq.current) return; // a newer request owns the list
-      const next = Array.isArray(data) ? sortOrdersNewestFirst(data) : [];
+      const data = await fetchOrdersList(userId);
+      if (!isCurrent()) return; // a newer request owns the list
+      const next = sortOrdersNewestFirst(data);
       lastOrders = { userId, orders: next };
+      storeOrders(userId, next);
       setOrders(next);
+      setLoaded(true);
     } catch {
-      if (!mounted.current || seq !== requestSeq.current) return;
-      // Keep the list that is already on screen; empty only when nothing was loaded before (as before).
-      if (!hasShownList) setOrders([]);
+      if (!isCurrent()) return;
+      // Keep the list that is on screen; with nothing on screen show the error, not «Заказов пока нет».
+      setFailed(true);
     } finally {
-      if (mounted.current && seq === requestSeq.current) setLoading(false);
+      clearTimeout(slowTimer);
+      if (isCurrent()) {
+        setLoading(false);
+        setSlow(false);
+      }
     }
   }, [isLoggedIn, userId]);
 
   useEffect(() => {
-    if (!isLoggedIn) lastOrders = null; // logout: never show the previous user's orders
+    if (!isLoggedIn) clearStoredOrders(); // logout: never show the previous user's orders
     void load();
   }, [load, isLoggedIn]);
 
@@ -143,7 +192,19 @@ const OrdersScreen = () => {
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
       <AppText style={[styles.title, isTablet && styles.titleTablet, { color: theme.text }]}>Заказы</AppText>
       {loading && !refreshing ? (
-        <ActivityIndicator color={theme.brand} style={{ marginTop: 40 }} />
+        <View style={styles.loadingBox}>
+          <ActivityIndicator color={theme.brand} />
+          {slow && (
+            <>
+              <AppText style={[styles.stateText, { color: theme.textSecondary }]}>
+                Загружаем заказы — это дольше обычного
+              </AppText>
+              <TouchableOpacity onPress={() => void load()} style={styles.stateAction}>
+                <AppText style={{ color: theme.brand }}>Повторить</AppText>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       ) : (
         <FlatList
           key={isTablet ? `cols-${columns}` : undefined}
@@ -158,9 +219,21 @@ const OrdersScreen = () => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.brand} />
           }
           ListEmptyComponent={
-            <AppText style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 40 }}>
-              Заказов пока нет
-            </AppText>
+            failed || !loaded ? (
+              // Not loaded yet / the request failed: never claim there are no orders.
+              <View style={styles.loadingBox}>
+                <AppText style={[styles.stateText, { color: theme.textSecondary }]}>
+                  Не удалось загрузить заказы
+                </AppText>
+                <TouchableOpacity onPress={() => void load()} style={styles.stateAction}>
+                  <AppText style={{ color: theme.brand }}>Повторить</AppText>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <AppText style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 40 }}>
+                Заказов пока нет
+              </AppText>
+            )
           }
           contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}
         />
@@ -177,6 +250,9 @@ const styles = StyleSheet.create({
   titleTablet: { paddingHorizontal: 24 },
   rowTablet: { alignItems: 'flex-start' },
   cellTablet: { flex: 1, paddingHorizontal: 8 },
+  loadingBox: { alignItems: 'center', marginTop: 40, paddingHorizontal: 24 },
+  stateText: { textAlign: 'center', marginTop: 12 },
+  stateAction: { marginTop: 12, padding: 8 },
 });
 
 export default OrdersScreen;
