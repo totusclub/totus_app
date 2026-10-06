@@ -18,6 +18,7 @@ import { useLayout } from '../../hooks/useLayout';
 import { getUserFavorites, removeFavorite, type Favorite } from '../../modules/api/favorites';
 import { HotelInfo } from '../../types/hotel/hotelCard';
 import { buildRecommendedHotelRouteParams } from '../../utils/hotelUtils/recommendedHotelNavigation';
+import { favoriteImageSources } from '../../utils/favoriteHotel';
 
 const FavoritesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -148,7 +149,7 @@ const FavoritesScreen: React.FC = () => {
         ) : (
           <View style={[styles.favoritesList, isTablet && styles.favoritesListTablet]}>
             {favorites.map((favorite) => {
-              const hotelData = favorite.hotelData;
+              const hotelData = favorite.hotelData || ({} as any);
               // Ensure hotel has required HotelInfo structure
               const hotel: HotelInfo = {
                 id: String(hotelData.id || favorite.hotelId),
@@ -156,11 +157,15 @@ const FavoritesScreen: React.FC = () => {
                 reviews: hotelData.reviews || 0,
                 rating: hotelData.rating || 0,
                 stars: hotelData.stars || 0,
-                images: hotelData.images || [],
+                // Записи с сайта хранят {webp_x620, x500,…}, из приложения — {uri}: приводим к {uri}.
+                images: favoriteImageSources(hotelData),
                 tags: hotelData.tags || [],
                 price: hotelData.price || '',
                 dateRange: hotelData.dateRange || '',
-                address: hotelData.address || hotelData.city_name || '',
+                address:
+                  hotelData.address ||
+                  [hotelData.city_name, hotelData.country_name].filter(Boolean).join(', ') ||
+                  '',
               };
               return (
                 <View key={favorite.id} style={[styles.favoriteItem, tabletCellStyle]}>
