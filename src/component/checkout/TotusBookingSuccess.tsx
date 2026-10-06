@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { openOrderDetails, openOrdersList } from '../../navigation/historyNavigation';
 import { AppButton, AppIcon, AppText } from '../UI';
 import { useTheme } from '../../hooks/useTheme';
 import TotusBookingBanner from '../orders/totusBooking/TotusBookingBanner';
@@ -67,16 +68,13 @@ const TotusBookingSuccess: React.FC<Props> = ({ orderId, booking, amount }) => {
     return parts.length ? `${head} ${parts.join(' · ')}` : head;
   }, [booking, orderId, amount]);
 
+  // Оплата закончена: экраны оплаты закрываются, «Назад» из заказа — туда, где начиналось бронирование.
   const handleOpenOrder = useCallback(() => {
-    navigation.navigate('OrdersStackScreen', {
-      screen: 'orderDetails',
-      params: { orderId },
-      initial: false,
-    });
+    openOrderDetails(navigation, orderId, { leaveFlow: true });
   }, [navigation, orderId]);
 
   const handleOpenOrders = useCallback(() => {
-    navigation.navigate('OrdersStackScreen', { screen: 'orders' });
+    openOrdersList(navigation, { leaveFlow: true });
   }, [navigation]);
 
   const bannerBooking: TotusBooking | null = booking
