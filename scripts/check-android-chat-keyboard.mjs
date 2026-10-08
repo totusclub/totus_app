@@ -22,38 +22,56 @@ function check(name, fn) {
   }
 }
 
-const hook = code(read('src/hooks/useAndroidKeyboardInset.ts'));
+const hookSrc = read('src/hooks/useAndroidKeyboardInset.ts');
+const hook = code(hookSrc);
 const chat = code(read('src/component/support/SupportChat.tsx'));
 
-// Расчёт отступа — как в хуке: низ контейнера минус верх клавиатуры, только при реальном перекрытии
-const insetFor = (y, height, keyboardTop) => {
-  const overlap = Math.round(y + height - keyboardTop);
-  return overlap > 0 && overlap < height ? overlap : 0;
-};
+// computeKeyboardInset из хука — как функция (без типов)
+const fnSrc = hook.match(/export function computeKeyboardInset\([\s\S]*?\): number \{([\s\S]*?)\n\}/)[1];
+// eslint-disable-next-line no-new-func
+const compute = new Function('containerY', 'containerHeight', 'screenHeight', 'keyboard', 'navBottomInset', fnSrc);
 
 console.log('Android: чат поддержки и клавиатура');
 
-check('хук работает только на Android; iOS — 0 и без подписок', () => {
-  assert.match(hook, /if \(Platform\.OS !== 'android'\) \{\s*return undefined;\s*\}/);
+check('расчёт подъёма: edge-to-edge — поле полностью над клавиатурой, включая панель навигации', () => {
+  // экран 900, панель навигации 48, клавиатура (IME) 380 → RN: height = 380 − 48 = 332;
+  // верх клавиатуры на самом деле 520, а screenY от RN на ~панель ниже (568) — как на скриншоте
+  const kb = {screenY: 568, height: 332};
+  assert.equal(compute(0, 900, 900, kb, 48), 380, 'подъём на всю клавиатуру, а не на 332');
+  // RN прислал верный screenY — тоже 380
+  assert.equal(compute(0, 900, 900, {screenY: 520, height: 332}, 48), 380);
+});
+
+check('старый Android (adjustResize сработал) — 0, без двойного подъёма', () => {
+  // окно уменьшилось: контейнер 0..520, под ним свободно 380
+  assert.equal(compute(0, 520, 900, {screenY: 520, height: 332}, 48), 0);
+  // контейнер не доходит до низа экрана на высоту панели (без edge-to-edge) — поднимаем только на клавиатуру
+  assert.equal(compute(0, 852, 900, {screenY: 520, height: 332}, 48), 332);
+});
+
+check('без клавиатуры или странные значения — 0', () => {
+  assert.equal(compute(0, 900, 900, {screenY: 900, height: 0}, 48), 0);
+  assert.equal(compute(0, 0, 900, {screenY: 520, height: 332}, 48), 0);
+  assert.equal(compute(0, 300, 900, {screenY: -2000, height: 5000}, 48), 0, 'не больше высоты контейнера');
+});
+
+check('хук: только Android; замер сразу и повторно (120/300/600 мс) и при смене размера окна; сброс при закрытии', () => {
+  assert.match(hook, /const isAndroid = Platform\.OS === 'android';/);
+  assert.match(hook, /if \(!isAndroid\) \{\s*return undefined;\s*\}/);
+  assert.match(hook, /const REMEASURE_DELAYS_MS = \[0, 120, 300, 600\];/);
+  assert.match(hook, /timers = REMEASURE_DELAYS_MS\.map\(delay => setTimeout\(recompute, delay\)\);/);
   assert.match(hook, /Keyboard\.addListener\('keyboardDidShow', onShow\)/);
   assert.match(hook, /Keyboard\.addListener\('keyboardDidHide', onHide\)/);
-  assert.match(hook, /showSub\.remove\(\);\s*hideSub\.remove\(\);/);
+  assert.match(hook, /keyboardRef\.current = null;\s*clearTimers\(\);\s*setInset\(0\);/);
+  assert.match(hook, /computeKeyboardInset\(y, height, Dimensions\.get\('screen'\)\.height, keyboard, navInsetRef\.current\)/);
+  assert.match(hook, /if \(keyboardRef\.current\) \{\s*recompute\(\);/);
 });
 
-check('отступ = фактическое перекрытие: edge-to-edge — поднимаем; adjustResize уже сработал — 0 (без двойного подъёма)', () => {
-  assert.match(hook, /const overlap = Math\.round\(y \+ height - keyboardTop\);\s*setInset\(overlap > 0 && overlap < height \? overlap : 0\);/);
-  // экран 800, клавиатура 300 + панель навигации 48 → верх клавиатуры 452
-  assert.equal(insetFor(0, 800, 452), 348, 'edge-to-edge: поле над клавиатурой, с учётом панели навигации');
-  assert.equal(insetFor(0, 452, 452), 0, 'старый Android: окно уже уменьшено');
-  assert.equal(insetFor(0, 800, 900), 0, 'клавиатура ниже контейнера');
-  assert.equal(insetFor(0, 800, -10), 0, 'странные координаты — не ломаем экран');
-});
-
-check('чат: на Android — внешний контейнер для замера, отступ снизу, без лишнего нижнего поля над клавиатурой', () => {
-  assert.match(chat, /const \{containerRef, inset: androidKeyboardInset\} = useAndroidKeyboardInset\(\);/);
+check('чат: на Android — внешний контейнер для замера (с onLayout), отступ снизу, композер без лишнего поля', () => {
+  assert.match(chat, /useAndroidKeyboardInset\(insets\.bottom\);/);
   assert.match(chat, /androidKeyboardInset > 0 \? \{paddingBottom: androidKeyboardInset\} : null,/);
   assert.match(chat, /bottomInset=\{androidKeyboardInset > 0 \? 0 : insets\.bottom\}/);
-  assert.match(chat, /<View ref=\{containerRef\} style=\{styles\.container\} collapsable=\{false\}>\s*\{screen\}\s*<\/View>/);
+  assert.match(chat, /<View\s+ref=\{containerRef\}\s+onLayout=\{onContainerLayout\}\s+style=\{styles\.container\}\s+collapsable=\{false\}>\s*\{screen\}\s*<\/View>/);
 });
 
 check('iOS без изменений: тот же KeyboardAvoidingView padding, экран без обёртки', () => {
