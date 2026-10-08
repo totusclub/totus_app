@@ -22,6 +22,8 @@ class MainApplication : Application(), ReactApplication {
               // add(MyReactNativePackage())
               add(CallKeepLaunchStatePackage())
               add(TotusCallPackage())
+              // Положение клавиатуры из WindowInsets (чат поддержки, Android edge-to-edge)
+              add(TotusKeyboardPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"
