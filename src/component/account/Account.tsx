@@ -7,7 +7,6 @@ import {
   Modal,
   Alert,
   StatusBar,
-  Switch,
   Platform,
   Linking,
 } from 'react-native';
@@ -21,6 +20,7 @@ import { jwtDecode } from 'jwt-decode';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LoyaltyCardBackground from '../../component/UI/icons/loyaltyCardBackground';
 import { useTheme } from '../../hooks/useTheme';
+import type { ThemeMode } from '../../theme';
 import {
   startOutgoingVoiceCallByLoyaltyId,
   getCurrentDeviceId,
@@ -45,6 +45,19 @@ import { unregisterPushDevice } from '../../modules/push/pushService';
 import { NotificationGlyph } from '../../component/notifications/CategoryIcon';
 // «Документы» ООО «ТОТУСКЛАБ» (тексты из CMS): src/screens/legal
 import { LEGAL_DOCUMENTS_ROUTE } from '../../screens/legal/legalRoutes';
+
+
+// Тема оформления: по умолчанию «Системная» — как в настройках телефона
+const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
+  { value: 'light', label: 'Светлая' },
+  { value: 'dark', label: 'Тёмная' },
+  { value: 'system', label: 'Системная' },
+];
+const THEME_SUBTITLE: Record<ThemeMode, string> = {
+  light: 'Светлая',
+  dark: 'Тёмная',
+  system: 'Как в системе',
+};
 
 type DecodedToken = {
   id?: string;
@@ -350,7 +363,7 @@ const AccountScreen = () => {
   // iOS: resolves when the support sheet has finished closing (see closeSupportSheet).
   const supportSheetClosedRef = React.useRef<(() => void) | null>(null);
   const [showCallingSupport, setShowCallingSupport] = React.useState(true);
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { theme, isDark, mode, setThemeMode } = useTheme();
   const { isTablet } = useLayout();
   const supportUnread = useSelector((state: RootState) => state.supportChat?.unreadCount ?? 0);
   const notificationsUnread = useSelector((state: RootState) => state.notifications?.unread ?? 0);
@@ -640,22 +653,46 @@ const AccountScreen = () => {
               </View>
               <View style={styles.settingsTextCol}>
                 <AppText style={[styles.settingsTitle, { color: theme.text }]}>
-                  {isDark ? 'Тёмная тема' : 'Светлая тема'}
+                  Оформление
                 </AppText>
                 <AppText style={[styles.settingsSubtitle, { color: theme.textTertiary }]}>
-                  Внешний вид приложения
+                  {THEME_SUBTITLE[mode]}
                 </AppText>
               </View>
-              <Switch
-                value={isDark}
-                onValueChange={toggleTheme}
-                trackColor={{
-                  false: isDark ? '#3A3A3C' : '#E5E5EA',
-                  true: isDark ? '#5856D6' : '#34C759',
-                }}
-                thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : isDark ? '#F2F2F7' : '#FFFFFF'}
-                style={styles.switch}
-              />
+            </View>
+            {/* Тема: Светлая / Тёмная / Системная (по умолчанию — как в настройках телефона) */}
+            <View
+              accessibilityRole="radiogroup"
+              accessibilityLabel="Тема оформления"
+              style={[
+                styles.themeSegment,
+                { backgroundColor: isDark ? '#2C2C2E' : '#EFEFF0' },
+              ]}>
+              {THEME_OPTIONS.map((option) => {
+                const active = mode === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
+                    activeOpacity={0.7}
+                    onPress={() => setThemeMode(option.value)}
+                    style={[
+                      styles.themeSegmentItem,
+                      active && styles.themeSegmentItemActive,
+                      active && { backgroundColor: isDark ? '#3A3A3C' : '#FFFFFF' },
+                    ]}>
+                    <AppText
+                      style={[
+                        styles.themeSegmentText,
+                        active && styles.themeSegmentTextActive,
+                        { color: active ? theme.text : theme.textSecondary },
+                      ]}>
+                      {option.label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
@@ -997,10 +1034,38 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     marginLeft: 52,
   },
-  switch: {
-    transform: Platform.OS === 'ios'
-      ? [{ scaleX: 0.82 }, { scaleY: 0.78 }]
-      : [{ scaleX: 0.85 }, { scaleY: 0.85 }],
+  // Выбор темы: три сегмента под строкой «Оформление» (отступ слева — как у разделителя)
+  themeSegment: {
+    flexDirection: 'row',
+    marginLeft: 52,
+    marginRight: 12,
+    marginBottom: 12,
+    padding: 2,
+    borderRadius: 9,
+    gap: 2,
+  },
+  themeSegmentItem: {
+    flex: 1,
+    minHeight: 32,
+    borderRadius: 7,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  themeSegmentItemActive: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  themeSegmentText: {
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: -0.1,
+  },
+  themeSegmentTextActive: {
+    fontWeight: '600',
   },
   // iPad only
   scrollContentTablet: {

@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { Appearance, ColorSchemeName } from 'react-native';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo, useRef } from 'react';
+import { Appearance, ColorSchemeName, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lightTheme, darkTheme, Theme, ThemeMode } from '../theme';
 
@@ -15,7 +15,26 @@ const defaultTheme: Theme = lightTheme;
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_STORAGE_KEY = '@app_theme_mode';
+// Тема: «Светлая», «Тёмная» или «Системная» (по умолчанию — как в настройках телефона).
+// Новый ключ: прежний переключатель сохранял только light/dark — после обновления у всех «Системная».
+const THEME_STORAGE_KEY = '@app_theme_mode_v2';
+const LEGACY_THEME_STORAGE_KEY = '@app_theme_mode';
+
+const parseThemeMode = (value: unknown): ThemeMode =>
+  value === 'light' || value === 'dark' ? value : 'system';
+
+/**
+ * iOS: системные элементы (клавиатура, Alert, выбор даты) — в выбранной теме приложения.
+ * null — снова как в системе. Android не трогаем: там это пересоздаёт окна звонка (IncomingCallActivity).
+ */
+const applyNativeColorScheme = (mode: ThemeMode) => {
+  if (Platform.OS !== 'ios' || typeof Appearance.setColorScheme !== 'function') return;
+  try {
+    Appearance.setColorScheme(mode === 'system' ? null : mode);
+  } catch {
+    // старый React Native без setColorScheme — системные элементы следуют теме устройства
+  }
+};
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -27,25 +46,37 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [systemColorScheme, setSystemColorScheme] = useState<ColorSchemeName>(
     initialColorScheme
   );
+  // При ручной теме на iOS Appearance сообщает выбранную тему, а не системную — её не запоминаем
+  const modeRef = useRef<ThemeMode>('system');
+
+  const applyMode = useCallback((nextMode: ThemeMode) => {
+    modeRef.current = nextMode;
+    setMode(nextMode);
+    applyNativeColorScheme(nextMode);
+    if (nextMode === 'system') {
+      setSystemColorScheme(Appearance.getColorScheme() || 'light');
+    }
+  }, []);
 
   useEffect(() => {
     const loadThemePreference = async () => {
       try {
         const savedMode = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'system') {
-          setMode(savedMode as ThemeMode);
-        }
+        applyMode(parseThemeMode(savedMode));
+        AsyncStorage.removeItem(LEGACY_THEME_STORAGE_KEY).catch(() => undefined);
       } catch (error) {
         console.error('Error loading theme preference:', error);
       }
     };
 
     loadThemePreference();
-  }, []);
+  }, [applyMode]);
 
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setSystemColorScheme(colorScheme);
+      if (modeRef.current === 'system') {
+        setSystemColorScheme(colorScheme);
+      }
     });
 
     return () => subscription.remove();
@@ -66,22 +97,21 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     return mode === 'dark';
   }, [mode, systemColorScheme]);
 
-  const toggleTheme = useCallback(() => {
-    const newMode: ThemeMode = isDark ? 'light' : 'dark';
-    setMode(newMode);
-
-    AsyncStorage.setItem(THEME_STORAGE_KEY, newMode).catch((error) => {
-      console.error('Error saving theme preference:', error);
-    });
-  }, [isDark]);
-
   const setThemeMode = useCallback((newMode: ThemeMode) => {
-    setMode(newMode);
+    const nextMode = parseThemeMode(newMode);
+    applyMode(nextMode);
 
-    AsyncStorage.setItem(THEME_STORAGE_KEY, newMode).catch((error) => {
+    const save = nextMode === 'system'
+      ? AsyncStorage.removeItem(THEME_STORAGE_KEY)
+      : AsyncStorage.setItem(THEME_STORAGE_KEY, nextMode);
+    save.catch((error) => {
       console.error('Error saving theme preference:', error);
     });
-  }, []);
+  }, [applyMode]);
+
+  const toggleTheme = useCallback(() => {
+    setThemeMode(isDark ? 'light' : 'dark');
+  }, [isDark, setThemeMode]);
 
   const value: ThemeContextType = useMemo(() => ({
     theme,
@@ -100,7 +130,7 @@ export const useThemeContext = (): ThemeContextType => {
     console.warn('useThemeContext must be used within a ThemeProvider. Falling back to default theme.');
     return {
       theme: defaultTheme,
-      mode: 'light',
+      mode: 'system',
       isDark: false,
       toggleTheme: () => { },
       setThemeMode: () => { },

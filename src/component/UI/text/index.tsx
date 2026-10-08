@@ -1,9 +1,9 @@
 import React, { ReactNode } from 'react';
-import { StyleSheet, Text, TextProps, TextStyle } from 'react-native';
+import { StyleProp, StyleSheet, Text, TextProps, TextStyle } from 'react-native';
 
 interface AppTextProps extends TextProps {
   children: ReactNode;
-  style?: TextStyle | TextStyle[];
+  style?: StyleProp<TextStyle>;
 }
 
 const AppText: React.FC<AppTextProps> = ({ children, style, ...props }) => {
