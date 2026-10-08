@@ -58,20 +58,37 @@ check('запасной расчёт (сборка без нативного м�
   assert.equal(fallback(0, 520, 900, {screenY: 520, height: 332}, 48), 0);
 });
 
-check('нативный модуль TotusKeyboard: только чтение WindowInsets, без слушателей и изменений окна; зарегистрирован', () => {
+check('нативный модуль TotusKeyboard: getInsets читает WindowInsets; окно (softInputMode, decor) не меняется; зарегистрирован', () => {
   assert.match(kt, /override fun getName\(\): String = "TotusKeyboard"/);
   assert.match(kt, /ViewCompat\.getRootWindowInsets\(decor\)/);
   assert.match(kt, /insets\.getInsets\(WindowInsetsCompat\.Type\.ime\(\)\)/);
   assert.match(kt, /map\.putDouble\("imeBottom", ime\.bottom \/ density\)/);
   assert.match(kt, /map\.putDouble\("windowHeight", decor\.height \/ density\)/);
-  assert.ok(!/setOnApplyWindowInsetsListener|setWindowInsetsAnimationCallback|setSoftInputMode|setDecorFitsSystemWindows/.test(kt), 'окно не меняется');
+  assert.ok(!/setWindowInsetsAnimationCallback|setSoftInputMode|setDecorFitsSystemWindows/.test(kt), 'окно не меняется');
   assert.match(pkg, /listOf\(TotusKeyboardModule\(reactContext\)\)/);
   assert.match(app, /add\(TotusCallPackage\(\)\)\s*add\(TotusKeyboardPackage\(\)\)/);
 });
 
-check('хук: только Android; опрос 250 мс (только когда приложение активно) + события клавиатуры + onLayout', () => {
+check('основной путь (Android 15+): экран уменьшается нативно, как adjustResize, только пока чат на экране', () => {
+  assert.match(kt, /fun setImeResize\(enabled: Boolean, promise: Promise\)/);
+  assert.match(kt, /if \(activity == null \|\| Build\.VERSION\.SDK_INT < 35\) \{\s*promise\.resolve\(false\)/);
+  assert.match(kt, /activity\.findViewById<View>\(android\.R\.id\.content\)/);
+  assert.match(kt, /ViewCompat\.setOnApplyWindowInsetsListener\(content\) \{ view, insets ->\s*val imeBottom = insets\.getInsets\(WindowInsetsCompat\.Type\.ime\(\)\)\.bottom/);
+  assert.match(kt, /view\.setPadding\(view\.paddingLeft, view\.paddingTop, view\.paddingRight, imeBottom\)/);
+  assert.match(kt, /view\.paddingRight, imeBottom\)\s*\}\s*insets\s*\}/, 'insets передаются дальше без изменений');
+  assert.match(kt, /ViewCompat\.setOnApplyWindowInsetsListener\(content, null\)\s*content\.setPadding\(content\.paddingLeft, content\.paddingTop, content\.paddingRight, 0\)/);
+  assert.match(kt, /ViewCompat\.requestApplyInsets\(content\)/);
+  assert.ok(!/decorView\)\s*\{/.test(kt.replace(/getRootWindowInsets\(decor\)/, '')), 'слушатель не на decorView');
+  assert.match(hook, /const isFocused = useIsFocused\(\);/);
+  assert.match(hook, /if \(!isAndroid \|\| !isFocused\) \{\s*return undefined;/);
+  assert.match(hook, /setImeResize\(true\)/);
+  assert.match(hook, /if \(enabled\) \{\s*setInset\(0\);/);
+  assert.match(hook, /setImeResize\?\.\(false\)\.catch\(\(\) => undefined\);/);
+  assert.match(hook, /\} else \{\s*stopFallback = startFallback\(\);/);
+});
+
+check('запасной путь: опрос 250 мс (только когда приложение активно) + события клавиатуры + onLayout', () => {
   assert.match(hook, /Platform\.OS === 'android' \? NativeModules\.TotusKeyboard : undefined/);
-  assert.match(hook, /if \(!isAndroid\) \{\s*return undefined;\s*\}/);
   assert.match(hook, /const POLL_INTERVAL_MS = 250;/);
   assert.match(hook, /setInterval\(recompute, POLL_INTERVAL_MS\)/);
   assert.match(hook, /AppState\.addEventListener\('change'/);
