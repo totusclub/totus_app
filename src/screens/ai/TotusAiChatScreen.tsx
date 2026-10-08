@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChatScreen, useAssistantStore } from '@tosmedia/ai-assistant-native';
 import { setAiHotelNavigator } from '../../utils/aiAssistantOpenHotel';
 import { getAiReturnTab } from '../../utils/aiTabReturn';
+import { useAndroidImeResize } from '../../hooks/useAndroidImeResize';
 
 /**
  * AI tab screen — Totus Мила chat; back returns to the tab the user came from.
@@ -13,6 +14,8 @@ import { getAiReturnTab } from '../../utils/aiTabReturn';
 export default function TotusAiChatScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  // Android 15+: поле ввода Милы над клавиатурой (экран уменьшается нативно); iOS — без изменений
+  useAndroidImeResize();
 
   useEffect(() => {
     setAiHotelNavigator((params) => {
