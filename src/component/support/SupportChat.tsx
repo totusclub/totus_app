@@ -51,7 +51,11 @@ const SupportChat: React.FC = () => {
   const {isTablet} = useLayout();
   const {width} = useWindowDimensions();
   // Android: поднять поле ввода над клавиатурой (на iOS — 0, работает KeyboardAvoidingView)
-  const {containerRef, inset: androidKeyboardInset} = useAndroidKeyboardInset();
+  const {
+    containerRef,
+    onContainerLayout,
+    inset: androidKeyboardInset,
+  } = useAndroidKeyboardInset(insets.bottom);
   const {
     messages,
     hours,
@@ -234,7 +238,11 @@ const SupportChat: React.FC = () => {
   }
   // Android: внешний контейнер не меняет размер от отступа — по нему меряется перекрытие клавиатурой.
   return (
-    <View ref={containerRef} style={styles.container} collapsable={false}>
+    <View
+      ref={containerRef}
+      onLayout={onContainerLayout}
+      style={styles.container}
+      collapsable={false}>
       {screen}
     </View>
   );
