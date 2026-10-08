@@ -1,5 +1,6 @@
-// Android: в «Чате с поддержкой» поле ввода поднимается над клавиатурой (edge-to-edge, targetSdk 36).
-// iOS не меняется. Запуск: node scripts/check-android-chat-keyboard.mjs (без npm install).
+// Android: в «Чате с поддержкой» поле ввода полностью над клавиатурой (edge-to-edge, targetSdk 36).
+// Положение клавиатуры — из WindowInsets (нативный модуль TotusKeyboard). iOS не меняется.
+// Запуск: node scripts/check-android-chat-keyboard.mjs (без npm install).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,59 +23,68 @@ function check(name, fn) {
   }
 }
 
-const hookSrc = read('src/hooks/useAndroidKeyboardInset.ts');
-const hook = code(hookSrc);
+const hook = code(read('src/hooks/useAndroidKeyboardInset.ts'));
 const chat = code(read('src/component/support/SupportChat.tsx'));
+const kt = code(read('android/app/src/main/java/com/totus/com/TotusKeyboardModule.kt'));
+const pkg = code(read('android/app/src/main/java/com/totus/com/TotusKeyboardPackage.kt'));
+const app = code(read('android/app/src/main/java/com/totusclubapp/MainApplication.kt'));
 
-// computeKeyboardInset из хука — как функция (без типов)
-const fnSrc = hook.match(/export function computeKeyboardInset\([\s\S]*?\): number \{([\s\S]*?)\n\}/)[1];
-// eslint-disable-next-line no-new-func
-const compute = new Function('containerY', 'containerHeight', 'screenHeight', 'keyboard', 'navBottomInset', fnSrc);
+const fn = (name, args) => {
+  const body = hook.match(new RegExp(`export function ${name}\\([\\s\\S]*?\\): number \\{([\\s\\S]*?)\\n\\}`))[1];
+  // eslint-disable-next-line no-new-func
+  return new Function(...args, body);
+};
+const fromNative = fn('computeInsetFromNative', ['containerY', 'containerHeight', 'native']);
+const fallback = fn('computeKeyboardInset', ['containerY', 'containerHeight', 'screenHeight', 'keyboard', 'navBottomInset']);
 
 console.log('Android: чат поддержки и клавиатура');
 
-check('расчёт подъёма: edge-to-edge — поле полностью над клавиатурой, включая панель навигации', () => {
-  // экран 900, панель навигации 48, клавиатура (IME) 380 → RN: height = 380 − 48 = 332;
-  // верх клавиатуры на самом деле 520, а screenY от RN на ~панель ниже (568) — как на скриншоте
-  const kb = {screenY: 568, height: 332};
-  assert.equal(compute(0, 900, 900, kb, 48), 380, 'подъём на всю клавиатуру, а не на 332');
-  // RN прислал верный screenY — тоже 380
-  assert.equal(compute(0, 900, 900, {screenY: 520, height: 332}, 48), 380);
+check('по WindowInsets: edge-to-edge — подъём ровно на клавиатуру (вместе с панелью навигации)', () => {
+  // окно 900, IME 380 (включая панель навигации 48) → верх клавиатуры 520
+  const native = {imeVisible: true, imeBottom: 380, navBottom: 48, windowHeight: 900};
+  assert.equal(fromNative(0, 900, native), 380);
+  // контейнер не до низа окна (например, 852) — поднимаем только на перекрытие
+  assert.equal(fromNative(0, 852, native), 332);
 });
 
-check('старый Android (adjustResize сработал) — 0, без двойного подъёма', () => {
-  // окно уменьшилось: контейнер 0..520, под ним свободно 380
-  assert.equal(compute(0, 520, 900, {screenY: 520, height: 332}, 48), 0);
-  // контейнер не доходит до низа экрана на высоту панели (без edge-to-edge) — поднимаем только на клавиатуру
-  assert.equal(compute(0, 852, 900, {screenY: 520, height: 332}, 48), 332);
+check('по WindowInsets: старый Android (окно уменьшилось) и закрытая клавиатура — 0', () => {
+  assert.equal(fromNative(0, 520, {imeVisible: true, imeBottom: 380, navBottom: 48, windowHeight: 900}), 0);
+  assert.equal(fromNative(0, 900, {imeVisible: false, imeBottom: 0, navBottom: 48, windowHeight: 900}), 0);
+  assert.equal(fromNative(0, 300, {imeVisible: true, imeBottom: 5000, navBottom: 0, windowHeight: 900}), 0, 'не больше контейнера');
 });
 
-check('без клавиатуры или странные значения — 0', () => {
-  assert.equal(compute(0, 900, 900, {screenY: 900, height: 0}, 48), 0);
-  assert.equal(compute(0, 0, 900, {screenY: 520, height: 332}, 48), 0);
-  assert.equal(compute(0, 300, 900, {screenY: -2000, height: 5000}, 48), 0, 'не больше высоты контейнера');
+check('запасной расчёт (сборка без нативного модуля) — как раньше', () => {
+  assert.equal(fallback(0, 900, 900, {screenY: 568, height: 332}, 48), 380);
+  assert.equal(fallback(0, 520, 900, {screenY: 520, height: 332}, 48), 0);
 });
 
-check('хук: только Android; замер сразу и повторно (120/300/600 мс) и при смене размера окна; сброс при закрытии', () => {
-  assert.match(hook, /const isAndroid = Platform\.OS === 'android';/);
+check('нативный модуль TotusKeyboard: только чтение WindowInsets, без слушателей и изменений окна; зарегистрирован', () => {
+  assert.match(kt, /override fun getName\(\): String = "TotusKeyboard"/);
+  assert.match(kt, /ViewCompat\.getRootWindowInsets\(decor\)/);
+  assert.match(kt, /insets\.getInsets\(WindowInsetsCompat\.Type\.ime\(\)\)/);
+  assert.match(kt, /map\.putDouble\("imeBottom", ime\.bottom \/ density\)/);
+  assert.match(kt, /map\.putDouble\("windowHeight", decor\.height \/ density\)/);
+  assert.ok(!/setOnApplyWindowInsetsListener|setWindowInsetsAnimationCallback|setSoftInputMode|setDecorFitsSystemWindows/.test(kt), 'окно не меняется');
+  assert.match(pkg, /listOf\(TotusKeyboardModule\(reactContext\)\)/);
+  assert.match(app, /add\(TotusCallPackage\(\)\)\s*add\(TotusKeyboardPackage\(\)\)/);
+});
+
+check('хук: только Android; опрос 250 мс (только когда приложение активно) + события клавиатуры + onLayout', () => {
+  assert.match(hook, /Platform\.OS === 'android' \? NativeModules\.TotusKeyboard : undefined/);
   assert.match(hook, /if \(!isAndroid\) \{\s*return undefined;\s*\}/);
-  assert.match(hook, /const REMEASURE_DELAYS_MS = \[0, 120, 300, 600\];/);
-  assert.match(hook, /timers = REMEASURE_DELAYS_MS\.map\(delay => setTimeout\(recompute, delay\)\);/);
+  assert.match(hook, /const POLL_INTERVAL_MS = 250;/);
+  assert.match(hook, /setInterval\(recompute, POLL_INTERVAL_MS\)/);
+  assert.match(hook, /AppState\.addEventListener\('change'/);
+  assert.match(hook, /clearInterval\(timer\);/);
+  assert.match(hook, /const next = computeInsetFromNative\(y, height, native\);/);
   assert.match(hook, /Keyboard\.addListener\('keyboardDidShow', onShow\)/);
-  assert.match(hook, /Keyboard\.addListener\('keyboardDidHide', onHide\)/);
-  assert.match(hook, /keyboardRef\.current = null;\s*clearTimers\(\);\s*setInset\(0\);/);
-  assert.match(hook, /computeKeyboardInset\(y, height, Dimensions\.get\('screen'\)\.height, keyboard, navInsetRef\.current\)/);
-  assert.match(hook, /if \(keyboardRef\.current\) \{\s*recompute\(\);/);
 });
 
-check('чат: на Android — внешний контейнер для замера (с onLayout), отступ снизу, композер без лишнего поля', () => {
+check('чат: на Android — внешний контейнер для замера, отступ снизу; iOS без изменений', () => {
   assert.match(chat, /useAndroidKeyboardInset\(insets\.bottom\);/);
   assert.match(chat, /androidKeyboardInset > 0 \? \{paddingBottom: androidKeyboardInset\} : null,/);
   assert.match(chat, /bottomInset=\{androidKeyboardInset > 0 \? 0 : insets\.bottom\}/);
-  assert.match(chat, /<View\s+ref=\{containerRef\}\s+onLayout=\{onContainerLayout\}\s+style=\{styles\.container\}\s+collapsable=\{false\}>\s*\{screen\}\s*<\/View>/);
-});
-
-check('iOS без изменений: тот же KeyboardAvoidingView padding, экран без обёртки', () => {
+  assert.match(chat, /<View\s+ref=\{containerRef\}\s+onLayout=\{onContainerLayout\}\s+style=\{styles\.container\}\s+collapsable=\{false\}>/);
   assert.match(chat, /behavior=\{Platform\.OS === 'ios' \? 'padding' : undefined\}/);
   assert.match(chat, /if \(Platform\.OS !== 'android'\) \{\s*return screen;\s*\}/);
 });
