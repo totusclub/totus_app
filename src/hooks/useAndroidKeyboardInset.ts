@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
+import {useIsFocused} from '@react-navigation/native';
 import {
   AppState,
   Dimensions,
@@ -22,7 +23,11 @@ export type NativeKeyboardInsets = {
   windowHeight: number;
 };
 
-type TotusKeyboardNative = {getInsets: () => Promise<NativeKeyboardInsets | null>};
+type TotusKeyboardNative = {
+  getInsets: () => Promise<NativeKeyboardInsets | null>;
+  /** Android 15+: экран уменьшается на высоту клавиатуры нативно (как adjustResize); true — включено. */
+  setImeResize?: (enabled: boolean) => Promise<boolean>;
+};
 
 const nativeKeyboard: TotusKeyboardNative | undefined =
   Platform.OS === 'android' ? NativeModules.TotusKeyboard : undefined;
@@ -72,8 +77,11 @@ export function computeKeyboardInset(
  * там KeyboardAvoidingView (behavior="padding") работает как раньше.
  *
  * При targetSdk 35+ Android включает edge-to-edge, и adjustResize больше не уменьшает окно.
- * Положение клавиатуры берётся из WindowInsets (NativeModules.TotusKeyboard): опрос каждые 250 мс,
- * пока экран открыт, плюс сразу по событиям клавиатуры и по onLayout контейнера.
+ * Основной путь (Android 15+): пока экран открыт, NativeModules.TotusKeyboard.setImeResize(true) —
+ * Android сам уменьшает экран на высоту клавиатуры, как adjustResize раньше; JS ничего не считает,
+ * отступ 0. При уходе с экрана — setImeResize(false).
+ * Запасной путь (старый Android или сборка без setImeResize): расчёт по WindowInsets / событиям,
+ * опрос каждые 250 мс, пока экран открыт.
  *
  * containerRef — внешний контейнер экрана, размер которого НЕ зависит от отступа (по нему меряем).
  */
@@ -84,6 +92,8 @@ export function useAndroidKeyboardInset(navBottomInset: number) {
   navInsetRef.current = navBottomInset;
   const [inset, setInset] = useState(0);
   const isAndroid = Platform.OS === 'android';
+  // Чат может остаться под другим экраном (детали заказа) — режим только пока чат на экране
+  const isFocused = useIsFocused();
 
   const recompute = useCallback(() => {
     const node = containerRef.current;
@@ -117,10 +127,10 @@ export function useAndroidKeyboardInset(navBottomInset: number) {
     }
   }, []);
 
-  useEffect(() => {
-    if (!isAndroid) {
-      return undefined;
-    }
+  // Запасной путь: события клавиатуры + опрос (только пока приложение на экране)
+  const fallbackActiveRef = useRef(false);
+  const startFallback = useCallback(() => {
+    fallbackActiveRef.current = true;
     const onShow = (event: KeyboardEvent) => {
       keyboardRef.current = {
         screenY: event.endCoordinates.screenY,
@@ -132,10 +142,8 @@ export function useAndroidKeyboardInset(navBottomInset: number) {
       keyboardRef.current = null;
       recompute();
     };
-
     const showSub = Keyboard.addListener('keyboardDidShow', onShow);
     const hideSub = Keyboard.addListener('keyboardDidHide', onHide);
-    // Опрос только пока приложение на экране
     let timer: ReturnType<typeof setInterval> | null = setInterval(recompute, POLL_INTERVAL_MS);
     const appStateSub = AppState.addEventListener('change', state => {
       if (state === 'active') {
@@ -149,6 +157,7 @@ export function useAndroidKeyboardInset(navBottomInset: number) {
       }
     });
     return () => {
+      fallbackActiveRef.current = false;
       if (timer) {
         clearInterval(timer);
       }
@@ -157,13 +166,53 @@ export function useAndroidKeyboardInset(navBottomInset: number) {
       hideSub.remove();
       appStateSub.remove();
     };
-  }, [isAndroid, recompute]);
+  }, [recompute]);
+
+  useEffect(() => {
+    if (!isAndroid || !isFocused) {
+      return undefined;
+    }
+    let cancelled = false;
+    let stopFallback: (() => void) | null = null;
+    const setImeResize = nativeKeyboard?.setImeResize;
+
+    if (setImeResize) {
+      setImeResize(true)
+        .then(enabled => {
+          if (cancelled) {
+            if (enabled) {
+              setImeResize(false).catch(() => undefined);
+            }
+            return;
+          }
+          if (enabled) {
+            setInset(0); // экран уменьшает сам Android
+          } else {
+            stopFallback = startFallback();
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            stopFallback = startFallback();
+          }
+        });
+    } else {
+      stopFallback = startFallback();
+    }
+
+    return () => {
+      cancelled = true;
+      stopFallback?.();
+      setInset(0);
+      setImeResize?.(false).catch(() => undefined);
+    };
+  }, [isAndroid, isFocused, startFallback]);
 
   const onContainerLayout = useCallback(() => {
-    if (isAndroid) {
+    if (fallbackActiveRef.current) {
       recompute();
     }
-  }, [isAndroid, recompute]);
+  }, [recompute]);
 
   return {containerRef, onContainerLayout, inset};
 }

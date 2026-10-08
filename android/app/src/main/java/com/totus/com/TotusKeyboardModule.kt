@@ -1,5 +1,7 @@
 package com.totus.com
 
+import android.os.Build
+import android.view.View
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.facebook.react.bridge.Arguments
@@ -15,13 +17,52 @@ import com.facebook.react.bridge.ReactMethod
  * из React Native 0.79 приходит один раз и с неточным screenY — поле ввода чата поддержки
  * оставалось под клавиатурой. Здесь значения читаются прямо из WindowInsets окна.
  *
- * Только чтение: никаких слушателей и изменений окна (звонки, IncomingCallActivity не затрагиваются).
+ * getInsets — только чтение. setImeResize — то, что делал adjustResize до Android 15: пока включено
+ * (только экран чата поддержки), контент MainActivity (android.R.id.content) получает нижний отступ
+ * ровно на высоту клавиатуры, и весь экран React Native становится выше клавиатуры. Включается
+ * только на Android 15+ (API 35, там edge-to-edge обязателен и adjustResize не работает); на
+ * старых версиях adjustResize работает сам. IncomingCallActivity и окно звонка не затрагиваются.
  * Используется в src/hooks/useAndroidKeyboardInset.ts. Значения в dp, как в React Native.
  */
 class TotusKeyboardModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
 
   override fun getName(): String = "TotusKeyboard"
+
+  /** true — режим включён (Android 15+); false — не нужен (старый Android) или не удалось. */
+  @ReactMethod
+  fun setImeResize(enabled: Boolean, promise: Promise) {
+    val activity = currentActivity
+    if (activity == null || Build.VERSION.SDK_INT < 35) {
+      promise.resolve(false)
+      return
+    }
+    activity.runOnUiThread {
+      try {
+        val content = activity.findViewById<View>(android.R.id.content)
+        if (content == null) {
+          promise.resolve(false)
+        } else {
+          if (enabled) {
+            ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+              val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+              if (view.paddingBottom != imeBottom) {
+                view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, imeBottom)
+              }
+              insets // дальше без изменений: дочерние view получают insets как раньше
+            }
+          } else {
+            ViewCompat.setOnApplyWindowInsetsListener(content, null)
+            content.setPadding(content.paddingLeft, content.paddingTop, content.paddingRight, 0)
+          }
+          ViewCompat.requestApplyInsets(content)
+          promise.resolve(enabled)
+        }
+      } catch (e: Exception) {
+        promise.resolve(false)
+      }
+    }
+  }
 
   @ReactMethod
   fun getInsets(promise: Promise) {
