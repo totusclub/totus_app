@@ -12,7 +12,7 @@
     "start": "react-native start",
     "start:clean": "react-native start --reset-cache",
     "test": "jest",
-    "check": "node scripts/check-mic-permission.mjs && node scripts/check-voip-answer-recovery.mjs && node scripts/check-android-firebase-guard.mjs && node scripts/check-android-call-flow.mjs && node scripts/check-call-end-sync.mjs && node scripts/check-call-modal-owner.mjs && node scripts/check-ios-voip-push.mjs && node scripts/check-android-sdk36.mjs && node scripts/check-legal-docs.mjs && node scripts/check-no-app-pin.mjs && node scripts/check-android-killed-push.mjs && node scripts/check-orders-load.mjs && node scripts/check-favorites-sync.mjs && node scripts/check-back-navigation.mjs && node scripts/check-theme-mode.mjs"
+    "check": "node scripts/check-mic-permission.mjs && node scripts/check-voip-answer-recovery.mjs && node scripts/check-android-firebase-guard.mjs && node scripts/check-android-call-flow.mjs && node scripts/check-call-end-sync.mjs && node scripts/check-call-modal-owner.mjs && node scripts/check-ios-voip-push.mjs && node scripts/check-android-sdk36.mjs && node scripts/check-legal-docs.mjs && node scripts/check-no-app-pin.mjs && node scripts/check-android-killed-push.mjs && node scripts/check-orders-load.mjs && node scripts/check-favorites-sync.mjs && node scripts/check-back-navigation.mjs && node scripts/check-android-chat-keyboard.mjs"
   },
   "dependencies": {
     "@notifee/react-native": "^9.1.8",

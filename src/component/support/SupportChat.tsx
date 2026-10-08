@@ -17,6 +17,7 @@ import {AppText} from '../UI';
 import {useTheme} from '../../hooks/useTheme';
 import {useLayout} from '../../hooks/useLayout';
 import {useSupportChat} from '../../modules/hooks/useSupportChat';
+import {useAndroidKeyboardInset} from '../../hooks/useAndroidKeyboardInset';
 import {
   SUPPORT_DISPLAY_NAME,
   SUPPORT_LOYALTY_ID,
@@ -49,6 +50,8 @@ const SupportChat: React.FC = () => {
   const {theme} = useTheme();
   const {isTablet} = useLayout();
   const {width} = useWindowDimensions();
+  // Android: поднять поле ввода над клавиатурой (на iOS — 0, работает KeyboardAvoidingView)
+  const {containerRef, inset: androidKeyboardInset} = useAndroidKeyboardInset();
   const {
     messages,
     hours,
@@ -197,7 +200,7 @@ const SupportChat: React.FC = () => {
         disabled={composerDisabled}
         errorText={sendError}
         onDismissError={clearSendError}
-        bottomInset={insets.bottom}
+        bottomInset={androidKeyboardInset > 0 ? 0 : insets.bottom}
         above={
           !isEmpty && !loading && !error ? (
             <SupportQuickTopics onSelect={handleTopic} disabled={composerDisabled} />
@@ -207,9 +210,13 @@ const SupportChat: React.FC = () => {
     </View>
   );
 
-  return (
+  const screen = (
     <KeyboardAvoidingView
-      style={[styles.container, {backgroundColor: theme.background, paddingTop: insets.top}]}
+      style={[
+        styles.container,
+        {backgroundColor: theme.background, paddingTop: insets.top},
+        androidKeyboardInset > 0 ? {paddingBottom: androidKeyboardInset} : null,
+      ]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {isTablet ? (
         // Как TabletCentered, но на всю высоту экрана (колонка чата по центру).
@@ -220,6 +227,16 @@ const SupportChat: React.FC = () => {
         content
       )}
     </KeyboardAvoidingView>
+  );
+
+  if (Platform.OS !== 'android') {
+    return screen;
+  }
+  // Android: внешний контейнер не меняет размер от отступа — по нему меряется перекрытие клавиатурой.
+  return (
+    <View ref={containerRef} style={styles.container} collapsable={false}>
+      {screen}
+    </View>
   );
 };
 
