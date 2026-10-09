@@ -45,11 +45,11 @@
 		<true/>
 	</dict>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Totus needs access to Bluetooth to connect to audio devices for calls.</string>
+	<string>Totus Club использует Bluetooth, чтобы во время звонка работали наушники и гарнитуры.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Totus needs access to the camera for scanning and photo-related features.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Totus needs access to your microphone to make and receive voice calls.</string>
+	<string>Микрофон нужен для звонков в службу поддержки Totus Club и голосового помощника.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Totus needs access to your photo library to upload and manage photos.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
