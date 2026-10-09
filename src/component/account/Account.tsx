@@ -27,6 +27,7 @@ import {
   getCallState,
   cleanupVoipOnLogout,
 } from '../../modules/voip/VoipService';
+import { callErrorText } from '../../modules/voip/callText';
 import { getUserById } from '../../modules/api/users';
 import { useLayout } from '../../hooks/useLayout';
 import { TabletColumns } from '../../component/UI/tablet';
@@ -523,8 +524,7 @@ const AccountScreen = () => {
       await startOutgoingVoiceCallByLoyaltyId(SUPPORT_LOYALTY_ID, SUPPORT_DISPLAY_NAME);
     } catch (e: any) {
       console.error('❌ Failed to call support:', e);
-      const errorMessage = e?.message || 'Неизвестная ошибка';
-      Alert.alert('Ошибка', `Не удалось позвонить в поддержку: ${errorMessage}`);
+      Alert.alert('Ошибка', `Не удалось позвонить в поддержку: ${callErrorText(e)}`);
     }
   };
 
