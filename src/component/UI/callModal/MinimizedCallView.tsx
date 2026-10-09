@@ -11,6 +11,7 @@ import {
     getActiveCallInfo,
     endCall,
 } from '../../../modules/voip/VoipService';
+import {callerNameForDisplay} from '../../../modules/voip/callText';
 
 type MinimizedCallViewProps = {
     onExpand: () => void;
@@ -82,7 +83,7 @@ export const MinimizedCallView: React.FC<MinimizedCallViewProps> = ({onExpand}) 
         return null;
     }
 
-    const displayName = currentState.callerName || 'Неизвестный';
+    const displayName = callerNameForDisplay(currentState.callerName) || 'Неизвестный';
     const isActive = currentState.state === 'answered';
     const isRinging = currentState.state === 'ringing';
 

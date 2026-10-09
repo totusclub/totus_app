@@ -17,6 +17,12 @@ import { getUserDisplayName } from '../../modules/api/users';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../modules/store';
 
+/** Текст ошибки сервера показываем, только если он по-русски; иначе — свой русский текст. */
+const russianOr = (message: unknown, fallback: string): string =>
+  typeof message === 'string' && /[А-Яа-яЁё]/.test(message) && !/[A-Za-z]{3,}/.test(message.replace(/\bID\b/g, ''))
+    ? message
+    : fallback;
+
 type AddContactModalProps = {
   visible: boolean;
   onClose: () => void;
@@ -42,7 +48,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
 
   const handleSearch = async () => {
     if (!loyaltyId.trim()) {
-      setError('Пожалуйста, введите Loyalty ID');
+      setError('Пожалуйста, введите номер карты лояльности');
       return;
     }
 
@@ -64,7 +70,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
       // Search for user
       const user = await searchUserByLoyaltyId(normalizedLoyaltyId);
       if (!user) {
-        setError('Пользователь с таким Loyalty ID не найден');
+        setError('Пользователь с таким номером карты лояльности не найден');
         return;
       }
 
@@ -78,7 +84,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
         setSearchedUser(user);
       }
     } catch (err: any) {
-      setError(err.message || 'Ошибка при поиске пользователя');
+      setError(russianOr(err?.message, 'Ошибка при поиске пользователя'));
     } finally {
       setIsSearching(false);
     }
@@ -104,7 +110,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
       onContactAdded(contact);
       handleClose();
     } catch (err: any) {
-      setError(err.message || 'Ошибка при добавлении контакта');
+      setError(russianOr(err?.message, 'Ошибка при добавлении контакта'));
     } finally {
       setIsAdding(false);
     }
@@ -173,7 +179,7 @@ const AddContactModal: React.FC<AddContactModalProps> = ({
               <TextInput
                 allowFontScaling={false}
                 style={[styles.input, { color: theme.inputText }]}
-                placeholder="Loyalty ID (например: 9897 3971 0801 6689)"
+                placeholder="Номер карты (например: 9897 3971 0801 6689)"
                 placeholderTextColor={theme.inputPlaceholder}
                 value={loyaltyId}
                 onChangeText={(text) => {

@@ -292,7 +292,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
       // Missing report + completion() = iOS terminates the app (killed-state VoIP crash).
       let reportCallId = callId ?? UUID().uuidString
       let reportHandle = handle ?? reportCallId
-      let reportName = callerName ?? "Incoming call"
+      let reportName = callerName ?? "Входящий звонок"
       print("   📞 Reporting incoming call to CallKeep...")
       CallKeepHelper.reportIncomingCall(
         reportCallId,
@@ -314,7 +314,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
       CallKeepHelper.reportIncomingCall(
         fallbackId,
         handle: fallbackId,
-        callerName: "Incoming call",
+        callerName: "Входящий звонок",
         hasVideo: false,
         payload: [:]
       ) {

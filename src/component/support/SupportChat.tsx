@@ -29,6 +29,7 @@ import {
   getCurrentDeviceId,
   startOutgoingVoiceCallByLoyaltyId,
 } from '../../modules/voip/VoipService';
+import {callErrorText} from '../../modules/voip/callText';
 import SupportHeader from './SupportHeader';
 import SupportMessageList from './SupportMessageList';
 import SupportComposer from './SupportComposer';
@@ -114,8 +115,7 @@ const SupportChat: React.FC = () => {
       await startOutgoingVoiceCallByLoyaltyId(SUPPORT_LOYALTY_ID, SUPPORT_DISPLAY_NAME);
       // Окно звонка показывает App.tsx по состоянию VoipService.
     } catch (e: any) {
-      const errorMessage = e?.message || 'Неизвестная ошибка';
-      Alert.alert('Ошибка', `Не удалось позвонить в поддержку: ${errorMessage}`);
+      Alert.alert('Ошибка', `Не удалось позвонить в поддержку: ${callErrorText(e)}`);
     }
   }, []);
 

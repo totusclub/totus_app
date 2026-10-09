@@ -30,6 +30,7 @@ import { AppIcon } from '../../component/UI';
 import { useTheme } from '../../hooks/useTheme';
 import AddContactModal from './AddContactModal';
 import { VOIP_BASE_URL } from '../../config/server';
+import { callErrorText } from '../../modules/voip/callText';
 
 const BASE_URL = VOIP_BASE_URL;
 
@@ -83,7 +84,7 @@ const CallsScreen: React.FC = () => {
       const errorMessage = error?.message || 'Неизвестная ошибка';
       // Only show alert if it's not a 404 (which means no contacts yet)
       if (!errorMessage.includes('404') && !errorMessage.includes('not found')) {
-        Alert.alert('Ошибка', `Не удалось загрузить список контактов: ${errorMessage}`);
+        Alert.alert('Ошибка', 'Не удалось загрузить список контактов. Попробуйте позже.');
       } else {
         // No contacts found - set empty array
         setUsers([]);
@@ -291,12 +292,12 @@ const CallsScreen: React.FC = () => {
     if (trimmedName.length > 0) {
       return trimmedName[0].toUpperCase();
     }
-    return 'U';
+    return 'П';
   };
 
   const handleCallUser = async (user: User) => {
     if (!currentLoyaltyId) {
-      Alert.alert('Ошибка', 'Loyalty ID не установлен. Пожалуйста, войдите в систему.');
+      Alert.alert('Ошибка', 'Номер карты лояльности не найден. Пожалуйста, войдите в систему.');
       return;
     }
     if (user.loyaltyId === currentLoyaltyId) {
@@ -334,8 +335,7 @@ const CallsScreen: React.FC = () => {
       await startOutgoingVoiceCallByLoyaltyId(user.loyaltyId, displayName);
     } catch (e: any) {
       console.error('❌ Failed to start call', e);
-      const errorMessage = e?.message || 'Unknown error';
-      Alert.alert('Ошибка', `Не удалось начать звонок: ${errorMessage}`);
+      Alert.alert('Ошибка', `Не удалось начать звонок: ${callErrorText(e)}`);
     }
   };
 
@@ -352,16 +352,16 @@ const CallsScreen: React.FC = () => {
 
   const handleCopyLoyaltyId = async () => {
     if (!currentLoyaltyId) {
-      Alert.alert('Ошибка', 'Loyalty ID не найден');
+      Alert.alert('Ошибка', 'Номер карты лояльности не найден');
       return;
     }
     const loyaltyIdToCopy = currentLoyaltyId.replace(/\s+/g, ''); // Remove spaces for copy
     try {
       Clipboard.setString(loyaltyIdToCopy);
-      Alert.alert('Скопировано', 'Loyalty ID скопирован в буфер обмена');
+      Alert.alert('Скопировано', 'Номер карты лояльности скопирован в буфер обмена');
     } catch (error) {
       console.error('Error copying loyalty ID:', error);
-      Alert.alert('Ошибка', 'Не удалось скопировать Loyalty ID');
+      Alert.alert('Ошибка', 'Не удалось скопировать номер карты лояльности');
     }
   };
 

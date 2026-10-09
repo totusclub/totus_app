@@ -3,6 +3,7 @@
 // CallKeep. Native side: android/.../TotusCallManager.kt (NativeModules.TotusCall).
 // On iOS (and in tests without the native module) every function is a no-op.
 import {DeviceEventEmitter, NativeModules, Platform} from 'react-native';
+import {callerNameForDisplay} from './callText';
 
 export type AndroidCallAction = {
   action: 'answer' | 'show' | 'open' | string;
@@ -26,7 +27,8 @@ export function syncAndroidIncomingCall(callId: string, isIncoming: boolean, cal
     return;
   }
   try {
-    m.updateCall(String(callId), Boolean(isIncoming), callerName ? String(callerName) : '');
+    // Имя показывается в уведомлении Android: служебные английские заглушки VoipService — по-русски.
+    m.updateCall(String(callId), Boolean(isIncoming), callerName ? callerNameForDisplay(String(callerName)) : '');
   } catch (e) {
     console.warn('[android-call-ui] updateCall failed', e);
   }
@@ -38,7 +40,7 @@ export async function startAndroidOngoingCall(callId: string, callerName?: strin
     return false;
   }
   try {
-    return Boolean(await m.startOngoing(String(callId), callerName ? String(callerName) : ''));
+    return Boolean(await m.startOngoing(String(callId), callerName ? callerNameForDisplay(String(callerName)) : ''));
   } catch (e) {
     console.warn('[android-call-ui] startOngoing failed', e);
     return false;

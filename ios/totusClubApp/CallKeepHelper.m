@@ -244,7 +244,7 @@ static atomic_bool totusAppInForeground = false;
     // Killed-app path: no React Native bridge is needed for any of this.
     NSString *safeCallId = (callId.length > 0) ? callId : [[NSUUID UUID] UUIDString];
     NSString *safeHandle = (handle.length > 0) ? handle : @"totus";
-    NSString *safeName = (callerName.length > 0) ? callerName : @"Incoming call";
+    NSString *safeName = (callerName.length > 0) ? callerName : @"Входящий звонок";
 
     NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:safeCallId];
     if (uuid == nil) {

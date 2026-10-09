@@ -7,6 +7,7 @@ import {
   Animated,
   Platform,
 } from 'react-native';
+import {callerNameForDisplay} from '../../../modules/voip/callText';
 
 type IncomingCallNotificationProps = {
   visible: boolean;
@@ -62,7 +63,7 @@ export const IncomingCallNotification: React.FC<IncomingCallNotificationProps> =
           <View style={styles.textContainer}>
             <Text style={styles.title}>Входящий звонок</Text>
             <Text style={styles.callerName} numberOfLines={1}>
-              {callerName || 'Неизвестный'}
+              {callerNameForDisplay(callerName) || 'Неизвестный'}
             </Text>
           </View>
         </View>

@@ -26,6 +26,7 @@ import {
 } from '../../../modules/voip/VoipService';
 import NetInfo from '@react-native-community/netinfo';
 import { getUserByLoyaltyId } from '../../../modules/api/users';
+import { callerNameForDisplay } from '../../../modules/voip/callText';
 import { AppIcon } from '../index';
 import MuteIcon from '../icons/mute';
 import SpeakerIcon from '../icons/speaker';
@@ -287,7 +288,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
     const isNoAnswer = isEnded && !isActive && !isIncoming;
 
     // Determine display name based on call state
-    const displayName = effectiveState.callerName || 'Неизвестный';
+    const displayName = callerNameForDisplay(effectiveState.callerName) || 'Неизвестный';
     const displayInitial = displayName.charAt(0).toUpperCase();
 
     // Format phone number for display
@@ -361,7 +362,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                             {connectionQuality === 'high'
                                 ? (isAndroid ? 'Хорошее соединение' : 'качество соединения - хорошее')
                                 : connectionQuality === 'low'
-                                    ? (isAndroid ? 'Слабое соединение' : 'качество соединения низкий')
+                                    ? (isAndroid ? 'Слабое соединение' : 'качество соединения - низкое')
                                     : 'Нет подключения'}
                         </Text>
                     </View>
@@ -458,7 +459,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                 <Text allowFontScaling={false} style={[styles.noAnswerText, { color: theme.error }]}>Нет ответа</Text>
                             )}
 
-                            {/* Outgoing (calling): same row layout as answered — SPEAKER | СБРОСИТЬ */}
+                            {/* Outgoing (calling): same row layout as answered — ДИНАМИК | СБРОСИТЬ */}
                             {isOutgoing && !isEnded && !isNoAnswer && (
                                 <View style={styles.controlsRow}>
                                     <View style={[
@@ -478,7 +479,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                         <Text allowFontScaling={false} style={[
                                             styles.actionButtonLabel,
                                             { color: effectiveState.speakerMode === 'loudspeaker' ? theme.warning : theme.text },
-                                        ]}>{isAndroid ? 'ДИНАМИК' : 'SPEAKER'}</Text>
+                                        ]}>ДИНАМИК</Text>
                                     </View>
                                     <LinearGradient
                                         colors={isDark
@@ -501,7 +502,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                 </View>
                             )}
 
-                            {/* Answered: MUTE | SPEAKER | СБРОСИТЬ — same horizontal row + dividers */}
+                            {/* Answered: МИКРОФОН | ДИНАМИК | СБРОСИТЬ — same horizontal row + dividers */}
                             {isActive && !isNoAnswer && (
                                 <View style={styles.controlsRow}>
                                     <View style={[
@@ -521,7 +522,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                         <Text allowFontScaling={false} style={[
                                             styles.actionButtonLabel,
                                             { color: effectiveState.isMuted ? theme.error : theme.text },
-                                        ]}>{isAndroid ? 'МИКРОФОН' : 'MUTE'}</Text>
+                                        ]}>МИКРОФОН</Text>
                                     </View>
                                     <LinearGradient
                                         colors={isDark
@@ -549,7 +550,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                         <Text allowFontScaling={false} style={[
                                             styles.actionButtonLabel,
                                             { color: effectiveState.speakerMode === 'loudspeaker' ? theme.warning : theme.text },
-                                        ]}>{isAndroid ? 'ДИНАМИК' : 'SPEAKER'}</Text>
+                                        ]}>ДИНАМИК</Text>
                                     </View>
                                     <LinearGradient
                                         colors={isDark
