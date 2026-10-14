@@ -6,6 +6,7 @@ import { AppText } from '../UI';
 import { useTheme } from '../../hooks/useTheme';
 import { agreementText, totalSteps } from './constants';
 import { TabletCentered } from '../UI/tablet';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type AgreementStepProps = {
     currentStep: number;
@@ -124,6 +125,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     agreementTitle: {
+        fontFamily: FONT_HEADING,
         fontSize: 20,
         fontWeight: '600',
         lineHeight: 24,

@@ -5,12 +5,12 @@ import {
   ScrollView,
   View,
   TouchableOpacity,
-  Text,
   Alert,
   RefreshControl,
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { FontText as Text } from '../../component/UI/text/FontText';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../modules/store';
@@ -31,6 +31,7 @@ import { useTheme } from '../../hooks/useTheme';
 import AddContactModal from './AddContactModal';
 import { VOIP_BASE_URL } from '../../config/server';
 import { callErrorText } from '../../modules/voip/callText';
+import { FONT_HEADING } from '../../theme/fonts';
 
 const BASE_URL = VOIP_BASE_URL;
 
@@ -528,6 +529,7 @@ const styles = StyleSheet.create({
     alignContent: 'center',
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 28,
     fontWeight: 'bold',
   },

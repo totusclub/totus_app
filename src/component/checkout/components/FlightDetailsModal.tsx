@@ -7,6 +7,7 @@ import FlightSegmentView from '../../tickets/ticket/FlightSegmentView';
 import { transformFlightDetails } from '../../../utils/ticketsUtils/flightDetailsUtils';
 import type { FlightDetails, FlightDetailSegment } from '../../../types/tickets/flightDetails';
 import { useTheme } from '../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 type FlightDetailsModalProps = {
   visible: boolean;
@@ -143,6 +144,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '700',
   },

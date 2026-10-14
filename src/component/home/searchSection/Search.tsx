@@ -38,6 +38,7 @@ import {buildApiSearchParams, withSearchTypeFilters} from '../../../utils/search
 import { useTheme } from '../../../hooks/useTheme';
 import { useLayout } from '../../../hooks/useLayout';
 import { BlurView } from '@react-native-community/blur';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 interface SearchProps {
   title: string;
@@ -709,6 +710,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   titleTablet: {
+    fontFamily: FONT_HEADING,
     fontSize: 24,
     lineHeight: 28,
     marginBottom: 20,

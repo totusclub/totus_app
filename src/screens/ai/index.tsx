@@ -2,18 +2,18 @@ import React, {useEffect, useRef, useState} from 'react';
 import Account from '../../component/account/Account';
 import {AppText, Content} from '../../component/UI';
 import {
-    Alert,
-    Dimensions,
-    PermissionsAndroid,
-    Platform,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    ScrollView,
-    Image,
-    ImageBackground,
+  Alert,
+  Dimensions,
+  PermissionsAndroid,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  ScrollView,
+  Image,
+  ImageBackground,
 } from "react-native";
+import { FontText as Text } from "../../component/UI/text/FontText";
 import LottieView from "lottie-react-native";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 import {useDispatch, useSelector} from "react-redux";
@@ -27,6 +27,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { AppIcon } from '../../component/UI';
 import axios from 'axios';
 import InCallManager from 'react-native-incall-manager';
+import { FONT_HEADING } from '../../theme/fonts';
 
 const {width,height} = Dimensions.get('window');
 
@@ -1326,6 +1327,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     headerTitle: {
+        fontFamily: FONT_HEADING,
         fontSize: 20,
         fontWeight: 'bold',
     },
@@ -1352,6 +1354,7 @@ const styles = StyleSheet.create({
         flex:1
     },
     welcome:{
+        fontFamily: FONT_HEADING,
         fontSize: 32,
         textAlign:'center',
         fontWeight:'500',
@@ -1530,7 +1533,7 @@ const styles = StyleSheet.create({
     hotelImage: { width: '100%', height: 140, backgroundColor: '#1a1a1a', objectFit: 'cover', borderRadius: 8, overflow: 'hidden', alignItems: 'flex-end', justifyContent: 'flex-end' },
     hotelInfo: { paddingTop: 12 },
     hotelHeader: { marginBottom: 8 },
-    hotelName: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
+    hotelName: { fontFamily: FONT_HEADING, fontSize: 16, fontWeight: '600', marginBottom: 4 },
     starsContainer: { flexDirection: 'row', gap: 2, marginTop: 4 },
     star: { fontSize: 18 },
     starFilled: { color: '#FE732E' },

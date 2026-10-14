@@ -10,6 +10,7 @@ import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, AppButton, AppIcon } from '../../../UI';
 import { useTheme } from '../../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../../theme/fonts';
 
 type TouristsSelectionModalProps = {
   visible: boolean;
@@ -308,6 +309,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '700',
   },

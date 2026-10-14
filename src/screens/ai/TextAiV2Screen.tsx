@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -12,6 +10,7 @@ import {
   Keyboard,
   Alert,
 } from 'react-native';
+import { FontText as Text, FontTextInput as TextInput } from '../../component/UI/text/FontText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../modules/store';
@@ -27,6 +26,7 @@ import type {
   TourAssistantV2ConversationSummary,
   TourAssistantV2Message,
 } from '../../types/tourAssistantV2';
+import { FONT_HEADING } from '../../theme/fonts';
 
 const SUGGESTIONS = [
   'Где отдохнуть на море?',
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   historyItem: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ccc' },
   scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
   greetingSection: { alignItems: 'center', marginTop: 24, marginBottom: 24 },
-  greetingTitle: { fontSize: 26, fontWeight: 'bold', textAlign: 'center' },
+  greetingTitle: { fontFamily: FONT_HEADING, fontSize: 26, fontWeight: 'bold', textAlign: 'center' },
   greetingSubtitle: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginTop: 4 },
   greetingHint: { fontSize: 13, textAlign: 'center', marginTop: 8, marginBottom: 16 },
   tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },

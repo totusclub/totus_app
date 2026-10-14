@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TextInput, Image } from 'react-native';
+import { StyleSheet, View, Image } from 'react-native';
+import { FontTextInput as TextInput } from '../text/FontText';
 import { useTheme } from '../../../hooks/useTheme';
 // import SearchIcon from './../../../assets/icons/Search.png';
 

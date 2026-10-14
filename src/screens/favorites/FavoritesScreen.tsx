@@ -19,6 +19,7 @@ import { getUserFavorites, removeFavorite, type Favorite } from '../../modules/a
 import { HotelInfo } from '../../types/hotel/hotelCard';
 import { buildRecommendedHotelRouteParams } from '../../utils/hotelUtils/recommendedHotelNavigation';
 import { favoriteImageSources } from '../../utils/favoriteHotel';
+import { FONT_HEADING } from '../../theme/fonts';
 
 const FavoritesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -206,6 +207,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 24,
     fontWeight: '700',
     paddingHorizontal: 16,

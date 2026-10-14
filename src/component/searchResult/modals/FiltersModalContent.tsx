@@ -12,6 +12,7 @@ import { RootState, AppDispatch } from '../../../modules/store';
 import { searchFilters, setAllMyHotels } from '../../../modules/store/slices/search';
 import { useTheme } from '../../../hooks/useTheme';
 import { withSearchTypeFilters } from '../../../utils/searchParamsUtils';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 /**
  * Full hotel-list filters from https://totus.club/search
@@ -825,6 +826,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
   },
@@ -926,6 +928,7 @@ const sidebarStyles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 18,
     fontWeight: '600',
     lineHeight: 24,

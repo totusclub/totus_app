@@ -23,6 +23,7 @@ import { ELoginDataType } from '../../types/auth';
 import { AppDispatch } from '../../modules/store';
 import { TabletCentered } from '../../component/UI/tablet';
 import YandexIdButton from '../../component/auth/YandexIdButton';
+import { FONT_HEADING } from '../../theme/fonts';
 
 /**
  * Вход по email. Капча появляется ПОСЛЕ нажатия «Войти» и, как только пройдена,
@@ -216,6 +217,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 28,
     fontWeight: '700',
     marginBottom: 8,

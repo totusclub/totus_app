@@ -1,4 +1,5 @@
 import { brandColor, successColor, errorColor, warningColor, transparent } from './colors';
+import { FONT_TEXT } from './fontNames';
 
 export const lightTheme = {
   mode: 'light' as const,
@@ -60,12 +61,12 @@ export const lightTheme = {
   // Divider
   divider: '#E4E4E4',
 
-  // Fonts (for React Navigation)
+  // Fonts (for React Navigation) — Museo Sans Cyrl, начертание задаётся файлом (theme/fonts.ts)
   fonts: {
-    regular: 'Golos Text',
-    medium: 'Golos Text',
-    bold: 'Golos Text',
-    heavy: 'Golos Text',
+    regular: FONT_TEXT.regular,
+    medium: FONT_TEXT.regular,
+    bold: FONT_TEXT.bold,
+    heavy: FONT_TEXT.black,
   },
 
   // Transparent

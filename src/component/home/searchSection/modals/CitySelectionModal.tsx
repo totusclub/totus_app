@@ -3,15 +3,16 @@ import {
   StyleSheet,
   View,
   TouchableOpacity,
-  TextInput,
   FlatList,
 } from 'react-native';
+import { FontTextInput as TextInput } from '../../../UI/text/FontText';
 import Modal from 'react-native-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, AppIcon } from '../../../UI';
 import EmptyCityIcon from '../../../UI/icons/emptyCity';
 import CityItem from '../CityItem';
 import { useTheme } from '../../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../../theme/fonts';
 
 type City = {
   id: string;
@@ -200,6 +201,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '700',
   },

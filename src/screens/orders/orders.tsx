@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { get } from '../../modules/axios';
 import type { Order } from '../../types';
 import { sortOrdersNewestFirst } from '../../utils/ordersUtils';
+import { FONT_HEADING } from '../../theme/fonts';
 
 /** After this long the spinner explains itself; the request keeps going and its answer is still shown. */
 const ORDERS_SLOW_MS = 15000;
@@ -245,7 +246,7 @@ const OrdersScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 24, fontWeight: '700', paddingHorizontal: 16, marginBottom: 12 },
+  title: { fontFamily: FONT_HEADING, fontSize: 24, fontWeight: '700', paddingHorizontal: 16, marginBottom: 12 },
   // iPad grid: 24 screen padding = 16 (list) + 8 (cell); 16 gap between columns = 8 + 8.
   titleTablet: { paddingHorizontal: 24 },
   rowTablet: { alignItems: 'flex-start' },

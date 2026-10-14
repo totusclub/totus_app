@@ -17,6 +17,7 @@ import { callTourAssistant, type TourAssistantMessage } from '../../modules/api/
 import { playGoogleTtsAudio } from '../../modules/api/googleTtsApi';
 import { useTheme } from '../../hooks/useTheme';
 import { AppText, AppIcon } from '../UI';
+import { FONT_HEADING } from '../../theme/fonts';
 
 // Safe imports with error handling
 let Voice: any = null;
@@ -624,6 +625,7 @@ const styles = StyleSheet.create({
         paddingBottom: 24,
     },
     title: {
+        fontFamily: FONT_HEADING,
         fontSize: 32,
         fontWeight: '700',
         marginBottom: 4,
@@ -655,6 +657,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     emptyTitle: {
+        fontFamily: FONT_HEADING,
         fontSize: 22,
         fontWeight: '600',
         marginBottom: 8,
@@ -709,6 +712,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     resultsTitle: {
+        fontFamily: FONT_HEADING,
         fontSize: 20,
         fontWeight: '600',
         marginBottom: 16,

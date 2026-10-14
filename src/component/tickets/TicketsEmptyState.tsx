@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { AppButton, AppText } from '../UI';
 import EmptyCityIcon from '../UI/icons/emptyCity';
 import { useTheme } from '../../hooks/useTheme';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type TicketsEmptyStateProps = {
   /** True when user has active ticket filters that can be cleared. */
@@ -93,6 +94,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     marginTop: 16,

@@ -12,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { maybePromptAndroidVoipPowerSetup } from '../../modules/voip/AndroidPowerManager';
 import { TabletCentered } from '../UI/tablet';
 import { returnAfterLogin } from '../../navigation/historyNavigation';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type VerificationRouteParams = {
   email: string;
@@ -212,6 +213,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 28,
     fontWeight: '700',
     marginBottom: 8,

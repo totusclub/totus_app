@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Text, StyleSheet, Platform, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Platform, View, useWindowDimensions } from 'react-native';
+import { FontText as Text } from '../component/UI/text/FontText';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';

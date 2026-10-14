@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -13,6 +11,7 @@ import {
   Alert,
   Keyboard,
 } from 'react-native';
+import { FontText as Text, FontTextInput as TextInput } from '../../component/UI/text/FontText';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -37,6 +36,7 @@ import type {
 import { buildAiHotelRouteParams } from '../../utils/aiHotelNavigation';
 import TypewriterText from '../../component/ai/TypewriterText';
 import TypingIndicator from '../../component/ai/TypingIndicator';
+import { FONT_HEADING } from '../../theme/fonts';
 
 const CONV_STORAGE_KEY = 'tour_assistant_v2_active_conversation';
 
@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
   backButtonText: { fontSize: 24, fontWeight: '400' },
   resetButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitleContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerTitle: { fontFamily: FONT_HEADING, fontSize: 20, fontWeight: 'bold' },
   aiBadge: {
     width: 32, height: 32, borderRadius: 16,
     justifyContent: 'center', alignItems: 'center', borderWidth: 2,
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
   greetingSection: { alignItems: 'center', marginBottom: 30, marginTop: 20 },
-  greetingTitle: { fontSize: 28, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
+  greetingTitle: { fontFamily: FONT_HEADING, fontSize: 28, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
   greetingSubtitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
   greetingHint: { fontSize: 14, textAlign: 'center', marginBottom: 16 },
   tagsContainer: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
@@ -723,7 +723,7 @@ const styles = StyleSheet.create({
   },
   hotelInfo: { paddingTop: 12 },
   hotelHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hotelName: { fontSize: 16, fontWeight: '600', marginBottom: 4, marginTop: 4 },
+  hotelName: { fontFamily: FONT_HEADING, fontSize: 16, fontWeight: '600', marginBottom: 4, marginTop: 4 },
   starsContainer: { flexDirection: 'row', gap: 2 },
   star: { fontSize: 16 },
   starFilled: { color: '#FE732E' },

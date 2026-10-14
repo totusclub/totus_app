@@ -4,6 +4,7 @@ import { AppText } from '../../UI';
 import type { Tourist, BookingValidationErrors } from '../../../types/booking';
 import { TouristForm } from './TouristForm';
 import { useTheme } from '../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 interface TouristsSectionProps {
   tourists: Tourist[];
@@ -59,6 +60,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 4,

@@ -8,6 +8,7 @@ import {
   getPackageBasePrice,
   toMoney,
 } from '../../utils/packagePrice';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type SelectedTourCardProps = {
   packageInfo: any;
@@ -214,6 +215,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   hotelName: {
+    fontFamily: FONT_HEADING,
     fontSize: 16,
     fontWeight: '700',
     lineHeight: 20,

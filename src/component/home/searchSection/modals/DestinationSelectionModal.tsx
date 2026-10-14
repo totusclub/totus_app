@@ -3,10 +3,11 @@ import {
   StyleSheet,
   View,
   TouchableOpacity,
-  TextInput,
   FlatList,
-  ActivityIndicator, Image,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
+import { FontTextInput as TextInput } from '../../../UI/text/FontText';
 import Modal from 'react-native-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';

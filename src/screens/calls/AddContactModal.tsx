@@ -3,11 +3,11 @@ import {
   StyleSheet,
   View,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { FontTextInput as TextInput } from '../../component/UI/text/FontText';
 import Modal from 'react-native-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, AppIcon } from '../../component/UI';
@@ -16,6 +16,7 @@ import { searchUserByLoyaltyId, addContact, contactExists, type Contact } from '
 import { getUserDisplayName } from '../../modules/api/users';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../modules/store';
+import { FONT_HEADING } from '../../theme/fonts';
 
 /** Текст ошибки сервера показываем, только если он по-русски; иначе — свой русский текст. */
 const russianOr = (message: unknown, fallback: string): string =>
@@ -315,6 +316,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '700',
   },

@@ -16,6 +16,7 @@ import type { HotelRoom } from '../../../types/hotel';
 import { transformRoomImages } from '../../../modules/hooks/useRoomTransformers';
 import { useTheme } from '../../../hooks/useTheme';
 import HotelIcons from '../../UI/icons/hotelIcons';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 type RoomDetailsModalContentProps = {
   onClose: () => void;
@@ -290,6 +291,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   roomName: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 12,

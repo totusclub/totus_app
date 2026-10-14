@@ -7,6 +7,7 @@ import { signupUser } from '../../modules/store/actions/auth';
 import { ELoginDataType } from '../../types/auth';
 import { useTheme } from '../../hooks/useTheme';
 import { TabletCentered } from '../UI/tablet';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type SignupRouteParams = {
   returnTo?: string;
@@ -256,6 +257,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 28,
     fontWeight: '700',
     marginBottom: 8,

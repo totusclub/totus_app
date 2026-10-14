@@ -7,6 +7,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { buildRecommendedHotelRouteParams } from '../../../utils/hotelUtils/recommendedHotelNavigation';
 import { useLayout } from '../../../hooks/useLayout';
 import { TabletGrid } from '../../UI/tablet';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 type PlaningTripProps = {
   recommendHotels?: any[] | null;
@@ -85,6 +86,7 @@ const styles = StyleSheet.create({
    marginHorizontal: 0,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '500',
     lineHeight: 24,

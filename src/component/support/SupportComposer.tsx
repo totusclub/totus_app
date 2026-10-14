@@ -1,8 +1,10 @@
 import React, {useCallback, useState} from 'react';
-import {Platform, StyleSheet, TextInput, TouchableOpacity, View} from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FontTextInput as TextInput } from '../UI/text/FontText';
 import {AppIcon, AppText} from '../UI';
 import {useTheme} from '../../hooks/useTheme';
 import {SUPPORT_MESSAGE_MAX_LENGTH} from '../../modules/api/supportChat';
+import {FONT_TEXT} from '../../theme/fonts';
 
 type Props = {
   onSend: (text: string) => void | Promise<void>;
@@ -129,7 +131,7 @@ const styles = StyleSheet.create({
   },
   input: {
     fontSize: 15,
-    fontFamily: 'Golos Text',
+    fontFamily: FONT_TEXT.regular,
     paddingTop: Platform.OS === 'ios' ? 10 : 8,
     paddingBottom: Platform.OS === 'ios' ? 10 : 8,
     maxHeight: 118,

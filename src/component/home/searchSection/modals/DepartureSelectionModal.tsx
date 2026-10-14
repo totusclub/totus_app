@@ -5,8 +5,8 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  TextInput,
 } from 'react-native';
+import { FontTextInput as TextInput } from '../../../UI/text/FontText';
 import Modal from 'react-native-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -17,6 +17,7 @@ import { RootState, AppDispatch } from '../../../../modules/store';
 import type { Departure } from '../../../../types/departures';
 import { highlightAllMatches } from '../../../UI/highlightText';
 import { useTheme } from '../../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../../theme/fonts';
 
 type DepartureSelectionModalProps = {
   visible: boolean;
@@ -250,6 +251,7 @@ const styles = StyleSheet.create({
     fontWeight: '300',
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '700',
   },

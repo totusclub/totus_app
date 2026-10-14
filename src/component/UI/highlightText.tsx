@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, TextStyle } from 'react-native';
+import { TextStyle } from 'react-native';
+import { FontText as Text } from './text/FontText';
 import AppText from './text';
 
 /**

@@ -2,10 +2,10 @@ import React from 'react';
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { FontText as Text } from '../../component/UI/text/FontText';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon, AppText } from '../../component/UI';
