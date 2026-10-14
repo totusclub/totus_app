@@ -12,6 +12,7 @@ import {
   formatTotusStayPeriod,
   type TotusBooking,
 } from '../../utils/totusBooking';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type Props = {
   orderId: string | number;
@@ -155,6 +156,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',

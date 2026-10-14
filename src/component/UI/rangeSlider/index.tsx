@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TextInput, LayoutChangeEvent } from 'react-native';
+import { StyleSheet, View, LayoutChangeEvent } from 'react-native';
+import { FontTextInput as TextInput } from '../text/FontText';
 import MultiSlider from '@ptomasroos/react-native-multi-slider';
 import AppText from '../text';
 import { useTheme } from '../../../hooks/useTheme';

@@ -27,6 +27,7 @@ import {
   isTotusInternalOrderId,
   type TotusBooking,
 } from '../../utils/totusBooking';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type PendingPaymentParams = {
   order_id: number | string;
@@ -360,6 +361,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',

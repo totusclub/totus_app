@@ -6,12 +6,12 @@
 import React, { useCallback, useEffect } from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
   ScrollView,
 } from 'react-native';
+import { FontText as Text } from '../../component/UI/text/FontText';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LottieView from 'lottie-react-native';
@@ -23,6 +23,7 @@ import { useVoiceAI } from '../../modules/hooks/useVoiceAI';
 import { synthesizeGoogleTts } from '../../modules/api/googleTtsApi';
 import type { VoiceAssistantResponse } from './voice/types';
 import {SERVER_BASE_URL} from '../../config/server';
+import { FONT_HEADING } from '../../theme/fonts';
 
 const { width } = Dimensions.get('window');
 
@@ -238,6 +239,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: 'bold',
   },

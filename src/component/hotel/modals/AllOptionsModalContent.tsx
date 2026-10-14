@@ -41,6 +41,7 @@ import {
   navigateAfterPackageCreate,
   normalizeSearchType,
 } from '../../../utils/bookingFlowUtils';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -469,6 +470,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
   },

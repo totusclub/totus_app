@@ -4,6 +4,7 @@ import { AppText, AppButton } from '../UI';
 import EmptyCityIcon from '../UI/icons/emptyCity';
 import { useTheme } from '../../hooks/useTheme';
 import { useNavigation } from '@react-navigation/native';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type EmptyStateProps = {
   onResetFilters: () => void;
@@ -45,6 +46,7 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     marginTop: 24,

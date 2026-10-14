@@ -1,14 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-    StyleSheet,
-    View,
-    Text,
-    TouchableOpacity,
-    Modal,
-    Platform,
-    StatusBar,
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  Modal,
+  Platform,
+  StatusBar,
 } from 'react-native';
+import { FontText as Text } from '../text/FontText';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {

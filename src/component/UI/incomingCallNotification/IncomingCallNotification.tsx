@@ -2,11 +2,11 @@ import React from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
   Animated,
   Platform,
 } from 'react-native';
+import { FontText as Text } from '../text/FontText';
 import {callerNameForDisplay} from '../../../modules/voip/callText';
 
 type IncomingCallNotificationProps = {

@@ -9,6 +9,7 @@ import Modal from 'react-native-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, AppButton } from '../../../UI';
 import { useTheme } from '../../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../../theme/fonts';
 
 type DateSelectionModalProps = {
   visible: boolean;
@@ -280,6 +281,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '700',
   },

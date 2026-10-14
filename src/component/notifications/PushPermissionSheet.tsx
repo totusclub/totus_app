@@ -6,6 +6,7 @@ import {useTheme} from '../../hooks/useTheme';
 import {useLayout} from '../../hooks/useLayout';
 import {PUSH_TEXTS} from '../../modules/push/pushConstants';
 import CategoryIcon from './CategoryIcon';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type Props = {
   visible: boolean;
@@ -122,6 +123,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     textAlign: 'center',

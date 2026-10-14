@@ -25,6 +25,7 @@ import {
   getTotusBookingShortText,
 } from '../../utils/totusBooking';
 import TotusBookingBanner from './totusBooking/TotusBookingBanner';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type Props = {
   order: Order;
@@ -220,6 +221,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   hotelName: {
+    fontFamily: FONT_HEADING,
     fontSize: 14,
     fontWeight: '500',
     lineHeight: 18,

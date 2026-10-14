@@ -12,6 +12,7 @@ import { AppText, AppIcon } from '../../UI';
 import { transformApiDataToSections } from '../../../modules/hooks/useExpandableSections';
 import type { ApiHotelData } from '../../../types/hotel';
 import { useTheme } from '../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 type ExpandableSectionModalContentProps = {
   onClose: () => void;
@@ -112,6 +113,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '500',
   },

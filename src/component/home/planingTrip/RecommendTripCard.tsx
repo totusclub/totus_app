@@ -10,6 +10,7 @@ import {
 import { AppIcon, AppText } from '../../UI';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 interface RecommendTripCardProps {
   style?: StyleProp<ViewStyle>;
@@ -152,6 +153,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 16,
     fontWeight: '500',
     lineHeight: 20,

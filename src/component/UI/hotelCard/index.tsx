@@ -17,6 +17,7 @@ import type { AiPriceChange } from '../../../utils/hotelUtils/aiRoomPick';
 import { getAiPriceChangeLabel } from '../../../utils/hotelUtils/aiRoomPick';
 
 import type { HotelInfo as HotelCardInfo } from '../../../types/hotel/hotelCard';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -886,6 +887,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     hotelName: {
+        fontFamily: FONT_HEADING,
         fontSize: 16,
         lineHeight: 20,
         fontWeight: '500',

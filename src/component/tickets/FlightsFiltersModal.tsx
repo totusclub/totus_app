@@ -16,6 +16,7 @@ import {
 } from '../../utils/ticketsUtils/filterSections';
 import { normalizeTicketsFilterSelections } from '../../utils/ticketsUtils/sanitizeTicketsFilterPayload';
 import { useTheme } from '../../hooks/useTheme';
+import { FONT_HEADING } from '../../theme/fonts';
 
 /** TicketsHeader: 40 content + 2 bottom border — same as hotel SearchResultHeader. */
 const TICKETS_HEADER_HEIGHT = 42;
@@ -250,6 +251,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
   },

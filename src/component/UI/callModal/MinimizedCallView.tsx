@@ -1,11 +1,11 @@
 import React, {useEffect, useState} from 'react';
 import {
-    StyleSheet,
-    View,
-    Text,
-    TouchableOpacity,
-    Animated,
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  Animated,
 } from 'react-native';
+import { FontText as Text } from '../text/FontText';
 import {
     getCallState,
     getActiveCallInfo,

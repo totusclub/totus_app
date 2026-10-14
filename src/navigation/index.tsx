@@ -24,19 +24,19 @@ export default function Navigation(): React.JSX.Element {
         fonts: {
           regular: {
             fontFamily: theme.fonts.regular,
-            fontWeight: '400',
+            fontWeight: '400', // начертание — в самом файле шрифта (theme/fonts.ts)
           },
           medium: {
             fontFamily: theme.fonts.medium,
-            fontWeight: '500',
+            fontWeight: '400', // начертание — в самом файле шрифта (theme/fonts.ts)
           },
           bold: {
             fontFamily: theme.fonts.bold,
-            fontWeight: '700',
+            fontWeight: '400', // начертание — в самом файле шрифта (theme/fonts.ts)
           },
           heavy: {
             fontFamily: theme.fonts.heavy,
-            fontWeight: '800',
+            fontWeight: '400', // начертание — в самом файле шрифта (theme/fonts.ts)
           },
         },
       }}>

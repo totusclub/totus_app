@@ -63,6 +63,11 @@
 		<string>GolosText-Regular.ttf</string>
 		<string>GolosText-SemiBold.ttf</string>
 		<string>GolosText-Text.ttf</string>
+		<string>MuseoSansCyrl-300.ttf</string>
+		<string>MuseoSansCyrl-500.ttf</string>
+		<string>MuseoSansCyrl-700.ttf</string>
+		<string>MuseoSansCyrl-900.ttf</string>
+		<string>Forum.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

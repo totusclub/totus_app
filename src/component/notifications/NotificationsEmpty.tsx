@@ -4,6 +4,7 @@ import {AppText} from '../UI';
 import {useTheme} from '../../hooks/useTheme';
 import {PUSH_TEXTS} from '../../modules/push/pushConstants';
 import CategoryIcon from './CategoryIcon';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type Props = {
   /** Показать карточку «Push-уведомления выключены» + «Включить». */
@@ -63,6 +64,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     marginTop: 8,

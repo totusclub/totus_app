@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, AppButton, AppIcon } from '../../UI';
 import type { HotelReview } from '../../../types/hotel';
 import { useTheme } from '../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 type HotelReviewsModalContentProps = {
   onClose: () => void;
@@ -198,6 +199,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   headerTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '500',
   },

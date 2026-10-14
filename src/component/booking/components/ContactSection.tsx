@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { AppText, AppInput, AppPhoneInput } from '../../UI';
 import type { BookingValidationErrors } from '../../../types/booking';
 import { useTheme } from '../../../hooks/useTheme';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 interface ContactSectionProps {
   email: string;
@@ -65,6 +66,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 4,

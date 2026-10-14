@@ -15,6 +15,7 @@ import {
   getNamePlaceholder,
   DEFAULT_NATIONALITY_ID,
 } from '../../../utils/booking/documentMappings';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 interface TouristFormProps {
   tourist: Tourist;
@@ -351,6 +352,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   touristTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 4,

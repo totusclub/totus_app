@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { AppText } from '../../UI';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 type ReadyTour = {
   id: string;
@@ -115,6 +116,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   sectionTitle: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 16,

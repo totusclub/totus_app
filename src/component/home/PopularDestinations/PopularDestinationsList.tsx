@@ -9,6 +9,7 @@ import { useDispatch } from "react-redux";
 import { useTheme } from '../../../hooks/useTheme';
 import { useLayout } from '../../../hooks/useLayout';
 import { TabletGrid } from '../../UI/tablet';
+import { FONT_HEADING } from '../../../theme/fonts';
 
 type PopularDestinationsListProps = {
   popularDestinations?: any[] | null;
@@ -121,6 +122,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '500',
     lineHeight: 24,

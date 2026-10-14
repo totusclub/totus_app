@@ -7,6 +7,7 @@ import { loginUser } from '../../modules/store/actions/auth';
 import { ELoginDataType } from '../../types/auth';
 import { handleEmail } from '../../utils/login';
 import { useTheme } from '../../hooks/useTheme';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type LoginRouteParams = {
   returnTo?: string;
@@ -154,6 +155,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 28,
     fontWeight: '700',
     marginBottom: 8,

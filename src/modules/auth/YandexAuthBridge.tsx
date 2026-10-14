@@ -31,6 +31,7 @@ import {
   yandexExchange,
   yandexStartUrl,
 } from '../api/yandexAuth';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type Stage = 'idle' | 'loading' | 'phone' | 'error';
 
@@ -261,6 +262,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 22,
     fontWeight: '700',
   },

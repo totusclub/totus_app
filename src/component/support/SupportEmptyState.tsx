@@ -6,6 +6,7 @@ import type {SupportHours} from '../../modules/api/supportChat';
 import type {SupportQuickTopic} from '../../modules/support/supportConstants';
 import SupportAvatar from './SupportAvatar';
 import SupportQuickTopics from './SupportQuickTopics';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type Props = {
   hours: SupportHours | null;
@@ -43,6 +44,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
+    fontFamily: FONT_HEADING,
     fontSize: 20,
     fontWeight: '600',
     marginTop: 8,

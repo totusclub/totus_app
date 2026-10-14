@@ -21,6 +21,7 @@ import type { CaptchaStatus } from '../../component/UI/YandexSmartCaptcha';
 import { useTheme } from '../../hooks/useTheme';
 import { signupUser } from '../../modules/store/actions/auth';
 import { AppDispatch } from '../../modules/store';
+import { FONT_HEADING } from '../../theme/fonts';
 
 type SignupRoute = RouteProp<{ signup: { email?: string } }, 'signup'>;
 
@@ -166,7 +167,7 @@ const SignupScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: 20 },
-  title: { fontSize: 28, fontWeight: '700', marginBottom: 24 },
+  title: { fontFamily: FONT_HEADING, fontSize: 28, fontWeight: '700', marginBottom: 24 },
   form: { gap: 16 },
   link: { marginTop: 20, alignItems: 'center' },
 });
