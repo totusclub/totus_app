@@ -18,7 +18,7 @@ import { RootState } from '../../modules/store';
 import { logoutReducer } from '../../modules/store/slices/auth';
 import { jwtDecode } from 'jwt-decode';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LoyaltyCardBackground from '../../component/UI/icons/loyaltyCardBackground';
+import LoyaltyCard from './LoyaltyCard';
 import { useTheme } from '../../hooks/useTheme';
 import type { ThemeMode } from '../../theme';
 import {
@@ -407,15 +407,8 @@ const AccountScreen = () => {
     }
   }, [accessToken, userFromState]);
 
-  const formatLoyaltyCard = (loyaltyId: string | undefined): string => {
-    if (!loyaltyId) return '0000 0000 0000 0000';
-    // Format as XXXX XXXX XXXX XXXX
-    const cleaned = loyaltyId.replace(/\s/g, '');
-    return cleaned.match(/.{1,4}/g)?.join(' ') || loyaltyId;
-  };
-
   const handleCopyLoyaltyId = async () => {
-    const loyaltyIdToCopy = loyaltyId.replace(/\s/g, ''); // Remove spaces for copy
+    const loyaltyIdToCopy = String(loyaltyId).replace(/\s/g, ''); // Remove spaces for copy
     try {
       Clipboard.setString(loyaltyIdToCopy);
       Alert.alert('Скопировано', 'Loyalty ID скопирован в буфер обмена');
@@ -534,7 +527,6 @@ const AccountScreen = () => {
 
   const userName = user ? `${user.name || ''} ${user.l_name || ''}`.trim() : 'Пользователь';
   const loyaltyId = user?.loyalty_id || user?.id || '0000 0000 0000 0000';
-  const [cardHeight, setCardHeight] = React.useState(240);
 
   // Don't render if not authenticated (will redirect to login)
   if (!fullAuth || !accessToken) {
@@ -787,52 +779,14 @@ const AccountScreen = () => {
         ]}
         showsVerticalScrollIndicator={false}>
         <TabletColumns sideWidth={380} side={settingsBlocks}>
-        {/* Loyalty Card */}
-        <View
-          style={[styles.loyaltyCardContainer, isTablet && styles.loyaltyCardContainerTablet]}
-          onLayout={(event) => {
-            const { height } = event.nativeEvent.layout;
-            if (height > 0) {
-              setCardHeight(height);
-            }
-          }}>
-          <View style={styles.loyaltyCardBackground}>
-            <LoyaltyCardBackground width="100%" height="100%" containerHeight={cardHeight} />
-          </View>
-          <View style={[styles.loyaltyCard, isTablet && styles.loyaltyCardTablet]}>
-            <View style={styles.loyaltyCardHeader}>
-              <AppText style={styles.loyaltyCardTitle}>Карта лояльности</AppText>
-              <AppIcon name="bird" size={64} color="#FFFFFF" accent={false} />
-            </View>
-
-            <View style={styles.loyaltyCardInfo}>
-              <TouchableOpacity
-                style={styles.loyaltyCardNumberContainer}
-                onPress={handleCopyLoyaltyId}
-                activeOpacity={0.7}>
-                <AppText style={styles.loyaltyCardNumber}  numberOfLines={1}>
-                  {formatLoyaltyCard(loyaltyId)}
-                </AppText>
-                <View style={styles.copyIconContainer}>
-                  <AppIcon name="copy" size={18} color="#FFFFFF" accent={false} />
-                </View>
-              </TouchableOpacity>
-              <View style={styles.loyaltyCardInfoRow}>
-                <AppIcon name="info" size={18} color="#FFFFFF" accent={false} />
-                <AppText style={styles.loyaltyCardInfoText}>
-                  Ваш персональный номер
-                </AppText>
-              </View>
-            </View>
-
-            <View style={styles.loyaltyCardFooter}>
-              <AppText style={styles.loyaltyCardName}>{userName}</AppText>
-              <View style={styles.userCardIcon}>
-                <AppIcon name="user" size={16} color="#FFFFFF" accent={false} />
-              </View>
-            </View>
-          </View>
-        </View>
+        {/* Карта лояльности: светлая тема — вариант C, тёмная — B (макет 15.10.2026) */}
+        <LoyaltyCard
+          number={loyaltyId}
+          name={userName}
+          isDark={isDark}
+          isTablet={isTablet}
+          onCopy={handleCopyLoyaltyId}
+        />
         </TabletColumns>
       </ScrollView>
 
@@ -878,94 +832,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     gap: 20,
-  },
-  loyaltyCardContainer: {
-    width: '100%',
-    minHeight: 240,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  loyaltyCardBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-  },
-  loyaltyCard: {
-    width: '100%',
-    padding: 24,
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    position: 'relative',
-    zIndex: 1,
-    minHeight: 240,
-  },
-  loyaltyCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  loyaltyCardTitle: {
-    fontSize: 25,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  loyaltyCardInfo: {
-    gap: 8,
-  },
-  loyaltyCardNumberContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginBottom: 8,
-    // paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  loyaltyCardNumber: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 2,
-    marginRight: 8,
-  },
-  copyIconContainer: {
-    opacity: 1,
-    marginLeft: 8,
-  },
-  loyaltyCardInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  loyaltyCardInfoText: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    lineHeight: 20,
-  },
-  loyaltyCardFooter: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(249, 249, 249, 0.22)',
-    paddingTop: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  loyaltyCardName: {
-    fontSize: 22,
-    fontWeight: '500',
-    color: '#FFFFFF',
-  },
-  userCardIcon: {
-    width: 39,
-    height: 39,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#F9F9F9',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   // Compact settings cards
   settingsBlocks: {
@@ -1070,12 +936,6 @@ const styles = StyleSheet.create({
   // iPad only
   scrollContentTablet: {
     padding: 24,
-  },
-  loyaltyCardContainerTablet: {
-    minHeight: 280,
-  },
-  loyaltyCardTablet: {
-    minHeight: 280,
   },
 });
 
