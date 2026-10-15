@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { AppText } from '../../UI';
-import MoonIcon from '../../UI/icons/moon';
+import { AppIcon, AppText } from '../../UI';
 import NightsSelectionModal from './modals/NightsSelectionModal';
 import { useTheme } from '../../../hooks/useTheme';
 
@@ -37,7 +36,7 @@ const NightsField: React.FC<NightsFieldProps> = ({ value, onChange, style }) => 
           <View style={styles.valueContainer}>
             <View style={styles.valueWithIcon}>
               <AppText style={[styles.value, { color: theme.text }]}>{value}</AppText>
-              <MoonIcon size={24} color={theme.textTertiary} />
+              <AppIcon name="nights" size={24} color={theme.textTertiary} />
             </View>
           </View>
         </View>

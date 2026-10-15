@@ -147,7 +147,7 @@ const FlightCardView: React.FC<Props> = ({ flight, priceLabel, feesLabel, onPres
         </View>
         <View style={[styles.arrowButton, { backgroundColor: theme.brand }]}>
           <View style={styles.arrowIcon}>
-            <AppIcon name="simpleArrow" size={24} color="#FFFFFF" />
+            <AppIcon name="simpleArrow" size={24} color="#FFFFFF" accent={false} />
           </View>
         </View>
       </View>

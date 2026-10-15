@@ -60,7 +60,7 @@ const SupportComposer: React.FC<Props> = ({
       ]}>
       {errorText ? (
         <TouchableOpacity onPress={onDismissError} activeOpacity={0.8} style={styles.errorRow}>
-          <AppIcon name="warning" size={14} color={theme.error} />
+          <AppIcon name="warning" size={14} color={theme.error} accent={false} />
           <AppText style={[styles.errorText, {color: theme.error}]} numberOfLines={2}>
             {errorText}
           </AppText>

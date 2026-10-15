@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { AppText } from '../../UI';
-import CalendarIcon from '../../UI/icons/calendar';
+import { AppIcon, AppText } from '../../UI';
 import DateSelectionModal from './modals/DateSelectionModal';
 import { useTheme } from '../../../hooks/useTheme';
 
@@ -47,7 +46,7 @@ const DateField: React.FC<DateFieldProps> = ({ value, onChange, style, label = '
           <View style={styles.valueContainer}>
             <View style={styles.valueWithIcon}>
               <AppText style={[styles.value, { color: theme.text }]}>{value}</AppText>
-              <CalendarIcon size={24} color={theme.textTertiary} />
+              <AppIcon name="dates" size={24} color={theme.textTertiary} />
             </View>
           </View>
         </View>

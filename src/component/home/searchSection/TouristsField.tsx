@@ -66,7 +66,7 @@ const TouristsField: React.FC<TouristsFieldProps> = ({
                 {value}
               </AppText>
               <AppIcon
-                name="OrdersStackScreen"
+                name="tourists"
                 size={24}
                 color={theme.textTertiary}
               />

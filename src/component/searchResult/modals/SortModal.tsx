@@ -27,7 +27,7 @@ type SortModalProps = {
 
 const defaultSortOptions: SortOption[] = [
   { id: 'recommended', label: 'По рекомендации', icon: 'recommended' },
-  { id: 'highRating', label: 'Высокий рейтинг', icon: 'star' },
+  { id: 'highRating', label: 'Высокий рейтинг', icon: 'sortRating' },
   { id: 'cheapFirst', label: 'Сначала дешёвые', icon: 'lineArrowDown' },
   { id: 'expensiveFirst', label: 'Сначала дорогие', icon: 'lineArrowUp' },
 ];

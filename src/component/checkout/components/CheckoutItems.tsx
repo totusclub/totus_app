@@ -219,7 +219,7 @@ export const CheckoutItems: React.FC<CheckoutItemsProps> = ({ order }) => {
 
           {order.package.client?.email && (
             <View style={[styles.infoBanner, styles.infoBannerCompact, { backgroundColor: theme.cardBackground, borderColor: theme.border, borderBottomColor: theme.brand, shadowColor: theme.shadow }]}>
-              <AppIcon name="warning" size={24} color={theme.brand} />
+              <AppIcon name="info" size={24} color={theme.brand} />
               <AppText style={[styles.infoBannerText, { color: theme.text }]}>
                 Отправим документы на <AppText style={[styles.emailHighlight, { color: theme.brand }]}>{order.package.client.email}</AppText>
               </AppText>

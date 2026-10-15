@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { AppText } from '../UI';
-import CloseCircleIcon from '../UI/icons/closeCircle';
+import { AppIcon, AppText } from '../UI';
 import { AppDispatch, RootState } from '../../modules/store';
 import { searchFilters, setAllMyHotels } from '../../modules/store/slices/search';
 import { useTheme } from '../../hooks/useTheme';
@@ -84,7 +83,7 @@ const SelectedFiltersRow: React.FC = () => {
             disabled={loading}
             onPress={() => handleRemove(chip)}
             style={[styles.chip, { backgroundColor: theme.brand }]}>
-            <CloseCircleIcon size={20} color={CHIP_TEXT_COLOR} />
+            <AppIcon name="close" size={20} color={CHIP_TEXT_COLOR} />
             <AppText style={styles.chipText} numberOfLines={1}>
               {chip.label}
             </AppText>

@@ -495,7 +495,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                             style={[styles.actionCircle, styles.actionCircleDanger]}
                                             onPress={handleEndCall}
                                             activeOpacity={0.8}>
-                                            <AppIcon name="phone" size={24} color="#FFFFFF" />
+                                            <AppIcon name="phone" size={24} color="#FFFFFF" accent={false} />
                                         </TouchableOpacity>
                                         <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>{isAndroid ? 'ЗАВЕРШИТЬ' : 'СБРОСИТЬ'}</Text>
                                     </View>
@@ -566,7 +566,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                             style={[styles.actionCircle, styles.actionCircleDanger]}
                                             onPress={handleEndCall}
                                             activeOpacity={0.8}>
-                                            <AppIcon name="phone" size={24} color="#FFFFFF" />
+                                            <AppIcon name="phone" size={24} color="#FFFFFF" accent={false} />
                                         </TouchableOpacity>
                                         <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>{isAndroid ? 'ЗАВЕРШИТЬ' : 'СБРОСИТЬ'}</Text>
                                     </View>
@@ -582,7 +582,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                             style={[styles.actionCircle, styles.actionCircleDanger]}
                                             onPress={handleRejectCall}
                                             activeOpacity={0.8}>
-                                            <AppIcon name="phone" size={24} color="#FFFFFF" />
+                                            <AppIcon name="phone" size={24} color="#FFFFFF" accent={false} />
                                         </TouchableOpacity>
                                         <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>{isAndroid ? 'ОТКЛОНИТЬ' : 'СБРОСИТЬ'}</Text>
                                     </View>
@@ -656,7 +656,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                             }}
                                             activeOpacity={0.8}>
                                             <View style={styles.phoneIconRotated}>
-                                                <AppIcon name="phone" size={24} color="#FFFFFF" />
+                                                <AppIcon name="phone" size={24} color="#FFFFFF" accent={false} />
                                             </View>
                                         </TouchableOpacity>
                                         <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>ОТВЕТИТЬ</Text>
@@ -674,7 +674,7 @@ export const CallModal: React.FC<CallModalProps> = ({ visible, onClose, onMinimi
                                             console.log('Call again pressed');
                                         }}
                                         activeOpacity={0.8}>
-                                        <AppIcon name="phone" size={24} color="#FFFFFF" />
+                                        <AppIcon name="phone" size={24} color="#FFFFFF" accent={false} />
                                     </TouchableOpacity>
                                     <Text allowFontScaling={false} style={[styles.actionButtonLabel, { color: theme.textTertiary }]}>ПОЗВОНИТЬ</Text>
                                 </View>

@@ -289,7 +289,7 @@ const CallSupportModal: React.FC<CallSupportModalProps> = ({
               style={[callSupportStyles.actionButton, { backgroundColor: theme.brand }]}
               onPress={onCallApp}
               activeOpacity={0.75}>
-              <AppIcon name="phone" size={20} color={theme.textInverse} />
+              <AppIcon name="phone" size={20} color={theme.textInverse} accent={false} />
               <AppText style={[confirmStyles.buttonText, { color: theme.textInverse }]}>
                 Звонок через приложение
               </AppText>
@@ -594,7 +594,7 @@ const AccountScreen = () => {
                       styles.settingsIcon,
                       { backgroundColor: isDark ? 'rgba(43,169,226,0.2)' : 'rgba(43,169,226,0.12)' },
                     ]}>
-                    <AppIcon name="support" size={16} color="#2BA9E2" />
+                    <AppIcon name="support" size={16} color="#2BA9E2" accent={false} />
                     {supportUnread > 0 ? (
                       <View style={[styles.settingsBadge, { backgroundColor: theme.brand, borderColor: theme.cardBackground }]} />
                     ) : null}
@@ -619,7 +619,7 @@ const AccountScreen = () => {
                       styles.settingsIcon,
                       { backgroundColor: isDark ? 'rgba(52,199,89,0.18)' : 'rgba(52,199,89,0.12)' },
                     ]}>
-                    <AppIcon name="HelpCenterIcon" size={16} color="#34C759" />
+                    <AppIcon name="phone" size={16} color="#34C759" accent={false} />
                   </View>
                   <View style={styles.settingsTextCol}>
                     <AppText style={[styles.settingsTitle, { color: theme.text }]}>
@@ -646,9 +646,9 @@ const AccountScreen = () => {
                   },
                 ]}>
                 {isDark ? (
-                  <AppIcon name="moon" size={16} color="#5856D6" />
+                  <AppIcon name="moon" size={16} color="#5856D6" accent={false} />
                 ) : (
-                  <AppIcon name="sun" size={16} color="#FF9500" />
+                  <AppIcon name="sun" size={16} color="#FF9500" accent={false} />
                 )}
               </View>
               <View style={styles.settingsTextCol}>
@@ -713,7 +713,7 @@ const AccountScreen = () => {
                   styles.settingsIcon,
                   { backgroundColor: isDark ? 'rgba(88,86,214,0.18)' : 'rgba(88,86,214,0.1)' },
                 ]}>
-                <AppIcon name="document" size={16} color="#5856D6" />
+                <AppIcon name="document" size={16} color="#5856D6" accent={false} />
               </View>
               <View style={styles.settingsTextCol}>
                 <AppText style={[styles.settingsTitle, { color: theme.text }]}>
@@ -744,7 +744,7 @@ const AccountScreen = () => {
                   styles.settingsIcon,
                   { backgroundColor: isDark ? 'rgba(255,149,0,0.18)' : 'rgba(255,149,0,0.12)' },
                 ]}>
-                <AppIcon name="logout" size={16} color="#FF9500" />
+                <AppIcon name="logout" size={16} color="#FF9500" accent={false} />
               </View>
               <AppText style={[styles.settingsTitle, styles.settingsTitleSolo, { color: theme.text }]}>
                 Выйти
@@ -763,7 +763,7 @@ const AccountScreen = () => {
                   styles.settingsIcon,
                   { backgroundColor: isDark ? 'rgba(254,115,46,0.2)' : 'rgba(254,115,46,0.12)' },
                 ]}>
-                <AppIcon name="warning" size={16} color="#FE732E" />
+                <AppIcon name="warning" size={16} color="#FE732E" accent={false} />
               </View>
               <AppText
                 style={[styles.settingsTitle, styles.settingsTitleSolo, { color: '#FE732E' }]}>
@@ -802,7 +802,7 @@ const AccountScreen = () => {
           <View style={[styles.loyaltyCard, isTablet && styles.loyaltyCardTablet]}>
             <View style={styles.loyaltyCardHeader}>
               <AppText style={styles.loyaltyCardTitle}>Карта лояльности</AppText>
-              <AppIcon name="bird" size={64} color="#FFFFFF" />
+              <AppIcon name="bird" size={64} color="#FFFFFF" accent={false} />
             </View>
 
             <View style={styles.loyaltyCardInfo}>
@@ -814,11 +814,11 @@ const AccountScreen = () => {
                   {formatLoyaltyCard(loyaltyId)}
                 </AppText>
                 <View style={styles.copyIconContainer}>
-                  <AppIcon name="copy" size={18} color="#FFFFFF" />
+                  <AppIcon name="copy" size={18} color="#FFFFFF" accent={false} />
                 </View>
               </TouchableOpacity>
               <View style={styles.loyaltyCardInfoRow}>
-                <AppIcon name="info" size={18} color="#FFFFFF" />
+                <AppIcon name="info" size={18} color="#FFFFFF" accent={false} />
                 <AppText style={styles.loyaltyCardInfoText}>
                   Ваш персональный номер
                 </AppText>
@@ -828,7 +828,7 @@ const AccountScreen = () => {
             <View style={styles.loyaltyCardFooter}>
               <AppText style={styles.loyaltyCardName}>{userName}</AppText>
               <View style={styles.userCardIcon}>
-                <AppIcon name="user" size={16} color="#FFFFFF" />
+                <AppIcon name="user" size={16} color="#FFFFFF" accent={false} />
               </View>
             </View>
           </View>

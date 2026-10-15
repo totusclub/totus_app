@@ -144,10 +144,15 @@ const AppButton = ({
       ) : (
         <View style={styles.contentContainer}>
           {icon && type !== 'small' && (
-            <AppIcon name={icon} size={iconSize} color={iconColor} />
+            <AppIcon
+              name={icon}
+              size={iconSize}
+              color={iconColor}
+              accent={type === 'outline' || type === 'transparent'}
+            />
           )}
           {type === 'small' && icon && (
-            <AppIcon name={icon} size={24} color={disabled ? theme.textDisabled : theme.textInverse} />
+            <AppIcon name={icon} size={24} color={disabled ? theme.textDisabled : theme.textInverse} accent={false} />
           )}
           {title && buttonStyle.text && (
             <AppText
