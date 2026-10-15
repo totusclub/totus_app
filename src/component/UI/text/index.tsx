@@ -2,6 +2,7 @@ import React, { ReactNode, useContext } from 'react';
 import { StyleProp, StyleSheet, Text, TextProps, TextStyle } from 'react-native';
 import { resolveAppFont } from '../../../theme/fonts';
 import { InheritedFontContext } from './FontText';
+import { withSymbolRuns } from './symbolRuns';
 
 interface AppTextProps extends TextProps {
   children: ReactNode;
@@ -9,13 +10,13 @@ interface AppTextProps extends TextProps {
 }
 
 const AppText: React.FC<AppTextProps> = ({ children, style, ...props }) => {
-  // Шрифт приложения (Museo / Forum) по начертанию из стиля — см. theme/fonts.ts
+  // Шрифт приложения (Museo / Forum) по начертанию из стиля, ₽ и стрелки — «Totus Symbols»; см. theme/fonts.ts
   const inherited = useContext(InheritedFontContext);
   const resolved = resolveAppFont([styles.text, style], inherited);
   return (
     <InheritedFontContext.Provider value={resolved.inherited}>
       <Text allowFontScaling={false} style={resolved.style} {...props}>
-        {children}
+        {withSymbolRuns(children, resolved.symbols)}
       </Text>
     </InheritedFontContext.Provider>
   );
