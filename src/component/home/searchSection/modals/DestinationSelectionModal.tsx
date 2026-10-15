@@ -19,6 +19,14 @@ import { RootState, AppDispatch } from '../../../../modules/store';
 import type { DestinationResult } from '../../../../types/destinations';
 import { highlightAllMatches } from '../../../UI/highlightText';
 import { useTheme } from '../../../../hooks/useTheme';
+import {
+  DEFAULT_BROWSE_COUNTRIES,
+  countryImageSrc,
+  countryLetter,
+  splitBrowseCountries,
+  type BrowseCountry,
+} from '../utils/countryImages';
+import { loadBrowseCountries } from '../utils/browseCountries';
 
 type DestinationSelectionModalProps = {
   visible: boolean;
@@ -30,6 +38,8 @@ type DestinationSelectionModalProps = {
 };
 
 const ignorName = ['Крым', 'Донецк', 'Луганск', 'Ялта', 'Yalta'];
+
+type ResultGroup = { key: string; type: string; title: string; items: DestinationResult[] };
 
 const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
   visible,
@@ -46,6 +56,8 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
+  // Страны для списка по нажатию (до ввода текста) — как на сайте: до ответа справочника — встроенный список.
+  const [browseCountries, setBrowseCountries] = useState<BrowseCountry[]>(DEFAULT_BROWSE_COUNTRIES);
   const insets = useSafeAreaInsets();
   const paddingTop = insets.top;
   const paddingBottom = insets.bottom;
@@ -56,9 +68,23 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
     }
   }, [visible]);
 
-  // Debounced search
+  // По нажатию — сразу список стран (Level.Travel /references/destinations), как на сайте.
   useEffect(() => {
     if (!visible) return;
+    let cancelled = false;
+    loadBrowseCountries(fromCity).then(list => {
+      if (!cancelled && list) setBrowseCountries(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, fromCity]);
+
+  const isTypingSearch = searchQuery.trim().length > 0;
+
+  // Debounced search — только после ввода текста (пустой запрос autocomplete_v2 отдаёт пустые группы)
+  useEffect(() => {
+    if (!visible || !searchQuery.trim()) return;
 
     const timeoutId = setTimeout(() => {
       dispatch(
@@ -68,13 +94,21 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
           search_type: searchType,
         }),
       );
-    }, searchQuery.trim() ? 500 : 0); // 500ms debounce only if there's a query
+    }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery, visible, dispatch, fromCity, searchType]);
 
   // Filter and group results
-  const groupedResults = useMemo(() => {
+  const groupedResults = useMemo((): ResultGroup[] => {
+    // Без ввода — популярные страны, затем остальные (как на сайте)
+    if (!isTypingSearch) {
+      const { popular, other } = splitBrowseCountries(browseCountries);
+      return [
+        { key: 'popular', type: 'countries', title: 'Популярные страны', items: popular as DestinationResult[] },
+        { key: 'other', type: 'countries', title: 'Другие страны', items: other as DestinationResult[] },
+      ].filter(group => group.items.length > 0);
+    }
     if (!data || data.length === 0) return [];
     const countries = data
       .filter(item => item?.group_name === 'countries')
@@ -107,16 +141,53 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
       );
 
     return [
-      { type: 'countries', title: 'Популярные страны', items: countries },
-      { type: 'regions', title: 'Регионы', items: regions },
-      { type: 'metaregions', title: 'Мегарегионы', items: metaregions },
-      { type: 'hotels', title: 'Отели', items: hotels },
+      { key: 'countries', type: 'countries', title: 'Страны', items: countries },
+      { key: 'regions', type: 'regions', title: 'Регионы', items: regions },
+      { key: 'metaregions', type: 'metaregions', title: 'Мегарегионы', items: metaregions },
+      { key: 'hotels', type: 'hotels', title: 'Отели', items: hotels },
     ].filter(group => group.items.length > 0);
-  }, [data]);
+  }, [data, isTypingSearch, browseCountries]);
 
   const handleSelect = (item: DestinationResult, type: string) => {
     onSelect(item, type);
     onClose();
+  };
+
+  // Кружок 40: у страны — своя картинка по ISO2 (как на сайте; картинки Level.Travel битые)
+  // или первая буква названия; у курорта, региона и отеля — картинка из ответа, если есть.
+  const renderAvatar = (result: DestinationResult, type: string) => {
+    if (type === 'countries') {
+      const src = countryImageSrc(result.iso2);
+      if (src) {
+        return (
+          <Image
+            source={{ uri: src }}
+            style={[styles.itemImage, { backgroundColor: theme.backgroundSecondary }]}
+            resizeMode="cover"
+          />
+        );
+      }
+      return (
+        <View
+          style={[
+            styles.itemImage,
+            styles.itemLetter,
+            { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+          ]}>
+          <AppText style={[styles.itemLetterText, { color: theme.brand }]}>
+            {countryLetter(result.name || (result as any).name_ru || result.name_en)}
+          </AppText>
+        </View>
+      );
+    }
+    if (!result?.image) return null;
+    return (
+      <Image
+        source={{ uri: result.image }}
+        style={styles.itemImage}
+        resizeMode="cover"
+      />
+    );
   };
 
   const renderItem = (result: DestinationResult, type: string) => {
@@ -138,13 +209,7 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
         onPress={() => handleSelect(result, type)}
         activeOpacity={0.7}>
         <View style={styles.itemContent}>
-          {result?.image && (
-            <Image
-              source={{ uri: result.image }}
-              style={styles.itemImage}
-              resizeMode="cover"
-            />
-          )}
+          {renderAvatar(result, type)}
           <View style={styles.itemTextContainer}>
             {highlightAllMatches(
               result.name || (result as any).name_ru || result.name_en || '',
@@ -161,14 +226,13 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
     );
   };
 
-  const renderSection = ({ item }: { item: typeof groupedResults[0] }) => {
+  const renderSection = ({ item }: { item: ResultGroup }) => {
     return (
       <View style={styles.section}>
-        <AppText style={[styles.sectionTitle, { color: theme.text }]}>{item.title}</AppText>
+        <AppText style={[styles.sectionTitle, { color: theme.brand }]}>{item.title}</AppText>
         {item.items.map((result, index) => (
-          <View key={`${result.id}-${index}`}>
+          <View key={`${result.iso2 || result.id}-${index}`}>
             {renderItem(result, item.type)}
-            {index < item.items.length - 1 && <View style={[styles.separator, { backgroundColor: theme.divider }]} />}
           </View>
         ))}
       </View>
@@ -241,11 +305,11 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
 
         {/* Results List or Loading/Empty State */}
         <View style={styles.listContainer}>
-          {status === 'loading' ? (
+          {isTypingSearch && status === 'loading' ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.brand} />
             </View>
-          ) : status === 'failed' ? (
+          ) : isTypingSearch && status === 'failed' ? (
             <View style={styles.emptyState}>
               <AppText style={[styles.errorText, { color: theme.error }]}>
                 Ошибка: {error || 'Не удалось загрузить данные'}
@@ -255,7 +319,8 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
             <FlatList
               data={groupedResults}
               renderItem={renderSection}
-              keyExtractor={(item, index) => `${item.type}-${index}`}
+              keyExtractor={item => item.key}
+              keyboardShouldPersistTaps="handled"
               style={styles.resultsList}
               contentContainerStyle={styles.resultsListContent}
               showsVerticalScrollIndicator={true}
@@ -355,26 +420,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '300',
   },
+  // Список — как на сайте (search.module.css: .searchGroupListText, .searchGroupListItem,
+  // .destinationImage, .destinationInfo): заголовок 14 оранжевым, строка от 48, кружок 40, отступ 12.
   section: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontWeight: '400',
+    marginBottom: 4,
   },
   itemContainer: {
-    paddingVertical: 12,
+    paddingVertical: 8,
+    minHeight: 48,
+    justifyContent: 'center',
   },
   itemContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   itemImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  itemLetter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  itemLetterText: {
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   itemImagePlaceholder: {
     width: 48,
@@ -389,14 +469,14 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: '500',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   highlightedText: {
     fontSize: 16,
     fontWeight: '500',
   },
   itemSubtext: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '400',
   },
   separator: {
