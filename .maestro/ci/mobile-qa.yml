@@ -1,0 +1,316 @@
+# ⚠ Этот файл нужно перенести в .github/workflows/mobile-qa.yml (коннектор Claude не может писать в .github/workflows).
+#
+# Дымовой UI-тест приложения (Maestro): Android-эмулятор, симуляторы iPhone и iPad.
+# Сценарий — .maestro/smoke.yaml (до экрана «Вход», ничего не бронирует).
+# Итог — issue с меткой qa-mobile (скриншоты в ветке qa-screenshots); его читает ежечасный чекап сайта.
+#
+# Когда:   09:10 и 19:10 МСК — все платформы; пуш в main — только Android (дёшево);
+#          вручную — Actions → Mobile QA → Run workflow (выбор платформ);
+#          PR с правками теста — все платформы, отчёт только в артефактах (issue не трогается).
+# Секрет:  AI_REPO_TOKEN — fine-grained PAT только на чтение tosmedia/totus_ai_v2 (Contents: Read):
+#          из него собирается пакет Милы @tosmedia/ai-assistant-native (package.json ссылается на ../totus_ai_v2).
+# Подпись: не нужна — APK подписан debug-ключом, iOS собирается для симулятора без подписи.
+name: Mobile QA
+
+on:
+  schedule:
+    - cron: '10 6,16 * * *' # 09:10 и 19:10 МСК
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  # Правки самого теста проверяются прямо в PR (без записи в issue)
+  pull_request:
+    paths:
+      - '.maestro/**'
+      - '.github/workflows/mobile-qa.yml'
+      - 'scripts/ci/**'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Платформы'
+        type: choice
+        options: [all, android, ios]
+        default: all
+
+concurrency:
+  group: mobile-qa
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  android:
+    name: Android (эмулятор)
+    if: github.event_name != 'workflow_dispatch' || inputs.platforms != 'ios'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      OUT: ${{ github.workspace }}/qa-out/android
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: totus_APP
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: totus_APP/package-lock.json
+
+      - name: Проверка секрета AI_REPO_TOKEN
+        env:
+          TOKEN: ${{ secrets.AI_REPO_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            node totus_APP/scripts/ci/ensure-result.mjs "$OUT" blocked "Нет секрета AI_REPO_TOKEN (чтение tosmedia/totus_ai_v2) — не собрать пакет Милы"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          repository: tosmedia/totus_ai_v2
+          token: ${{ secrets.AI_REPO_TOKEN }}
+          path: totus_ai_v2
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Зависимости (пакет Милы + npm ci)
+        run: |
+          mkdir -p "$OUT"
+          {
+            bash totus_APP/scripts/ci/prepare-ai-package.sh totus_APP
+            cd totus_APP
+            npm ci --no-audit --no-fund || { echo "::warning::npm ci не прошёл — пробую npm install"; npm install --no-audit --no-fund; }
+          } 2>&1 | tee "$OUT/build.log"
+
+      - name: Сборка APK (Release, x86_64, debug-подпись)
+        working-directory: totus_APP/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon 2>&1 | tee -a "$OUT/build.log"
+
+      - name: Включить KVM для эмулятора
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Установить Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Прогон на эмуляторе (API 34)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash totus_APP/scripts/ci/android-smoke.sh
+
+      - name: Итог, если до теста не дошло
+        if: always()
+        run: node totus_APP/scripts/ci/ensure-result.mjs "$OUT" build_failed "Сборка Android не прошла" "$OUT/build.log"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-android
+          path: qa-out/android
+          retention-days: 14
+
+  ios:
+    name: iPhone + iPad (симуляторы)
+    if: github.event_name == 'schedule' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.platforms != 'android')
+    runs-on: macos-15
+    timeout-minutes: 100
+    env:
+      LOG: ${{ github.workspace }}/qa-out/ios-build.log
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: totus_APP
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: totus_APP/package-lock.json
+
+      - name: Есть ли что собирать
+        id: pre
+        env:
+          TOKEN: ${{ secrets.AI_REPO_TOKEN }}
+        run: |
+          mkdir -p qa-out
+          reason=""
+          [ -d totus_APP/ios/totusClubApp.xcodeproj ] || reason="В Git нет ios/totusClubApp.xcodeproj — iOS из репозитория не собирается"
+          [ -n "$TOKEN" ] || reason="${reason:+$reason; }Нет секрета AI_REPO_TOKEN (чтение tosmedia/totus_ai_v2)"
+          if [ -n "$reason" ]; then
+            for p in iphone ipad; do node totus_APP/scripts/ci/ensure-result.mjs "qa-out/$p" blocked "$reason"; done
+            echo "::warning::$reason"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.pre.outputs.ok == 'true'
+        with:
+          repository: tosmedia/totus_ai_v2
+          token: ${{ secrets.AI_REPO_TOKEN }}
+          path: totus_ai_v2
+
+      - name: Зависимости (пакет Милы + npm ci + pod install)
+        if: steps.pre.outputs.ok == 'true'
+        run: |
+          {
+            bash totus_APP/scripts/ci/prepare-ai-package.sh totus_APP
+            cd totus_APP
+            npm ci --no-audit --no-fund || { echo "::warning::npm ci не прошёл — пробую npm install"; npm install --no-audit --no-fund; }
+            cd ios
+            pod install
+          } 2>&1 | tee "$LOG"
+
+      - name: Выбрать симуляторы
+        id: sim
+        if: steps.pre.outputs.ok == 'true'
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, subprocess
+          data = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))
+          def pick(prefix):
+              best = None
+              for runtime, devices in data['devices'].items():
+                  if 'SimRuntime.iOS-' not in runtime:
+                      continue
+                  ver = tuple(int(x) for x in runtime.split('iOS-')[1].split('-'))
+                  for d in devices:
+                      if d['name'].startswith(prefix) and (best is None or ver > best[0]):
+                          best = (ver, d['udid'], d['name'])
+              return best
+          for key, prefix in (('iphone', 'iPhone'), ('ipad', 'iPad')):
+              b = pick(prefix)
+              print(f"{key}={b[1] if b else ''}")
+              print(f"{key}_name={b[2] + ' / iOS ' + '.'.join(map(str, b[0])) if b else ''}")
+          PY
+          cat "$GITHUB_OUTPUT"
+
+      - name: Сборка .app для симулятора (Release, без подписи)
+        if: steps.pre.outputs.ok == 'true'
+        working-directory: totus_APP
+        run: |
+          xcodebuild -workspace ios/totusClubApp.xcworkspace -scheme totusClubApp -configuration Release \
+            -destination "id=${{ steps.sim.outputs.iphone }}" -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build >> "$LOG" 2>&1 \
+            || { grep -E "error:|BUILD FAILED" "$LOG" | tail -40; exit 1; }
+          APP=$(find ios/build/Build/Products -maxdepth 2 -name '*.app' -path '*iphonesimulator*' | head -1)
+          echo "APP_PATH=$PWD/$APP" >> "$GITHUB_ENV"
+          echo "Собрано: $APP"
+
+      - name: Установить Maestro
+        if: steps.pre.outputs.ok == 'true'
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: iPhone — ${{ steps.sim.outputs.iphone_name }}
+        id: iphone
+        if: steps.pre.outputs.ok == 'true'
+        continue-on-error: true
+        run: |
+          UDID="${{ steps.sim.outputs.iphone }}"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP_PATH"
+          code=0
+          bash totus_APP/scripts/ci/run-maestro.sh iphone app.totus.club "$PWD/qa-out/iphone" "$UDID" || code=$?
+          xcrun simctl shutdown "$UDID" || true
+          exit $code
+
+      - name: iPad — ${{ steps.sim.outputs.ipad_name }}
+        id: ipad
+        if: steps.pre.outputs.ok == 'true'
+        continue-on-error: true
+        run: |
+          UDID="${{ steps.sim.outputs.ipad }}"
+          [ -n "$UDID" ] || { node totus_APP/scripts/ci/ensure-result.mjs qa-out/ipad blocked "На раннере нет симулятора iPad"; exit 1; }
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP_PATH"
+          code=0
+          bash totus_APP/scripts/ci/run-maestro.sh ipad app.totus.club "$PWD/qa-out/ipad" "$UDID" || code=$?
+          xcrun simctl shutdown "$UDID" || true
+          exit $code
+
+      - name: Итог, если до теста не дошло
+        if: always()
+        run: |
+          for p in iphone ipad; do
+            node totus_APP/scripts/ci/ensure-result.mjs "qa-out/$p" build_failed "Сборка iOS не прошла" "$LOG"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-iphone
+          path: qa-out/iphone
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-ipad
+          path: qa-out/ipad
+          retention-days: 14
+
+      - name: Красный статус, если тест упал
+        if: steps.iphone.outcome == 'failure' || steps.ipad.outcome == 'failure'
+        run: exit 1
+
+  report:
+    name: Отчёт в issue
+    needs: [android, ios]
+    if: always() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # ветка qa-screenshots
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: totus_APP
+          sparse-checkout: scripts/ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: qa-*
+          path: qa-artifacts
+
+      - name: Скриншоты в ветку qa-screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash totus_APP/scripts/ci/publish-shots.sh qa-artifacts
+
+      - name: Обновить issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const report = require('./totus_APP/scripts/ci/report-issue.cjs');
+            await report({ github, context, core });
