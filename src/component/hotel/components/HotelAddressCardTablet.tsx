@@ -4,6 +4,7 @@ import { AppButton, AppText } from '../../UI';
 import type { HotelInfo } from '../../UI';
 import type { ApiHotelData } from '../../../types/hotel';
 import { useTheme } from '../../../hooks/useTheme';
+import TotusIconByKey from '../../UI/icons/totus/TotusIconByKey';
 
 /**
  * iPad only: address block that sits under the price/search column on the
@@ -52,7 +53,10 @@ const HotelAddressCardTablet: React.FC<Props> = ({ hotel, apiHotelData }) => {
         { backgroundColor: theme.cardBackground, borderColor: theme.border },
       ]}>
       <AppText style={[styles.title, { color: theme.text }]}>Расположение</AppText>
-      <AppText style={[styles.address, { color: theme.textSecondary }]}>{address}</AppText>
+      <View style={styles.addressRow}>
+        <TotusIconByKey name="pin" size={16} color={theme.textSecondary} />
+        <AppText style={[styles.address, styles.addressText, { color: theme.textSecondary }]}>{address}</AppText>
+      </View>
       {mapsUrl ? (
         <AppButton title="Показать на карте" type="outline" size="sm" onPress={openMap} />
       ) : null}
@@ -61,6 +65,14 @@ const HotelAddressCardTablet: React.FC<Props> = ({ hotel, apiHotelData }) => {
 };
 
 const styles = StyleSheet.create({
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  addressText: {
+    flexShrink: 1,
+  },
   card: {
     borderRadius: 24,
     borderWidth: 1,

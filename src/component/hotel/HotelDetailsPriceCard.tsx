@@ -17,6 +17,8 @@ import {
   getOfferPriceValue,
 } from '../../utils/hotelUtils/roomHelpers';
 import { getOfferPriceTitle } from '../../utils/bookingFlowUtils';
+import TotusIconByKey from '../UI/icons/totus/TotusIconByKey';
+import { mealIcon } from '../UI/icons/totus/ltIcons';
 
 type HotelDetailsPriceCardProps = {
   rooms: HotelRoom[];
@@ -190,8 +192,16 @@ const HotelDetailsPriceCard: React.FC<HotelDetailsPriceCardProps> = ({
     enrichedPick,
     listMatched?.room?.room?.name_ru,
   );
+  // Иконка питания у строки «номер · питание»: один код — своя, несколько — общая.
+  const mealCodes = String(enrichedPick?.mealId || '')
+    .split(',')
+    .map(code => code.trim())
+    .filter(Boolean);
+  const roomOfferMealIcon =
+    mealCodes.length === 1 ? mealIcon(mealCodes[0]) : mealCodes.length > 1 ? 'meal-other' : null;
 
-  const dateLine = useMemo(() => {
+  // Дата и ночи — отдельными частями, у каждой своя иконка (календарь, луна), как на сайте.
+  const dateParts = useMemo(() => {
     const dateStr = formatStartDateRu(
       highlightOffer?.start_date ||
         enrichedPick?.startDate ||
@@ -201,7 +211,7 @@ const HotelDetailsPriceCard: React.FC<HotelDetailsPriceCardProps> = ({
     const nightsStr = formatNightsLabel(
       highlightOffer?.nights_count ?? searchNights,
     );
-    return [dateStr, nightsStr].filter(Boolean).join(', ');
+    return { dateStr, nightsStr };
   }, [
     highlightOffer?.start_date,
     highlightOffer?.nights_count,
@@ -278,26 +288,50 @@ const HotelDetailsPriceCard: React.FC<HotelDetailsPriceCardProps> = ({
                 {getOfferPriceTitle(searchType)}
               </AppText>
               {roomOfferLabel ? (
-                <AppText
-                  style={[
-                    styles.meta,
-                    embedded && styles.compactMeta,
-                    { color: theme.textTertiary },
-                  ]}
-                  numberOfLines={1}>
-                  {roomOfferLabel}
-                </AppText>
+                <View style={styles.metaRow}>
+                  {roomOfferMealIcon ? (
+                    <TotusIconByKey name={roomOfferMealIcon} size={embedded ? 12 : 14} color={theme.textTertiary} />
+                  ) : null}
+                  <AppText
+                    style={[
+                      styles.meta,
+                      embedded && styles.compactMeta,
+                      styles.metaText,
+                      { color: theme.textTertiary },
+                    ]}
+                    numberOfLines={1}>
+                    {roomOfferLabel}
+                  </AppText>
+                </View>
               ) : null}
-              {dateLine ? (
-                <AppText
-                  style={[
-                    styles.meta,
-                    embedded && styles.compactMeta,
-                    { color: theme.textTertiary },
-                  ]}
-                  numberOfLines={1}>
-                  {dateLine}
-                </AppText>
+              {dateParts.dateStr || dateParts.nightsStr ? (
+                <View style={styles.metaRow}>
+                  {dateParts.dateStr ? (
+                    <>
+                      <TotusIconByKey name="calendar" size={embedded ? 12 : 14} color={theme.textTertiary} />
+                      <AppText
+                        style={[styles.meta, embedded && styles.compactMeta, { color: theme.textTertiary }]}
+                        numberOfLines={1}>
+                        {dateParts.dateStr}
+                      </AppText>
+                    </>
+                  ) : null}
+                  {dateParts.nightsStr ? (
+                    <>
+                      <TotusIconByKey
+                        name="nights"
+                        size={embedded ? 12 : 14}
+                        color={theme.textTertiary}
+                        style={dateParts.dateStr ? styles.metaGap : undefined}
+                      />
+                      <AppText
+                        style={[styles.meta, embedded && styles.compactMeta, { color: theme.textTertiary }]}
+                        numberOfLines={1}>
+                        {dateParts.nightsStr}
+                      </AppText>
+                    </>
+                  ) : null}
+                </View>
               ) : null}
             </>
           )}
@@ -315,6 +349,17 @@ const HotelDetailsPriceCard: React.FC<HotelDetailsPriceCardProps> = ({
 };
 
 const styles = StyleSheet.create({
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    flexShrink: 1,
+  },
+  metaGap: {
+    marginLeft: 4,
+  },
   card: {
     marginHorizontal: 8,
     marginTop: 12,

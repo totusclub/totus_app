@@ -18,6 +18,50 @@ import { getAiPriceChangeLabel } from '../../../utils/hotelUtils/aiRoomPick';
 
 import type { HotelInfo as HotelCardInfo } from '../../../types/hotel/hotelCard';
 import { FONT_HEADING } from '../../../theme/fonts';
+import TotusIconByKey from '../icons/totus/TotusIconByKey';
+import type { TotusIconKey } from '../icons/totus/registry.generated';
+
+/*
+ * Иконки набора Totus для строк карточки (как на сайте). Теги и особенности номера приходят
+ * готовыми строками (ResultList.transformHotel, useRoomTransformers.getRoomFeatures),
+ * поэтому иконка подбирается по тексту; нет совпадения — тег без иконки.
+ */
+const tagIcon = (tag: string): TotusIconKey | undefined => {
+  const t = tag.toLowerCase();
+  if (t.includes('линия')) return 'line';
+  if (t.includes('до пляжа')) return 'to-sea';
+  if (t.includes('до аэропорта')) return 'to-airport';
+  if (t.includes('до центра')) return 'to-center';
+  if (/до подъ[её]мника/.test(t)) return 'ski-lift';
+  if (t.includes('wi-fi')) return t.includes('платн') ? 'wifi-paid' : t.includes('без') ? 'wifi-none' : 'wifi-free';
+  if (t.includes('песок с галькой')) return 'surface-mixed';
+  if (t === 'песок') return 'surface-sand';
+  if (t === 'галька') return 'surface-pebble';
+  if (t === 'платформа') return 'surface-platform';
+  if (t === 'бетон') return 'surface-concrete';
+  if (t === 'коралл') return 'surface-coral';
+  if (t === 'скалы') return 'surface-rocks';
+  return undefined;
+};
+const mealLabelIcon = (label: string): TotusIconKey => {
+  const t = label.toLowerCase();
+  if (t.includes(',') && !t.includes('завтрак, обед, ужин')) return 'meal-other';
+  if (t.includes('ультра') || t.includes('премиум')) return 'meal-uai';
+  if (/вс[её] включено/.test(t)) return 'meal-ai';
+  if (t.includes('завтрак, обед, ужин') || t.includes('полный пансион')) return 'meal-full';
+  if (t.includes('завтрак и ужин') || t.includes('полупансион')) return 'meal-half';
+  if (t.includes('без питания')) return 'meal-none';
+  if (t.includes('завтрак')) return 'meal-breakfast';
+  if (t.includes('ужин')) return 'meal-dinner';
+  if (t.includes('обед')) return 'meal-lunch';
+  return 'meal-other';
+};
+/** Особенность номера: «Быстрое подтверждение», питание или туроператоры. */
+const roomFeatureIcon = (feature: string): TotusIconKey => {
+  if (feature === 'Быстрое подтверждение') return 'instant';
+  if (/завтрак|обед|ужин|включено|питани|пансион/i.test(feature)) return mealLabelIcon(feature);
+  return 'operator';
+};
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -346,7 +390,7 @@ const HotelCard: React.FC<HotelCardProps> = ({
                     <View style={styles.featuresContainer}>
                         {roomFeatures.map((feature, index) => (
                             <View key={`feature-${index}`} style={styles.featureItem}>
-                                <AppIcon name="checkmark" size={16} color={theme.text} />
+                                <TotusIconByKey name={roomFeatureIcon(feature)} size={16} color={theme.text} />
                                 <AppText style={[styles.featureText, { color: theme.text }]}>{feature}</AppText>
                             </View>
                         ))}
@@ -392,15 +436,19 @@ const HotelCard: React.FC<HotelCardProps> = ({
                         )}
 
                         {showAddress && (
-                            <AppText style={[styles.address, { color: theme.textTertiary }]}>
-                                {hotel.address || 'Адрес не указан'}
-                            </AppText>
+                            <View style={styles.addressRow}>
+                                <TotusIconByKey name="pin" size={14} color={theme.textTertiary} />
+                                <AppText style={[styles.address, styles.addressText, { color: theme.textTertiary }]}>
+                                    {hotel.address || 'Адрес не указан'}
+                                </AppText>
+                            </View>
                         )}
 
                         {showTags && (
                             <View style={[styles.tagsContainer, equalHeight && styles.tagsContainerEqualHeight]}>
                                 {hotel.tags.map((tag, index) => (
                                     <View key={`${hotel.id}-${tag}`} style={[styles.tag, { backgroundColor: theme.backgroundTertiary }]}>
+                                        {tagIcon(tag) ? <TotusIconByKey name={tagIcon(tag)!} size={14} color={theme.text} /> : null}
                                         <AppText style={[styles.tagText, { color: theme.text }, equalHeight ? styles.tagTextEqualHeight : {}]}>{tag}</AppText>
                                     </View>
                                 ))}
@@ -450,15 +498,19 @@ const HotelCard: React.FC<HotelCardProps> = ({
                         {isRoomCard && <AppText style={styles.hotelName}>{hotel.name}</AppText>}
 
                         {showAddress && (
-                            <AppText style={[styles.address, { color: theme.textTertiary }]}>
-                                {hotel.address || 'Адрес не указан'}
-                            </AppText>
+                            <View style={styles.addressRow}>
+                                <TotusIconByKey name="pin" size={14} color={theme.textTertiary} />
+                                <AppText style={[styles.address, styles.addressText, { color: theme.textTertiary }]}>
+                                    {hotel.address || 'Адрес не указан'}
+                                </AppText>
+                            </View>
                         )}
 
                         {showTags && (
                             <View style={styles.tagsContainer}>
                                 {hotel.tags.map((tag, index) => (
                                     <View key={`${hotel.id}-${tag}`} style={[styles.tag, { backgroundColor: theme.backgroundTertiary }]}>
+                                        {tagIcon(tag) ? <TotusIconByKey name={tagIcon(tag)!} size={14} color={theme.text} /> : null}
                                         <AppText style={[styles.tagText, { color: theme.text }]}>{tag}</AppText>
                                     </View>
                                 ))}
@@ -660,7 +712,7 @@ const HotelCard: React.FC<HotelCardProps> = ({
                     <View style={styles.featuresContainer}>
                         {roomFeatures.map((feature, index) => (
                             <View key={`feature-${index}`} style={styles.featureItem}>
-                                <AppIcon name="checkmark" size={16} color={theme.text} />
+                                <TotusIconByKey name={roomFeatureIcon(feature)} size={16} color={theme.text} />
                                 <AppText style={[styles.featureText, { color: theme.text }]}>{feature}</AppText>
                             </View>
                         ))}
@@ -701,15 +753,19 @@ const HotelCard: React.FC<HotelCardProps> = ({
                         )}
 
                         {showAddress && (
-                            <AppText style={[styles.address, { color: theme.textTertiary }]}>
-                                {hotel.address || 'Адрес не указан'}
-                            </AppText>
+                            <View style={styles.addressRow}>
+                                <TotusIconByKey name="pin" size={14} color={theme.textTertiary} />
+                                <AppText style={[styles.address, styles.addressText, { color: theme.textTertiary }]}>
+                                    {hotel.address || 'Адрес не указан'}
+                                </AppText>
+                            </View>
                         )}
 
                         {showTags && (
                             <View style={styles.tagsContainer}>
                                 {hotel.tags.map((tag, index) => (
                                     <View key={`${hotel.id}-${tag}`} style={[styles.tag, { backgroundColor: theme.backgroundTertiary }]}>
+                                        {tagIcon(tag) ? <TotusIconByKey name={tagIcon(tag)!} size={14} color={theme.text} /> : null}
                                         <AppText style={[styles.tagText, { color: theme.text }]}>{tag}</AppText>
                                     </View>
                                 ))}
@@ -758,15 +814,19 @@ const HotelCard: React.FC<HotelCardProps> = ({
 
 
                         {showAddress && (
-                            <AppText style={[styles.address, { color: theme.textTertiary }]}>
-                                {hotel.address || 'Адрес не указан'}
-                            </AppText>
+                            <View style={styles.addressRow}>
+                                <TotusIconByKey name="pin" size={14} color={theme.textTertiary} />
+                                <AppText style={[styles.address, styles.addressText, { color: theme.textTertiary }]}>
+                                    {hotel.address || 'Адрес не указан'}
+                                </AppText>
+                            </View>
                         )}
 
                         {showTags && (
                             <View style={styles.tagsContainer}>
                                 {hotel.tags.map((tag, index) => (
                                     <View key={`${hotel.id}-${tag}`} style={[styles.tag, { backgroundColor: theme.backgroundTertiary }]}>
+                                        {tagIcon(tag) ? <TotusIconByKey name={tagIcon(tag)!} size={14} color={theme.text} /> : null}
                                         <AppText style={[styles.tagText, { color: theme.text }]}>{tag}</AppText>
                                     </View>
                                 ))}
@@ -948,12 +1008,23 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         lineHeight: 18,
     },
+    addressRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    addressText: {
+        flexShrink: 1,
+    },
     tagsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 8,
     },
     tag: {
+        flexDirection: 'row', // иконка Totus 14px + подпись
+        alignItems: 'center',
+        gap: 4,
         borderRadius: 16,
         paddingHorizontal: 12,
         paddingVertical: 6,

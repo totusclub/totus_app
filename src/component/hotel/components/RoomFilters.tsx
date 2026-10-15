@@ -24,6 +24,8 @@ import {
   type HotelRoomFilters,
   type RoomFilterOption,
 } from '../../../utils/hotelUtils/roomFilters';
+import TotusIconByKey from '../../UI/icons/totus/TotusIconByKey';
+import type { TotusIconKey } from '../../UI/icons/totus/registry.generated';
 
 type RoomFiltersProps = {
   filters: HotelRoomFilters | null;
@@ -135,15 +137,20 @@ function FilterOptionRow({
 
 type FilterSectionProps = {
   title: string;
+  /** Иконка группы (набор Totus) — как у фильтров номеров на сайте. */
+  icon?: TotusIconKey;
   children: React.ReactNode;
 };
 
-function FilterSection({ title, children }: FilterSectionProps) {
+function FilterSection({ title, icon, children }: FilterSectionProps) {
   const { theme } = useTheme();
 
   return (
     <View style={[styles.section, { borderBottomColor: theme.borderLight }]}>
-      <AppText style={[styles.sectionTitle, { color: theme.text }]}>{title}</AppText>
+      <View style={styles.sectionTitleRow}>
+        {icon ? <TotusIconByKey name={icon} size={18} color={theme.text} /> : null}
+        <AppText style={[styles.sectionTitle, styles.sectionTitleText, { color: theme.text }]}>{title}</AppText>
+      </View>
       {children}
     </View>
   );
@@ -313,7 +320,7 @@ const RoomFilters: React.FC<RoomFiltersProps> = ({
             bounces
           >
             {hasMeals && draftFilters?.meals ? (
-              <FilterSection title="Питание">
+              <FilterSection title="Питание" icon="meal-ai">
                 {draftFilters.meals.map((meal) => (
                   <FilterOptionRow
                     key={String(meal.id)}
@@ -332,7 +339,7 @@ const RoomFilters: React.FC<RoomFiltersProps> = ({
             ) : null}
 
             {hasFreeCancel && draftFilters?.free_cancel ? (
-              <FilterSection title="Отмена">
+              <FilterSection title="Отмена" icon="free-cancel">
                 {draftFilters.free_cancel.map((item) => (
                   <FilterOptionRow
                     key={String(item.id)}
@@ -351,7 +358,7 @@ const RoomFilters: React.FC<RoomFiltersProps> = ({
             ) : null}
 
             {hasConfirmability && draftFilters?.confirmability ? (
-              <FilterSection title="Подтверждение">
+              <FilterSection title="Подтверждение" icon="instant">
                 {draftFilters.confirmability.map((item) => (
                   <FilterOptionRow
                     key={String(item.id)}
@@ -373,7 +380,7 @@ const RoomFilters: React.FC<RoomFiltersProps> = ({
             ) : null}
 
             {hasOperators && draftFilters?.operators ? (
-              <FilterSection title="Туроператор">
+              <FilterSection title="Туроператор" icon="operator">
                 {draftFilters.operators.map((operator) => (
                   <FilterOptionRow
                     key={String(operator.id)}
@@ -502,6 +509,15 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     marginBottom: 8,
     borderBottomWidth: 1,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  sectionTitleText: {
+    marginBottom: 0,
   },
   sectionTitle: {
     fontSize: 16,

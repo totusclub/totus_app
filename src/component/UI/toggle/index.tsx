@@ -2,19 +2,26 @@ import React from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import AppText from '../text';
 import { useTheme } from '../../../hooks/useTheme';
+import TotusIconByKey from '../icons/totus/TotusIconByKey';
+import type { TotusIconKey } from '../icons/totus/registry.generated';
 
 type ToggleProps = {
   label: string;
   value: boolean;
   onToggle: () => void;
+  /** Иконка слева от подписи (набор Totus). */
+  icon?: TotusIconKey;
 };
 
-const Toggle: React.FC<ToggleProps> = ({ label, value, onToggle }) => {
+const Toggle: React.FC<ToggleProps> = ({ label, value, onToggle, icon }) => {
   const { theme } = useTheme();
 
   return (
     <View style={styles.toggleRow}>
-      <AppText style={[styles.toggleLabel, { color: theme.text }]}>{label}</AppText>
+      <View style={styles.toggleLabelRow}>
+        {icon ? <TotusIconByKey name={icon} size={20} color={theme.text} /> : null}
+        <AppText style={[styles.toggleLabel, { color: theme.text }]}>{label}</AppText>
+      </View>
       <TouchableOpacity
         style={[
           styles.toggleSwitch,
@@ -41,6 +48,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  toggleLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
   },
   toggleLabel: {
     fontSize: 16,

@@ -2,12 +2,16 @@ import React from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import AppText from '../text';
 import { useTheme } from '../../../hooks/useTheme';
+import TotusIconByKey from '../icons/totus/TotusIconByKey';
+import type { TotusIconKey } from '../icons/totus/registry.generated';
 
 type ChipOption<T = string | number> = {
   label: string;
   value: T;
   meta?: string;
   disabled?: boolean;
+  /** Иконка варианта (набор Totus) — питание, тип размещения, пляж… */
+  icon?: TotusIconKey | null;
 };
 
 type ChipsProps<T = string | number> = {
@@ -29,6 +33,7 @@ const Chips = <T extends string | number = string | number>({
           typeof option === 'string' ? (option as T) : (option.value as T);
         const optionLabel = typeof option === 'string' ? option : option.label;
         const optionMeta = typeof option === 'string' ? undefined : option.meta;
+        const optionIcon = typeof option === 'string' ? undefined : option.icon;
         const disabled =
           typeof option === 'string' ? false : Boolean(option.disabled);
         const isSelected = selected.some(
@@ -55,14 +60,24 @@ const Chips = <T extends string | number = string | number>({
             onPress={() => {
               if (!disabled) onToggle(optionValue);
             }}>
-            <AppText
-              style={[
-                styles.chipText,
-                { color: theme.text },
-                ...(isSelected ? [styles.chipTextSelected] : []),
-              ]}>
-              {optionLabel}
-            </AppText>
+            <View style={styles.chipLabelRow}>
+              {optionIcon ? (
+                <TotusIconByKey
+                  name={optionIcon}
+                  size={16}
+                  color={isSelected ? '#FFFFFF' : theme.text}
+                  accent={!isSelected}
+                />
+              ) : null}
+              <AppText
+                style={[
+                  styles.chipText,
+                  { color: theme.text },
+                  ...(isSelected ? [styles.chipTextSelected] : []),
+                ]}>
+                {optionLabel}
+              </AppText>
+            </View>
             {optionMeta ? (
               <AppText
                 style={[
@@ -96,6 +111,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     maxWidth: '100%',
     alignItems: 'flex-start',
+  },
+  chipLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
   },
   chipText: {
     fontSize: 14,

@@ -5,6 +5,7 @@ import { HotelInfo } from '../UI';
 import ExpandableSectionsList from './ExpandableSectionsList';
 import type { ExpandableSection, ApiHotelData } from '../../types/hotel';
 import { useTheme } from '../../hooks/useTheme';
+import TotusIconByKey from '../UI/icons/totus/TotusIconByKey';
 
 // Re-export ApiHotelData for backward compatibility
 export type { ApiHotelData };
@@ -39,7 +40,10 @@ const HotelDescriptionCard: React.FC<HotelDescriptionCardProps> = ({
   return (
     <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <AppText style={[styles.title, { color: theme.text }]}>Описание</AppText>
+        <View style={styles.titleRow}>
+          <TotusIconByKey name="sec-general" size={20} color={theme.text} />
+          <AppText style={[styles.title, { color: theme.text }]}>Описание</AppText>
+        </View>
       </View>
 
       {description && (
@@ -61,6 +65,11 @@ const HotelDescriptionCard: React.FC<HotelDescriptionCardProps> = ({
 export default HotelDescriptionCard;
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   card: {
     borderRadius: 24,
     padding: 16,
