@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import module from 'node:module';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
@@ -56,6 +57,67 @@ const WEB_ISO2 = [
   'RU', 'SA', 'SC', 'SG', 'TH', 'TJ', 'TN', 'TR', 'TZ', 'UZ', 'VE', 'VN',
 ];
 
+// sha256 (первые 16 знаков) WebP внутри totus_WEB public/countries/<ISO2>.svg — картинки байт в байт как на сайте
+const WEB_SHA256 = {
+  AB: 'a2f6904d522b5cad',
+  AE: 'aa11b04d60601098',
+  AL: 'e10e9ce951893f53',
+  AM: '864cf4cbfc8c3824',
+  AZ: '29139a3d6d44243c',
+  BG: '882343d4db672708',
+  BH: '617470f52bdf39e3',
+  BY: '40b7c819d08b529f',
+  CN: 'f1d1111dc7bc0a2e',
+  CU: 'f5716376825e9ab9',
+  CY: 'd17ed55fbc0e7781',
+  CZ: '2a205e578cf07f3a',
+  DO: '78ca60b43e00d51a',
+  EG: '61dc0ad0d76d4563',
+  ES: '796641e2ab1f7a86',
+  FI: 'e2353630084be737',
+  FR: 'd9fee055d390080a',
+  GE: '2522a556ece3d77b',
+  GR: '4b0afc5e795817f9',
+  HK: '91c42a75432e1f3c',
+  HR: 'c7445f253f3977e7',
+  HU: '7a1aab927ade3a85',
+  ID: 'c2d124d78fe1eda1',
+  IL: '22807c6908c450ce',
+  IN: 'e2e5e5e62cd67268',
+  IT: '16fb02622e81b1cd',
+  JO: '25a7411a3c890d42',
+  JP: '5c0d52bd7f840967',
+  KG: '2a05c79380cb24f4',
+  KR: '34584c2477d176e8',
+  KZ: '0670ee5af6742c76',
+  LK: 'd690388695392f28',
+  MA: '98b1d9029a145b7b',
+  ME: 'e26fab9c82854eff',
+  MT: '90a9ff2126aa4526',
+  MU: 'b7a75d3912dc7ae3',
+  MV: 'b56443b63e957e75',
+  MX: '763388d6139d8c87',
+  MY: 'a92d11b9a8cb6952',
+  NO: '15c65c1b6453443e',
+  OM: 'a13d97af027bc8d0',
+  PH: 'ef2c7ca09966d0ea',
+  PT: 'b103449fdca898a5',
+  QA: '9cb468c403c8d445',
+  RS: 'fd2d6605a70984f8',
+  RU: '11862239b7e9580f',
+  SA: 'bf0b34e998702ea4',
+  SC: 'e93b65dd7903777c',
+  SG: '23b5c12bc4952c12',
+  TH: 'fe3f76cd36288d2a',
+  TJ: 'fb0c4fc203518b23',
+  TN: 'b7fe7362d0ea2d28',
+  TR: '66043df046b532e1',
+  TZ: '3f9388efffd64f2c',
+  UZ: 'c6203827d5e798a8',
+  VE: 'd594cd46c43d9c1d',
+  VN: '65d2d97cb0a9e2a8',
+};
+
 function webpSize(buf) {
   // RIFF....WEBPVP8 (lossy): width/height are 14-bit little-endian at 26/28
   assert.equal(buf.toString('ascii', 0, 4), 'RIFF');
@@ -74,13 +136,15 @@ out('Country images (same as the website)');
 check('57 images, the same ISO2 set as the website', () => {
   assert.deepEqual(Object.keys(data.COUNTRY_IMAGE_DATA).sort(), [...WEB_ISO2].sort());
 });
-check('each image is a WebP 80×80 data: address, total < 150 KB', () => {
+check('each image is the website WebP byte for byte (80×80, sha256), total < 150 KB', () => {
   let total = 0;
   for (const [code, uri] of Object.entries(data.COUNTRY_IMAGE_DATA)) {
     const m = /^data:image\/webp;base64,([A-Za-z0-9+/=]+)$/.exec(uri);
     assert.ok(m, `${code}: not a WebP data: address`);
     const buf = Buffer.from(m[1], 'base64');
     assert.deepEqual(webpSize(buf), [80, 80], `${code}: not 80×80`);
+    assert.equal(buf.readUInt32LE(4) + 8, buf.length, `${code}: WebP cut or padded`);
+    assert.equal(crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16), WEB_SHA256[code], `${code}: not the website image`);
     assert.ok(buf.length < 4096, `${code}: ${buf.length} bytes`);
     total += buf.length;
   }
