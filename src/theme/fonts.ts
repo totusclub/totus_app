@@ -15,11 +15,12 @@ import { StyleProp, StyleSheet, TextStyle } from 'react-native';
  *
  * Соответствие начертаний как на сайте и на утверждённой доске Figma:
  *   fontWeight 100–399 → 300, 400–599 (основной текст) → 500, 600–799 и 'bold' → 700, 800+ → 900.
- * Знаков ₽ и стрелок в этих шрифтах нет — iOS и Android берут их из системного шрифта сами.
+ * Знаков ₽, стрелок и дефисов U+2010/U+2011 в этих шрифтах нет — как на сайте, они берутся из
+ * «Totus Symbols» (FONT_SYMBOLS): AppText / FontText выделяют такие знаки во вложенный текст.
  */
-import { FONT_HEADING, FONT_TEXT } from './fontNames';
+import { FONT_HEADING, FONT_SYMBOLS, FONT_TEXT } from './fontNames';
 
-export { FONT_HEADING, FONT_TEXT };
+export { FONT_HEADING, FONT_SYMBOLS, FONT_TEXT };
 
 /** Старые и «пустые» имена, которые означают основной текстовый шрифт приложения. */
 const TEXT_FAMILY_ALIASES = new Set<string>([
@@ -48,6 +49,24 @@ export function textFontFamily(weight?: TextStyle['fontWeight']): string {
   return FONT_TEXT.black;
 }
 
+/**
+ * Знаки, которых нет в самом шрифте (сверено по cmap файлов — scripts/check-app-fonts.mjs).
+ * Museo: ‐ ‑ ₽ ← ↑ → ↓ ↖ ↗ ↘ ↙; Forum — то же и ¹ ² ³. Остальное (★, эмодзи) — системный шрифт, как в браузере.
+ */
+export const SYMBOLS_NOT_IN_TEXT = /[\u2010\u2011\u20BD\u2190-\u2193\u2196-\u2199]+/g;
+export const SYMBOLS_NOT_IN_HEADING = /[\u00B2\u00B3\u00B9\u2010\u2011\u20BD\u2190-\u2193\u2196-\u2199]+/g;
+
+/** Файл «Totus Symbols» для начертания: как на сайте, ₽ 100–399 → 300, 400–599 → 500, 600+ → 700. */
+export function symbolsFontFamily(weight?: TextStyle['fontWeight']): string {
+  const w = weightNumber(weight);
+  if (w < 400) return FONT_SYMBOLS.light;
+  if (w < 600) return FONT_SYMBOLS.regular;
+  return FONT_SYMBOLS.bold;
+}
+
+/** Каким шрифтом и какие знаки набирать отдельно (null — шрифт не наш, ничего не выделяем). */
+export type AppSymbols = { family: string; pattern: RegExp } | null;
+
 /** Шрифт родительского текста — для вложенных текстов без своего fontWeight / fontFamily. */
 export type InheritedFont = { weight?: TextStyle['fontWeight']; heading?: boolean };
 
@@ -61,7 +80,7 @@ export type InheritedFont = { weight?: TextStyle['fontWeight']; heading?: boolea
 export function resolveAppFont<T extends TextStyle>(
   style: StyleProp<T>,
   inherited?: InheritedFont,
-): { style: StyleProp<T>; inherited: InheritedFont } {
+): { style: StyleProp<T>; inherited: InheritedFont; symbols: AppSymbols } {
   const flat = (StyleSheet.flatten(style) || {}) as TextStyle;
   const weight = flat.fontWeight ?? inherited?.weight;
   const family = flat.fontFamily ?? (inherited?.heading ? FONT_HEADING : undefined);
@@ -70,15 +89,18 @@ export function resolveAppFont<T extends TextStyle>(
     return {
       style: [style, { fontFamily: FONT_HEADING, fontWeight: 'normal', letterSpacing: ls } as T],
       inherited: { weight, heading: true },
+      // у заголовков на сайте font-weight 400 → знаки начертанием 500
+      symbols: { family: symbolsFontFamily(400), pattern: SYMBOLS_NOT_IN_HEADING },
     };
   }
   if (family === undefined || TEXT_FAMILY_ALIASES.has(family)) {
     return {
       style: [style, { fontFamily: textFontFamily(weight), fontWeight: 'normal' } as T],
       inherited: { weight, heading: false },
+      symbols: { family: symbolsFontFamily(weight), pattern: SYMBOLS_NOT_IN_TEXT },
     };
   }
-  return { style, inherited: { weight, heading: false } };
+  return { style, inherited: { weight, heading: false }, symbols: null };
 }
 
 export function withAppFont<T extends TextStyle>(style: StyleProp<T>, inherited?: InheritedFont): StyleProp<T> {

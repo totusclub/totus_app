@@ -68,6 +68,9 @@
 		<string>MuseoSansCyrl-700.ttf</string>
 		<string>MuseoSansCyrl-900.ttf</string>
 		<string>Forum.ttf</string>
+		<string>TotusSymbols-300.ttf</string>
+		<string>TotusSymbols-500.ttf</string>
+		<string>TotusSymbols-700.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

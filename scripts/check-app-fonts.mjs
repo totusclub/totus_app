@@ -1,4 +1,5 @@
-// Шрифты приложения: Museo Sans Cyrl — весь текст, Forum — заголовки и названия отелей (как на сайте, totus_WEB #69).
+// Шрифты приложения как на сайте: Museo Sans Cyrl — весь текст, Forum — заголовки и названия отелей (totus_WEB #69),
+// «Totus Symbols» — ₽ сайта, стрелки и дефисы, которых нет в Museo и Forum (totus_WEB #70).
 // Запуск: node scripts/check-app-fonts.mjs (без npm install).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,6 +25,8 @@ function check(name, fn) {
 
 const FONT_DIRS = ['assets/fonts', 'ios/fonts', 'android/app/src/main/assets/fonts'];
 const FONTS = ['MuseoSansCyrl-300', 'MuseoSansCyrl-500', 'MuseoSansCyrl-700', 'MuseoSansCyrl-900', 'Forum'];
+const SYMBOL_FONTS = ['TotusSymbols-300', 'TotusSymbols-500', 'TotusSymbols-700'];
+const ALL_FONTS = [...FONTS, ...SYMBOL_FONTS];
 
 // --- разбор TTF: таблицы name (PostScript-имя) и cmap (какие символы есть) ---
 function tables(buf) {
@@ -73,8 +76,8 @@ function codepoints(buf) {
 
 console.log('Шрифты приложения');
 
-check('файлы Museo (300/500/700/900) и Forum лежат во всех трёх папках и одинаковые', () => {
-  for (const f of FONTS) {
+check('файлы Museo (300/500/700/900), Forum и Totus Symbols (300/500/700) лежат во всех трёх папках и одинаковые', () => {
+  for (const f of ALL_FONTS) {
     const bufs = FONT_DIRS.map((d) => {
       const p = path.join(root, d, `${f}.ttf`);
       assert.ok(fs.existsSync(p), `нет ${d}/${f}.ttf`);
@@ -85,7 +88,7 @@ check('файлы Museo (300/500/700/900) и Forum лежат во всех тр
 });
 
 check('PostScript-имя внутри файла = имя файла (одно fontFamily для iOS и Android)', () => {
-  for (const f of FONTS) assert.equal(postScriptName(fs.readFileSync(path.join(root, 'assets/fonts', `${f}.ttf`))), f);
+  for (const f of ALL_FONTS) assert.equal(postScriptName(fs.readFileSync(path.join(root, 'assets/fonts', `${f}.ttf`))), f);
 });
 
 check('в шрифтах есть вся кириллица (А–я, Ё, ё) и латиница, цифры, знаки препинания', () => {
@@ -104,7 +107,7 @@ check('в шрифтах есть вся кириллица (А–я, Ё, ё) и
 check('iOS: шрифты перечислены в Info.plist → UIAppFonts (Golos оставлен)', () => {
   const plist = read('ios/totusClubApp/Info.plist');
   const arr = plist.match(/<key>UIAppFonts<\/key>\s*<array>([\s\S]*?)<\/array>/)[1];
-  for (const f of FONTS) assert.match(arr, new RegExp(`<string>${f}\\.ttf</string>`));
+  for (const f of ALL_FONTS) assert.match(arr, new RegExp(`<string>${f}\\.ttf</string>`));
   assert.match(arr, /<string>GolosText-Regular\.ttf<\/string>/);
 });
 
@@ -144,6 +147,110 @@ check('тема (light/dark) и навигация: шрифты Museo, fontWeig
   assert.equal((nav.match(/fontWeight: '400'/g) || []).length >= 4, true);
 });
 
+// --- Totus Symbols ---
+const hex = (c) => 'U+' + c.toString(16).toUpperCase().padStart(4, '0');
+const cmapOf = (f) => codepoints(fs.readFileSync(path.join(root, 'assets/fonts', `${f}.ttf`)));
+const patternSet = (name) => {
+  const m = fontsTs.match(new RegExp(`export const ${name} = /\\[([^\\]]+)\\]\\+/g;`));
+  assert.ok(m, `нет ${name}`);
+  const set = new Set();
+  const body = m[1].replace(/\\u([0-9A-Fa-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  for (let i = 0; i < body.length; i++) {
+    if (body[i + 1] === '-' && body[i + 2]) {
+      for (let c = body.charCodeAt(i); c <= body.charCodeAt(i + 2); c++) set.add(c);
+      i += 2;
+    } else set.add(body.charCodeAt(i));
+  }
+  return set;
+};
+const sortHex = (set) => [...set].sort((a, b) => a - b).map(hex);
+
+check('Totus Symbols: ₽, стрелки ← ↑ → ↓ ↖ ↗ ↘ ↙, дефисы U+2010/2011, ¹ ² ³ — в каждом начертании', () => {
+  const need = [0x20bd, 0x2010, 0x2011, 0xb9, 0xb2, 0xb3, 0x2190, 0x2191, 0x2192, 0x2193, 0x2196, 0x2197, 0x2198, 0x2199];
+  for (const f of SYMBOL_FONTS) {
+    const cps = cmapOf(f);
+    assert.deepEqual(need.filter((c) => !cps.has(c)).map(hex), [], f);
+  }
+});
+
+check('выделяются ровно те знаки Totus Symbols, которых нет в Museo (текст) и Forum (заголовки)', () => {
+  const sym = cmapOf('TotusSymbols-500');
+  for (const [name, fonts] of [['SYMBOLS_NOT_IN_TEXT', FONTS.slice(0, 4)], ['SYMBOLS_NOT_IN_HEADING', ['Forum']]]) {
+    const missing = new Set();
+    for (const f of fonts) {
+      const cps = cmapOf(f);
+      for (const c of sym) if (!cps.has(c) && c > 0x20) missing.add(c);
+    }
+    assert.deepEqual(sortHex(patternSet(name)), sortHex(missing), name);
+  }
+});
+
+check('Totus Symbols: начертания как на сайте (₽ 300 / 500 / 700) и строка не выше, чем у Museo и Forum', () => {
+  assert.match(fontsTs, /light: 'TotusSymbols-300'/);
+  assert.match(fontsTs, /regular: 'TotusSymbols-500'/);
+  assert.match(fontsTs, /bold: 'TotusSymbols-700'/);
+  assert.match(fontsTs, /if \(w < 400\) return FONT_SYMBOLS\.light;/);
+  assert.match(fontsTs, /if \(w < 600\) return FONT_SYMBOLS\.regular;/);
+  assert.match(fontsTs, /return FONT_SYMBOLS\.bold;/);
+  assert.match(fontsTs, /symbols: \{ family: symbolsFontFamily\(400\), pattern: SYMBOLS_NOT_IN_HEADING \}/);
+  assert.match(fontsTs, /symbols: \{ family: symbolsFontFamily\(weight\), pattern: SYMBOLS_NOT_IN_TEXT \}/);
+  const hhea = (f) => {
+    const b = fs.readFileSync(path.join(root, 'assets/fonts', `${f}.ttf`));
+    const { off } = tables(b).hhea;
+    return [b.readInt16BE(off + 4), -b.readInt16BE(off + 6), b.readInt16BE(off + 8)];
+  };
+  const [asc, desc] = hhea('TotusSymbols-500');
+  for (const f of FONTS) {
+    const [a, d] = hhea(f);
+    assert.ok(asc <= a && desc <= d, `${f}: ${a}/${d}, символы ${asc}/${desc}`);
+  }
+  // ширина ₽ — как у знака сайта (scripts/ruble-glyph.json в totus_WEB: 630 / 650 / 670)
+  const adv = (f) => {
+    const b = fs.readFileSync(path.join(root, 'assets/fonts', `${f}.ttf`));
+    const t = tables(b);
+    const nH = b.readUInt16BE(t.hhea.off + 34);
+    // индекс глифа ₽ из cmap format 4
+    const { off } = t.cmap;
+    let gid = 0;
+    for (let i = 0; i < b.readUInt16BE(off + 2); i++) {
+      const r = off + 4 + i * 8;
+      const sub = off + b.readUInt32BE(r + 4);
+      if (b.readUInt16BE(r) !== 3 || b.readUInt16BE(sub) !== 4) continue;
+      const segX2 = b.readUInt16BE(sub + 6);
+      const ends = sub + 14, starts = ends + segX2 + 2, deltas = starts + segX2, ranges = deltas + segX2;
+      for (let s = 0; s < segX2 / 2; s++) {
+        const end = b.readUInt16BE(ends + s * 2), start = b.readUInt16BE(starts + s * 2);
+        if (0x20bd < start || 0x20bd > end) continue;
+        const delta = b.readInt16BE(deltas + s * 2), ro = b.readUInt16BE(ranges + s * 2);
+        gid = ro === 0 ? (0x20bd + delta) & 0xffff : b.readUInt16BE(ranges + s * 2 + ro + (0x20bd - start) * 2);
+      }
+    }
+    return b.readUInt16BE(t.hmtx.off + Math.min(gid, nH - 1) * 4);
+  };
+  assert.deepEqual(SYMBOL_FONTS.map(adv), [630, 650, 670]);
+});
+
+check('AppText и FontText выделяют знаки во вложенный Text со шрифтом Totus Symbols', () => {
+  const runs = code(read('src/component/UI/text/symbolRuns.tsx'));
+  assert.match(runs, /fontFamily: family, fontWeight: 'normal'/);
+  assert.match(runs, /new RegExp\(symbols\.pattern\.source, 'g'\)/);
+  for (const f of ['src/component/UI/text/index.tsx', 'src/component/UI/text/FontText.tsx']) {
+    assert.match(code(read(f)), /withSymbolRuns\(children, resolved\.symbols\)/, f);
+  }
+});
+
+check('Мила (@tosmedia/ai-assistant-native) получает Text / TextInput со шрифтами приложения через Metro', () => {
+  const metro = code(read('metro.config.js'));
+  assert.match(metro, /ai-assistant-native/);
+  assert.match(metro, /resolveRequest: \(context, moduleName, platform\) =>/);
+  assert.match(metro, /moduleName === 'react-native' && context\.originModulePath\.includes\(MILA_PACKAGE\)/);
+  assert.match(metro, /return context\.resolveRequest\(context, moduleName, platform\);/);
+  assert.match(metro, /src\/theme\/reactNativeWithAppFonts\.ts/);
+  const shim = code(read('src/theme/reactNativeWithAppFonts.ts'));
+  assert.match(shim, /export \* from 'react-native';/);
+  assert.match(shim, /export \{ FontText as Text, FontTextInput as TextInput \} from '\.\.\/component\/UI\/text\/FontText';/);
+});
+
 const walk = (dir) =>
   fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) =>
     e.isDirectory() ? walk(path.join(dir, e.name)) : /\.(tsx?|jsx?)$/.test(e.name) ? [path.join(dir, e.name)] : [],
@@ -157,7 +264,7 @@ check('нигде не осталось fontFamily «Golos Text»', () => {
 
 check('Text и TextInput из react-native берутся только в обёртках шрифта (кроме тестового VoIP-экрана)', () => {
   const allow = new Set(
-    ['src/component/UI/text/FontText.tsx', 'src/component/UI/text/index.tsx', 'src/component/test/VoIPTestScreen.tsx'].map(path.normalize),
+    ['src/component/UI/text/FontText.tsx', 'src/component/UI/text/index.tsx', 'src/component/UI/text/symbolRuns.tsx', 'src/component/test/VoIPTestScreen.tsx'].map(path.normalize),
   );
   const bad = [];
   for (const f of srcFiles) {
