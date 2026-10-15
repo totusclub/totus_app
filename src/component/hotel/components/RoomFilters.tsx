@@ -117,7 +117,7 @@ function FilterOptionRow({
               },
             ]}
           >
-            {selected ? <AppIcon name="checkmark" size={14} color="#FFFFFF" /> : null}
+            {selected ? <AppIcon name="checkmark" size={14} color="#FFFFFF" accent={false} /> : null}
           </View>
         )}
         <View style={styles.optionTextWrap}>
@@ -229,6 +229,7 @@ const RoomFilters: React.FC<RoomFiltersProps> = ({
             name="filters"
             size={compact ? 14 : 18}
             color={hasActiveFilters ? '#FFFFFF' : theme.text}
+            accent={!hasActiveFilters}
           />
           <AppText
             style={[

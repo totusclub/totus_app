@@ -20,7 +20,7 @@ const SupportAvatar: React.FC<Props> = ({size = 40, online = false}) => {
           styles.circle,
           {width: size, height: size, borderRadius: size / 2, backgroundColor: theme.brand},
         ]}>
-        <AppIcon name="bird" size={Math.round(size * 0.55)} color="#FFFFFF" />
+        <AppIcon name="bird" size={Math.round(size * 0.55)} color="#FFFFFF" accent={false} />
       </View>
       {online ? (
         <View

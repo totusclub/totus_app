@@ -525,7 +525,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
                   borderColor: isSelected ? theme.brand : theme.textDisabled,
                 },
               ]}>
-              {isSelected ? <AppIcon name="checkmark" size={14} color="#FFFFFF" /> : null}
+              {isSelected ? <AppIcon name="checkmark" size={14} color="#FFFFFF" accent={false} /> : null}
             </View>
             <AppText style={[sidebarStyles.rowLabel, { color: theme.text }]} numberOfLines={1}>
               {option.label}

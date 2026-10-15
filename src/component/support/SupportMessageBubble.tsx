@@ -50,7 +50,7 @@ const OrderCard: React.FC<{
   const content = (
     <View style={[styles.orderCard, {backgroundColor: bg, borderColor: mine ? 'transparent' : theme.border}]}>
       <View style={[styles.orderIcon, {backgroundColor: mine ? 'rgba(255,255,255,0.2)' : theme.backgroundTertiary}]}>
-        <AppIcon name="order" size={16} color={mine ? '#FFFFFF' : theme.brand} />
+        <AppIcon name="order" size={16} color={mine ? '#FFFFFF' : theme.brand} accent={!mine} />
       </View>
       <View style={styles.orderTextCol}>
         <AppText style={[styles.orderTitle, {color: titleColor}]} numberOfLines={1}>

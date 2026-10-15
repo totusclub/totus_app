@@ -35,7 +35,7 @@ export default function PopularDestinationCard({ destination, style, handlePress
             style={styles.gradientBadge}>
             <View style={styles.badgeContainer}>
               <AppText style={styles.badgeText}>{destination.name}</AppText>
-              <AppIcon name="arrowRight" size={18} color="#FFFFFF" />
+              <AppIcon name="arrowRight" size={18} color="#FFFFFF" accent={false} />
             </View>
           </LinearGradient>
         </ImageBackground>

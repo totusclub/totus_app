@@ -44,7 +44,7 @@ const TotusBookingBanner: React.FC<Props> = ({ booking, title, text, compact = f
       style={[styles.banner, compact && styles.bannerCompact, { backgroundColor: palette.bg }, style]}
       accessibilityRole="text">
       <View style={styles.iconWrap}>
-        <AppIcon name={TONE_ICON[tone] ?? 'info'} size={compact ? 16 : 20} color={palette.fg} />
+        <AppIcon name={TONE_ICON[tone] ?? 'info'} size={compact ? 16 : 20} color={palette.fg} accent={false} />
       </View>
       <View style={styles.body}>
         {!compact && !!finalTitle && (

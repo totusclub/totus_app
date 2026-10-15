@@ -379,7 +379,7 @@ const CallsScreen: React.FC = () => {
               style={[styles.addButton, { backgroundColor: theme.brand }]}
               onPress={() => setAddContactModalVisible(true)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <AppIcon name="plus" size={20} color="#FFFFFF" />
+              <AppIcon name="plus" size={20} color="#FFFFFF" accent={false} />
             </TouchableOpacity>
           )}
         </View>
@@ -492,7 +492,7 @@ const CallsScreen: React.FC = () => {
                       ]}
                       onPress={() => handleCallUser(user)}
                       disabled={!canCall}>
-                      <AppIcon name="phone" size={20} color="#FFFFFF" />
+                      <AppIcon name="phone" size={20} color="#FFFFFF" accent={false} />
                     </TouchableOpacity>
                   </View>
                 );

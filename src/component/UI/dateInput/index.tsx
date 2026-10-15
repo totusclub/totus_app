@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { TextInputMask } from 'react-native-masked-text';
 import AppText from '../text';
-import CalendarIcon from '../icons/calendar';
+import AppIcon from '../icons';
 import DatePickerModal from './DatePickerModal';
 import { useTheme } from '../../../hooks/useTheme';
 
@@ -104,7 +104,7 @@ const DateInput: React.FC<DateInputProps> = ({
             activeOpacity={0.7}
             style={styles.calendarButton}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <CalendarIcon size={20} color={disabled ? theme.textDisabled : theme.brand} />
+            <AppIcon name="calendar" size={20} color={disabled ? theme.textDisabled : theme.brand} />
           </TouchableOpacity>
         </View>
         {error && (

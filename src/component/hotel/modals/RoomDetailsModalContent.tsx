@@ -237,7 +237,7 @@ const RoomDetailsModalContent: React.FC<RoomDetailsModalContentProps> = ({
           <View style={[styles.facilitiesContainer, { backgroundColor: theme.backgroundTertiary }]}>
             {room.room.facilities.map((facility, index) => (
               <View key={`facility-${facility.id}-${index}`} style={styles.facilityItem}>
-                <HotelIcons name={facility.group_identifier as string} size={24} color={theme.text} />
+                <HotelIcons name={facility.group_identifier} label={facility.name} size={24} color={theme.text} />
                 <AppText style={[styles.facilityText, { color: theme.text }]}>{facility.name}</AppText>
               </View>
             ))}

@@ -55,7 +55,7 @@ const OriginField: React.FC<OriginFieldProps> = ({
                   value?.name_en ||
                   'Москва'}
               </AppText>
-              <AppIcon name="plane" size={24} color={theme.textTertiary} />
+              <AppIcon name="from" size={24} color={theme.textTertiary} />
             </View>
           </View>
         </View>
