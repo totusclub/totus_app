@@ -4,6 +4,16 @@ import { AppIcon, AppText } from '../UI';
 import { generateSectionsFromData } from '../../modules/hooks/useExpandableSections';
 import type { ExpandableSection, ApiHotelData } from '../../types/hotel';
 import { useTheme } from '../../hooks/useTheme';
+import TotusIconByKey from '../UI/icons/totus/TotusIconByKey';
+import type { TotusIconKey } from '../UI/icons/totus/registry.generated';
+
+/** Иконки разделов (useExpandableSections: main, onSite, forChildren, entertainment) — набор Totus. */
+const SECTION_ICONS: Record<string, TotusIconKey> = {
+  main: 'sec-general',
+  onSite: 'sec-territory',
+  forChildren: 'sec-kids',
+  entertainment: 'sec-fun',
+};
 
 type ExpandableSectionsListProps = {
   onSectionPress: (section: ExpandableSection) => void;
@@ -37,7 +47,11 @@ const ExpandableSectionsList: React.FC<ExpandableSectionsListProps> = ({
           onPress={() => onSectionPress(section)}>
           <View style={styles.expandableContent}>
             <View style={styles.expandableIcon}>
-              <View style={[styles.expandableIconCircle, { borderColor: theme.border }]} />
+              {SECTION_ICONS[section.id] ? (
+                <TotusIconByKey name={SECTION_ICONS[section.id]} size={24} color={theme.text} />
+              ) : (
+                <View style={[styles.expandableIconCircle, { borderColor: theme.border }]} />
+              )}
             </View>
             <View style={styles.expandableTextContainer}>
               <AppText style={[styles.expandableTitle, { color: theme.text }]}>{section.title}</AppText>

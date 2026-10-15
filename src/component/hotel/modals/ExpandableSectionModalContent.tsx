@@ -8,11 +8,13 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppText, AppIcon } from '../../UI';
+import { AppText } from '../../UI';
 import { transformApiDataToSections } from '../../../modules/hooks/useExpandableSections';
 import type { ApiHotelData } from '../../../types/hotel';
 import { useTheme } from '../../../hooks/useTheme';
 import { FONT_HEADING } from '../../../theme/fonts';
+import TotusIconByKey from '../../UI/icons/totus/TotusIconByKey';
+import { amenityTextIcon } from '../../UI/icons/totus/ltIcons';
 
 type ExpandableSectionModalContentProps = {
   onClose: () => void;
@@ -75,7 +77,9 @@ const ExpandableSectionModalContent: React.FC<ExpandableSectionModalContentProps
                         resizeMode="contain"
                       />
                     ) : (
-                      <AppIcon name="checkmark" size={20} color={theme.text} />
+                      // Пункты «Развлечения», «На территории», «Для детей» — свободный текст LT:
+                      // иконка по словам (amenityTextIcon, как на сайте), иначе «Другое».
+                      <TotusIconByKey name={amenityTextIcon(item.title)} size={20} color={theme.text} />
                     )}
                     <AppText style={[styles.itemText, { color: theme.text }]}>{item.title}</AppText>
                   </View>

@@ -13,6 +13,18 @@ import { searchFilters, setAllMyHotels } from '../../../modules/store/slices/sea
 import { useTheme } from '../../../hooks/useTheme';
 import { withSearchTypeFilters } from '../../../utils/searchParamsUtils';
 import { FONT_HEADING } from '../../../theme/fonts';
+import TotusIconByKey from '../../UI/icons/totus/TotusIconByKey';
+import type { TotusIconKey } from '../../UI/icons/totus/registry.generated';
+import {
+  amenityIcon,
+  beachSurfaceIcon,
+  beachTypeIcon,
+  categoryIcon,
+  confirmabilityIcon,
+  hotelTypeIcon,
+  mealIcon,
+  wifiIcon,
+} from '../../UI/icons/totus/ltIcons';
 
 /**
  * Full hotel-list filters from https://totus.club/search
@@ -163,6 +175,8 @@ const formatOptionMeta = (item: any): string => {
 const mapFacetOptions = (
   items: any[] | undefined,
   labelFn: (item: any) => string,
+  /** Иконка варианта (набор Totus) по id Level.Travel — как в фильтрах сайта. */
+  iconFn?: (id: string) => TotusIconKey | undefined,
 ) =>
   (items || []).map((item: any) => ({
     label: labelFn(item),
@@ -170,6 +184,7 @@ const mapFacetOptions = (
     count: item.hotel_count != null ? Number(item.hotel_count) : undefined,
     value: String(item.id),
     disabled: Boolean(item.disabled),
+    icon: iconFn ? iconFn(String(item.id)) : undefined,
   }));
 
 const hotelsWord = (n: number): string => {
@@ -303,13 +318,13 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
 
   const accommodationOptions = useMemo(
     () =>
-      mapFacetOptions(apiFilters?.hotel_type, (h: any) => h.name || String(h.id)),
+      mapFacetOptions(apiFilters?.hotel_type, (h: any) => h.name || String(h.id), hotelTypeIcon),
     [apiFilters?.hotel_type],
   );
 
   const mealsOptions = useMemo(
     () =>
-      mapFacetOptions(apiFilters?.meals, (m: any) => m.name || String(m.id)),
+      mapFacetOptions(apiFilters?.meals, (m: any) => m.name || String(m.id), mealIcon),
     [apiFilters?.meals],
   );
 
@@ -351,6 +366,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
       mapFacetOptions(
         apiFilters?.wifi,
         (w: any) => WIFI_LABELS[String(w.id)] || w.name || String(w.id),
+        wifiIcon,
       ),
     [apiFilters?.wifi],
   );
@@ -361,6 +377,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
         apiFilters?.beach_surface,
         (b: any) =>
           BEACH_SURFACE_LABELS[String(b.id)] || b.name || String(b.id),
+        beachSurfaceIcon,
       ),
     [apiFilters?.beach_surface],
   );
@@ -370,6 +387,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
       mapFacetOptions(
         apiFilters?.beach_type,
         (b: any) => BEACH_TYPE_LABELS[String(b.id)] || b.name || String(b.id),
+        beachTypeIcon,
       ),
     [apiFilters?.beach_type],
   );
@@ -379,6 +397,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
       mapFacetOptions(
         apiFilters?.category,
         (c: any) => CATEGORY_LABELS[String(c.id)] || c.name || String(c.id),
+        categoryIcon,
       ),
     [apiFilters?.category],
   );
@@ -389,6 +408,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
         apiFilters?.confirmability,
         (c: any) =>
           CONFIRMABILITY_LABELS[String(c.id)] || c.name || String(c.id),
+        confirmabilityIcon,
       ),
     [apiFilters?.confirmability],
   );
@@ -413,6 +433,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
         count: trueOpt?.hotel_count != null ? Number(trueOpt.hotel_count) : undefined,
         value: a.key,
         disabled: false,
+        icon: amenityIcon(a.key),
       };
     });
   }, [apiFilters]);
@@ -503,7 +524,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
 
   /** iPad sidebar: checkbox row with the hotel count on the right (Figma). */
   const renderCheckRows = (
-    options: { label: string; value: string; count?: number; disabled?: boolean }[],
+    options: { label: string; value: string; count?: number; disabled?: boolean; icon?: TotusIconKey | null }[],
     selected: string[],
     stateKey: keyof FilterState,
   ) => (
@@ -527,6 +548,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
               ]}>
               {isSelected ? <AppIcon name="checkmark" size={14} color="#FFFFFF" accent={false} /> : null}
             </View>
+            {option.icon ? <TotusIconByKey name={option.icon} size={18} color={theme.text} /> : null}
             <AppText style={[sidebarStyles.rowLabel, { color: theme.text }]} numberOfLines={1}>
               {option.label}
             </AppText>
@@ -612,6 +634,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
         <View style={sidebarStyles.section}>
           <Toggle
             label="Быстрое подтверждение"
+            icon="instant"
             value={filters.quickConfirmation}
             onToggle={() =>
               setFilters(prev => ({
@@ -664,6 +687,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
         <View style={styles.section}>
           <Toggle
             label="Быстрое подтверждение"
+            icon="instant"
             value={filters.quickConfirmation}
             onToggle={() =>
               setFilters(prev => ({
@@ -757,6 +781,9 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
                     ]}
                     activeOpacity={0.7}
                     onPress={() => toggleInList('amenities', option.value)}>
+                    {option.icon ? (
+                      <TotusIconByKey name={option.icon} size={20} color={theme.text} />
+                    ) : null}
                     <View style={styles.amenityText}>
                       <AppText style={[styles.amenityLabel, { color: theme.text }]}>
                         {option.label}

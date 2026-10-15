@@ -42,6 +42,8 @@ import {
   normalizeSearchType,
 } from '../../../utils/bookingFlowUtils';
 import { FONT_HEADING } from '../../../theme/fonts';
+import TotusIconByKey from '../../UI/icons/totus/TotusIconByKey';
+import { mealIcon } from '../../UI/icons/totus/ltIcons';
 
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -297,7 +299,8 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
           return (
           <View key={expandKey} style={styles.mealTypeSection}>
             <View style={styles.mealTypeHeader}>
-              <AppText style={[styles.mealTypeTitle, { color: theme.text }]}>
+              <TotusIconByKey name={mealIcon(mealTypeId)} size={20} color={theme.text} />
+              <AppText style={[styles.mealTypeTitle, styles.mealTypeTitleText, { color: theme.text }]}>
                 {roomTypeName[mealTypeId] || mealType.description || mealTypeId}
               </AppText>
             </View>
@@ -333,12 +336,20 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
                     onPress={() => handleOfferPress(offer)}>
                     <View style={styles.offerLeft}>
                       {isAiOffer ? <AiPickBadge variant="inline" /> : null}
-                      <AppText style={[styles.offerNights, { color: theme.text }]}>
-                        {offer.nights_count} ночей {formatOfferDate(offer.start_date)}
-                      </AppText>
-                      <AppText style={[styles.offerOperator, { color: theme.textTertiary }]}>
-                        {offer.operator_name}
-                      </AppText>
+                      <View style={[styles.offerLine, styles.offerNights]}>
+                        <TotusIconByKey name="nights" size={16} color={theme.text} />
+                        <AppText style={[styles.offerLineText, { color: theme.text }]}>
+                          {offer.nights_count} ночей {formatOfferDate(offer.start_date)}
+                        </AppText>
+                      </View>
+                      <View style={styles.offerLine}>
+                        {offer.operator_name ? (
+                          <TotusIconByKey name="operator" size={14} color={theme.textTertiary} />
+                        ) : null}
+                        <AppText style={[styles.offerOperator, styles.offerLineShrink, { color: theme.textTertiary }]}>
+                          {offer.operator_name}
+                        </AppText>
+                      </View>
                     </View>
                     <View style={styles.offerRight}>
                       <AppText style={[styles.offerPrice, { color: theme.text }]}>
@@ -524,7 +535,25 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   mealTypeHeader: {
+    flexDirection: 'row', // иконка питания (Totus 20px) + название
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 16,
+  },
+  mealTypeTitleText: {
+    flexShrink: 1,
+  },
+  offerLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  offerLineText: {
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  offerLineShrink: {
+    flexShrink: 1,
   },
   mealTypeTitle: {
     fontSize: 16,
