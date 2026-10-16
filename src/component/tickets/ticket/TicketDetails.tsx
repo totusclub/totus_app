@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -18,6 +18,9 @@ import {
   toMoney,
 } from '../../../utils/packagePrice';
 import { TabletCentered } from '../../UI/tablet';
+import { getSelectedFlight } from '../../../modules/api/levelTravelApi';
+import { extractPackageId } from '../../../utils/hotelUtils/packageHelpers';
+import { isRequestCancelled } from '../../../utils/bookingOffer';
 
 type TicketDetailsRoute = RouteProp<
   {
@@ -40,6 +43,8 @@ type TicketDetailsRoute = RouteProp<
       totalPrice: number;
       transferDuration?: string;
       searchType?: 'package' | 'hotel';
+      /** Рейс из лёгкого списка (?view=app): полные данные (пересадки) догружаются здесь. */
+      flightIsSlim?: boolean;
     };
   },
   'ticketDetails'
@@ -53,14 +58,44 @@ const TicketDetails: React.FC = () => {
   const { fullAuth, accessToken } = useSelector((state: RootState) => state.auth);
   const [footerHeight, setFooterHeight] = useState(120);
   const {
-    flightData,
+    flightData: listFlight,
     packageInfo,
     hotelMeta,
     searchContext,
     transferDuration,
     totalPrice,
     searchType,
+    flightIsSlim,
   } = route.params || {};
+
+  // Полный выбранный рейс — один, через ?view=pair (вместо всего списка перелётов пакета).
+  const [fullFlight, setFullFlight] = useState<any>(null);
+  /** Рейса больше нет в ответе туроператора — продан или сменился. */
+  const [flightGone, setFlightGone] = useState(false);
+  const pairId = listFlight?.flight_pair_id ?? listFlight?.id;
+  const packageIdForFlight = useMemo(() => extractPackageId(packageInfo), [packageInfo]);
+
+  useEffect(() => {
+    setFullFlight(null);
+    setFlightGone(false);
+    if (!flightIsSlim || !pairId || !packageIdForFlight) return;
+    const controller = new AbortController();
+    getSelectedFlight(packageIdForFlight, pairId, { signal: controller.signal })
+      .then(found => {
+        if (controller.signal.aborted) return;
+        if (found) setFullFlight(found);
+        else setFlightGone(true);
+      })
+      .catch(err => {
+        // Сеть / туроператор: остаёмся на данных из списка — их хватает для бронирования.
+        if (!controller.signal.aborted && !isRequestCancelled(err)) {
+          console.warn('[TicketDetails] selected flight failed:', err?.message || err);
+        }
+      });
+    return () => controller.abort();
+  }, [flightIsSlim, pairId, packageIdForFlight]);
+
+  const flightData = fullFlight || listFlight;
 
   // Transform flight data
   const flightDetails = useMemo<FlightDetails>(() => {
@@ -92,7 +127,7 @@ const TicketDetails: React.FC = () => {
       totalLabel: formatMoneyRub(total).replace(' ₽', '₽'),
       feesLabel:
         fees > 0
-          ? `Доплаты и сборы: +${formatMoneyRub(fees).replace(' ₽', '₽')}`
+          ? `Топливный сбор: +${formatMoneyRub(fees).replace(' ₽', '₽')}`
           : null,
     };
   }, [packageInfo, flightData, totalPrice]);
@@ -103,6 +138,7 @@ const TicketDetails: React.FC = () => {
   }, []);
 
   const handleReserve = () => {
+    if (flightGone) return;
     if (!fullAuth || !accessToken) {
       navigation.navigate('tab', {
         screen: 'AccountStackScreen',
@@ -234,9 +270,19 @@ const TicketDetails: React.FC = () => {
             {priceBreakdown.totalLabel}
           </AppText>
         </View>
+        {flightGone ? (
+          <View accessibilityRole="alert" style={styles.goneBox}>
+            <AppText style={[styles.goneTitle, { color: theme.text }]}>
+              Этот перелёт уже недоступен
+            </AppText>
+            <AppText style={[styles.goneText, { color: theme.textTertiary }]}>
+              Туроператор продал места или изменил рейс. Выберите другой перелёт к этому отелю.
+            </AppText>
+          </View>
+        ) : null}
         <AppButton
-          title="Перейти к бронированию"
-          onPress={handleReserve}
+          title={flightGone ? 'Выбрать другой перелёт' : 'Перейти к бронированию'}
+          onPress={flightGone ? () => navigation.goBack() : handleReserve}
           size="large"
           style={styles.ctaButton}
         />
@@ -285,6 +331,18 @@ const styles = StyleSheet.create({
   },
   ctaButton: {
     width: '100%',
+  },
+  goneBox: {
+    gap: 4,
+  },
+  goneTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  goneText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   // iPad only: keeps the footer's vertical gap inside the centered column
   footerColumnTablet: {

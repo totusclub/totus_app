@@ -50,7 +50,19 @@ function isPackageGoneError(err: unknown): boolean {
   );
 }
 
+function isCancelledError(err: unknown): boolean {
+  const e = err as { name?: string; code?: string; __CANCEL__?: boolean } | null;
+  return e?.name === 'CanceledError' || e?.name === 'AbortError' || e?.code === 'ERR_CANCELED' || e?.__CANCEL__ === true;
+}
+
 function getFriendlyFlightsError(err: unknown): string {
+  const e = err as { code?: string; message?: string; response?: unknown } | null;
+  if (e && !e.response && (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT' || /timeout/i.test(String(e.message || '')))) {
+    return 'Туроператор отвечает дольше обычного. Попробуйте обновить через несколько секунд.';
+  }
+  if (e && !e.response && /network/i.test(String(e.message || ''))) {
+    return 'Нет подключения к интернету. Проверьте сеть и попробуйте ещё раз.';
+  }
   if (isPackageGoneError(err)) {
     return 'Не удалось загрузить варианты перелёта. Попробуйте выбрать тур заново.';
   }
@@ -84,6 +96,11 @@ export const useTicketsData = (
    */
   const baseFiltersMetaRef = useRef<unknown>(null);
   const actualizedPackageIdRef = useRef<number | null>(null);
+  /** Ответ имеет смысл только у последнего запроса: прежний отменяется (как на сайте, #45). */
+  const requestSeqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  /** Ответ totus_API ?view=app — у рейсов нет пересадок, экран рейса догружает их сам. */
+  const [listView, setListView] = useState(false);
 
   const filtersKey = useMemo(
     () => JSON.stringify(normalizeTicketsFilterSelections(filtersPayload)),
@@ -113,6 +130,12 @@ export const useTicketsData = (
       return;
     }
 
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const seq = ++requestSeqRef.current;
+    const isCurrent = () => seq === requestSeqRef.current && !controller.signal.aborted;
+
     // kedam_WEB: actualize once, then reuse package.id for every filtered
     // request — re-actualizing on each filter change is slow and can hand back
     // a different package id mid-session.
@@ -122,7 +145,7 @@ export const useTicketsData = (
         return cached;
       }
 
-      const actualized = await PackagesActualize(packageId, 'package');
+      const actualized = await PackagesActualize(packageId, 'package', { signal: controller.signal });
       const normalizedPackage = (actualized as any)?.package ?? null;
       const actualizedId = normalizedPackage?.id;
 
@@ -131,6 +154,7 @@ export const useTicketsData = (
       }
 
       const resolved = Number(actualizedId) || actualizedId;
+      if (!isCurrent()) return resolved;
       actualizedPackageIdRef.current = resolved;
       setPackageInfo(normalizedPackage);
 
@@ -158,7 +182,9 @@ export const useTicketsData = (
       }) as PackagesFlightsParams;
 
       try {
-        const flightsResponse = await Packagesflights(payload);
+        // view: 'app' — лёгкий ответ API (без srcset, источников багажа, цен по всем турам).
+        const flightsResponse = await Packagesflights(payload, { view: 'app', signal: controller.signal });
+        if (!isCurrent()) return;
         if (__DEV__) {
           console.log('[Tickets] flightsResponse', {
             count: flightsResponse?.flights?.length,
@@ -167,6 +193,7 @@ export const useTicketsData = (
         }
 
         const allFlightsData = flightsResponse?.flights || [];
+        setListView(flightsResponse?.app_view === true);
         setAllFlights(allFlightsData);
 
         const nextFilters = flightsResponse?.filters || null;
@@ -185,11 +212,12 @@ export const useTicketsData = (
           setHasMore(false);
         }
       } catch (err: unknown) {
+        if (!isCurrent() || isCancelledError(err)) return;
         // kedam-WEB: expired package → actualize once and retry with fresh id.
         if (allowRetry && isPackageGoneError(err)) {
           actualizedPackageIdRef.current = null;
           try {
-            const refreshed = await PackagesActualize(packageId, 'package');
+            const refreshed = await PackagesActualize(packageId, 'package', { signal: controller.signal });
             const freshId = (refreshed as any)?.package?.id;
             if (freshId != null) {
               const resolved = Number(freshId) || freshId;
@@ -214,6 +242,8 @@ export const useTicketsData = (
 
       await requestFlights(true);
     } catch (err: unknown) {
+      // Запрос отменён новым (фильтр переключили ещё раз) или экран закрыт — это не ошибка.
+      if (!isCurrent() || isCancelledError(err)) return;
       console.error('[Tickets] Flights loading failed:', err);
       // Keep package card when only /packages/flights failed (kedam-WEB does the same).
       const hadPackage = actualizedPackageIdRef.current != null;
@@ -223,15 +253,22 @@ export const useTicketsData = (
         actualizedPackageIdRef.current = null;
         baseFiltersMetaRef.current = null;
         setErrorKind('package');
-        setError('Не удалось загрузить пакет. Вернитесь к выбору номера.');
+        setError(
+          (err as any)?.response
+            ? 'Не удалось загрузить пакет. Вернитесь к выбору номера.'
+            : getFriendlyFlightsError(err),
+        );
       } else {
         setErrorKind('flights');
         setError(getFriendlyFlightsError(err));
       }
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [packageId, filtersKey, clearFlightsOnly, filtersPayload]);
+
+  // Ушли с экрана — незаконченный запрос больше никому не нужен.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore || allFlights.length === 0) return;
@@ -274,6 +311,7 @@ export const useTicketsData = (
     loadingMore,
     error,
     errorKind,
+    listView,
     hasMore,
     refetch: fetchFlights,
     loadMore,
