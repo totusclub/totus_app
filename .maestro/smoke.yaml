@@ -1,0 +1,113 @@
+# Дымовой тест Totus Club (Maestro): онбординг → главная → «Найти» → первый отель →
+# первое предложение → перелёт → «Перейти к бронированию» → экран «Вход».
+# Ничего не бронирует и не вводит: пользователь не авторизован, флоу заканчивается на экране входа.
+#
+# Запуск:  maestro test .maestro/smoke.yaml -e APP_ID=com.totus.com   (iOS: -e APP_ID=app.totus.club)
+#
+# Элементы ищутся по видимым текстам (testID в приложении пока нет). Тексты взяты из кода:
+#   онбординг      src/component/onboarding/*            «Далее» ×4, «Я согласен»
+#   главная        src/component/home/searchSection      «Путешествия начинаются здесь», «Найти»
+#   выдача         src/component/searchResult/*          «Найдено N отелей», карточка «от … на N ночей»
+#   отель          src/component/hotel/*                 «Выберите номер», «Все варианты»,
+#                                                        модалка «Все варианты проживания» → «Выбрать … ₽»
+#   перелёт        src/component/tickets/*               «Найдено вариантов: N», «За тур с перелётом»,
+#                                                        «Перейти к бронированию»
+#   вход           src/screens/auth/LoginScreen.tsx      «Вход», «Электронная почта»
+# Если меняются эти тексты — поправить флоу. Тексты в Maestro — регулярные выражения на весь текст элемента.
+#
+# Скриншоты NN-*.png — контрольные точки: по последней из них видно, докуда дошёл прогон.
+appId: ${APP_ID}
+name: Totus smoke — до экрана входа
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+
+# 1. Онбординг: 4 шага «Далее» + соглашение «Я согласен»
+- extendedWaitUntil:
+    visible: "Далее"
+    timeout: 90000
+- takeScreenshot: 01-onboarding
+- repeat:
+    times: 4
+    commands:
+      - tapOn: "Далее"
+- extendedWaitUntil:
+    visible: "Я согласен"
+    timeout: 15000
+- tapOn: "Я согласен"
+
+# 2. Главная (по умолчанию: тур, Москва → Египет, через неделю, 7 ночей, 2 взрослых)
+- extendedWaitUntil:
+    visible: "Найти"
+    timeout: 30000
+- assertVisible: "Путешествия начинаются здесь"
+- takeScreenshot: 02-home
+
+# 3. Поиск: статус опрашивается каждые 6 с, своего таймаута у приложения нет
+- tapOn: "Найти"
+- extendedWaitUntil:
+    visible: "Найдено \\d+ отел.*"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "от .* на \\d+ ноч.*"
+    timeout: 30000
+- takeScreenshot: 03-search
+
+# 4. Отель: карточка целиком кликабельна, кнопки «Выбрать» на ней нет
+- tapOn:
+    text: "от .* на \\d+ ноч.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Выберите номер"
+    timeout: 60000
+- takeScreenshot: 04-hotel
+# Номера подгружаются опросом до ~60 с и лежат ниже первого экрана
+- scrollUntilVisible:
+    element: "Все варианты"
+    direction: DOWN
+    timeout: 120000
+    centerElement: true
+- takeScreenshot: 05-rooms
+- tapOn:
+    text: "Все варианты"
+    index: 0
+- extendedWaitUntil:
+    visible: "Все варианты проживания"
+    timeout: 20000
+# Футер «Выбрать … ₽» появляется только после выбора строки предложения («7 ночей 22.10 …»)
+- tapOn:
+    text: "\\d+ ноч.*"
+    below: "Все варианты проживания"
+    index: 0
+- extendedWaitUntil:
+    visible: "Выбрать .*₽.*"
+    timeout: 15000
+- takeScreenshot: 06-offer
+# Текст «Выбрать … ₽» есть дважды (заголовок футера и кнопка); кнопка — под подписью «тур с перелётом»
+- tapOn:
+    text: "Выбрать .*₽.*"
+    below: "тур с перелётом"
+
+# 5. Перелёт: карточка рейса целиком кликабельна → детали → «Перейти к бронированию»
+- extendedWaitUntil:
+    visible: "Найдено вариантов: \\d+"
+    timeout: 120000
+- takeScreenshot: 07-tickets
+- tapOn:
+    text: "За тур с перелётом"
+    index: 0
+- scrollUntilVisible:
+    element: "Перейти к бронированию"
+    direction: DOWN
+    timeout: 30000
+- takeScreenshot: 08-ticket-details
+- tapOn: "Перейти к бронированию"
+
+# 6. Без входа бронирование ведёт на экран «Вход» — это и есть успешный конец сценария
+- extendedWaitUntil:
+    visible: "Электронная почта"
+    timeout: 20000
+- assertVisible: "Вход"
+- takeScreenshot: 09-login
