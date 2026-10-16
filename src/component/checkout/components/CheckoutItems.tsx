@@ -7,6 +7,12 @@ import FlightDetailsModal from './FlightDetailsModal';
 import { getPackageData, formatPeriod } from '../../../utils/ordersUtils';
 import { useTheme } from '../../../hooks/useTheme';
 import { TabletCentered } from '../../UI/tablet';
+import { formatMoneyRub, toMoney } from '../../../utils/packagePrice';
+import {
+  getBookingInclusions,
+  getCheckoutExtraRow,
+  getConfirmationLabel,
+} from '../../../utils/bookingOffer';
 
 interface CheckoutItemsProps {
   order: Order | null;
@@ -21,6 +27,21 @@ export const CheckoutItems: React.FC<CheckoutItemsProps> = ({ order }) => {
 
   const formatDate = useMemo(() => {
     return formatPeriod(pkg);
+  }, [pkg]);
+
+  // «Подтверждение» и «А что ещё» — из данных Level.Travel по заказу, а не одинаковый для всех
+  // туров текст («Быстрое подтверждение», «Страховка включена», «Трансфер не включён»).
+  const confirmation = useMemo(() => getConfirmationLabel(pkg), [pkg]);
+  const extraRows = useMemo(() => {
+    const isHotelOnly = (pkg as any)?.search_type === 'hotel';
+    const rows = getBookingInclusions(pkg, { isHotelOnly })
+      .filter(item => item.key !== 'flight' && item.key !== 'stay')
+      .map(item => ({ key: item.key, ...getCheckoutExtraRow(item) }));
+    const fuel = toMoney((pkg as any)?.fuel_charge);
+    if (fuel > 0) {
+      rows.push({ key: 'fuel', label: 'Топливный сбор', value: `${formatMoneyRub(fuel)}, уже в сумме` });
+    }
+    return rows;
   }, [pkg]);
 
 
@@ -81,15 +102,14 @@ export const CheckoutItems: React.FC<CheckoutItemsProps> = ({ order }) => {
               )}
             </View>
 
-            <View style={[styles.infoItem, { borderBottomColor: theme.divider }]}>
-              <View style={styles.infoItemContent}>
-                <AppText style={[styles.infoItemLabel, { color: theme.text }]}>Скорость бронирования</AppText>
-                <AppText style={[styles.infoItemValue, { color: theme.textTertiary }]}>Быстрое подтверждение</AppText>
+            {confirmation ? (
+              <View style={[styles.infoItem, { borderBottomColor: theme.divider }]}>
+                <View style={styles.infoItemContent}>
+                  <AppText style={[styles.infoItemLabel, { color: theme.text }]}>Подтверждение</AppText>
+                  <AppText style={[styles.infoItemValue, { color: theme.textTertiary }]}>{confirmation}</AppText>
+                </View>
               </View>
-              {/* <View style={styles.arrowIconContainer}>
-                <AppIcon name="simpleArrow" size={24} color={theme.text} />
-              </View> */}
-            </View>
+            ) : null}
 
             <View style={[styles.infoItem, styles.infoItemLast]}>
               <View style={styles.infoItemContent}>
@@ -167,31 +187,31 @@ export const CheckoutItems: React.FC<CheckoutItemsProps> = ({ order }) => {
           </View>
         </View>
 
-        {/* А что еще */}
-        <View style={[styles.sectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          <View style={styles.sectionTitle}>
-            <AppText style={[styles.sectionTitleText, { color: theme.text }]}>А что еще</AppText>
-          </View>
-
-          <View style={[styles.infoItemsLayout, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={[styles.infoItem, { borderBottomColor: theme.divider }]}>
-              <View style={styles.infoItemContent}>
-                <AppText style={[styles.infoItemLabel, { color: theme.text }]}>Страховка</AppText>
-                <AppText style={[styles.infoItemValue, { color: theme.textTertiary }]}>Включена в стоимость</AppText>
-              </View>
-              {/* <View style={styles.arrowIconContainer}>
-                <AppIcon name="simpleArrow" size={24} color={theme.text} />
-              </View> */}
+        {/* А что ещё — из данных заказа; строк нет — блок не показываем */}
+        {extraRows.length > 0 ? (
+          <View style={[styles.sectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+            <View style={styles.sectionTitle}>
+              <AppText style={[styles.sectionTitleText, { color: theme.text }]}>А что ещё</AppText>
             </View>
 
-            <View style={[styles.infoItem, styles.infoItemLast]}>
-              <View style={styles.infoItemContent}>
-                <AppText style={[styles.infoItemLabel, { color: theme.text }]}>Трансфер</AppText>
-                <AppText style={[styles.infoItemValue, { color: theme.textTertiary }]}>Не включен в стоимость</AppText>
-              </View>
+            <View style={[styles.infoItemsLayout, { backgroundColor: theme.backgroundSecondary }]}>
+              {extraRows.map((row, index) => (
+                <View
+                  key={row.key}
+                  style={[
+                    styles.infoItem,
+                    { borderBottomColor: theme.divider },
+                    index === extraRows.length - 1 && styles.infoItemLast,
+                  ]}>
+                  <View style={styles.infoItemContent}>
+                    <AppText style={[styles.infoItemLabel, { color: theme.text }]}>{row.label}</AppText>
+                    <AppText style={[styles.infoItemValue, { color: theme.textTertiary }]}>{row.value}</AppText>
+                  </View>
+                </View>
+              ))}
             </View>
           </View>
-        </View>
+        ) : null}
 
         {/* Контакты покупателя */}
         <View style={[styles.sectionCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
