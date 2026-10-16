@@ -8,6 +8,8 @@ import {
   formatMoneyRub,
   getBookingPriceBreakdown,
 } from '../../../utils/packagePrice';
+import { formatNights, getBookingInclusions, getFeesLabel } from '../../../utils/bookingOffer';
+import { BookingInclusions } from './BookingStatus';
 
 interface BookingFooterProps {
   onSubmit: () => void;
@@ -18,7 +20,9 @@ interface BookingFooterProps {
 export const BookingOrderSummary: React.FC<{
   packageData?: any;
   selectedFlight?: any;
-}> = ({ packageData, selectedFlight }) => {
+  /** Отель без перелёта: «Отель в …», без перелёта и трансфера в «Что входит». */
+  isHotelOnly?: boolean;
+}> = ({ packageData, selectedFlight, isHotelOnly = false }) => {
   const { theme } = useTheme();
 
   const { basePrice, fees, totalPrice } = useMemo(
@@ -27,12 +31,21 @@ export const BookingOrderSummary: React.FC<{
   );
 
   const destination = useMemo(() => {
+    const kind = isHotelOnly ? 'Отель' : 'Тур';
     const city = packageData?.hotel?.city;
     const country = packageData?.hotel?.country;
-    if (city && country) return `Тур в ${city}, ${country}`;
-    if (city) return `Тур в ${city}`;
-    return 'Тур';
-  }, [packageData]);
+    if (city && country) return `${kind} в ${city}, ${country}`;
+    if (city) return `${kind} в ${city}`;
+    return kind;
+  }, [packageData, isHotelOnly]);
+
+  // «Что входит в тур» — из полей Level.Travel (страховка, трансфер, виза, налоги, уведомления).
+  const inclusions = useMemo(
+    () => getBookingInclusions(packageData, { isHotelOnly }),
+    [packageData, isHotelOnly],
+  );
+  const operatorName = packageData?.operator?.name || 'туроператора';
+  const hasSeparatePayments = Array.isArray(packageData?.taxes) && packageData.taxes.length > 0;
 
   const dateLabel = useMemo(() => {
     const start = packageData?.dates_info?.start_date;
@@ -51,7 +64,8 @@ export const BookingOrderSummary: React.FC<{
       month: 'long',
     });
     const range = `${formatter.format(startDate)} – ${formatter.format(endDate)}`;
-    return nights ? `${range}, на ${nights} ночей` : range;
+    const nightsLabel = formatNights(nights);
+    return nightsLabel ? `${range}, на ${nightsLabel}` : range;
   }, [packageData]);
 
   if (!packageData || totalPrice <= 0) return null;
@@ -78,7 +92,7 @@ export const BookingOrderSummary: React.FC<{
       {fees > 0 ? (
         <View style={styles.row}>
           <AppText style={[styles.rowLabel, { color: theme.text }]}>
-            Доплаты и сборы
+            {getFeesLabel(packageData, selectedFlight)}
           </AppText>
           <AppText style={[styles.rowValue, { color: theme.text }]}>
             +{formatMoneyRub(fees)}
@@ -94,6 +108,12 @@ export const BookingOrderSummary: React.FC<{
           {formatMoneyRub(totalPrice)}
         </AppText>
       </View>
+
+      <AppText style={[styles.priceNote, { color: theme.textTertiary }]}>
+        Цена {operatorName} на момент проверки{hasSeparatePayments ? '' : ', со всеми доплатами'}
+      </AppText>
+
+      <BookingInclusions items={inclusions} title={isHotelOnly ? 'Что входит' : 'Что входит в тур'} />
     </View>
   );
 };
@@ -198,6 +218,10 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  priceNote: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   legalWrap: {
     marginBottom: 8,

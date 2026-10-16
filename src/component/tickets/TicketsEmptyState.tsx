@@ -11,6 +11,8 @@ type TicketsEmptyStateProps = {
   hasActiveFilters?: boolean;
   onResetFilters?: () => void;
   onRetry?: () => void;
+  /** Сбой загрузки (сеть, таймаут, туроператор) — показать причину вместо «нет вариантов». */
+  errorMessage?: string | null;
 };
 
 /**
@@ -21,18 +23,22 @@ const TicketsEmptyState: React.FC<TicketsEmptyStateProps> = ({
   hasActiveFilters = false,
   onResetFilters,
   onRetry,
+  errorMessage,
 }) => {
   const { theme } = useTheme();
   const navigation = useNavigation();
 
-  const body = hasActiveFilters
-    ? 'По выбранным фильтрам нет подходящих перелётов. Попробуйте изменить параметры или сбросить фильтры.'
-    : 'На эти даты пока нет доступных вариантов перелёта. Попробуйте обновить результаты или выбрать другой тур.';
+  const failed = Boolean(errorMessage);
+  const body = failed
+    ? String(errorMessage)
+    : hasActiveFilters
+      ? 'По выбранным фильтрам нет подходящих перелётов. Попробуйте изменить параметры или сбросить фильтры.'
+      : 'На эти даты пока нет доступных вариантов перелёта. Попробуйте обновить результаты или выбрать другой тур.';
 
-  const primaryTitle = hasActiveFilters ? 'Сбросить фильтры' : 'Обновить';
+  const primaryTitle = failed ? 'Повторить' : hasActiveFilters ? 'Сбросить фильтры' : 'Обновить';
 
   const handlePrimary = () => {
-    if (hasActiveFilters && onResetFilters) {
+    if (!failed && hasActiveFilters && onResetFilters) {
       onResetFilters();
       return;
     }
@@ -50,7 +56,7 @@ const TicketsEmptyState: React.FC<TicketsEmptyStateProps> = ({
           <EmptyCityIcon size={72} color={theme.brand} />
         </View>
         <AppText style={[styles.title, { color: theme.text }]}>
-          Перелёты не найдены
+          {failed ? 'Не удалось загрузить перелёты' : 'Перелёты не найдены'}
         </AppText>
         <AppText style={[styles.message, { color: theme.textTertiary }]}>
           {body}
@@ -58,10 +64,10 @@ const TicketsEmptyState: React.FC<TicketsEmptyStateProps> = ({
         <AppButton title={primaryTitle} onPress={handlePrimary} size="large" />
         <View style={styles.secondary}>
           <AppButton
-            title={hasActiveFilters ? 'Обновить' : 'Вернуться назад'}
+            title={!failed && hasActiveFilters ? 'Обновить' : 'Вернуться назад'}
             type="outline"
             onPress={() =>
-              hasActiveFilters ? onRetry?.() : navigation.goBack()
+              !failed && hasActiveFilters ? onRetry?.() : navigation.goBack()
             }
             size="large"
           />

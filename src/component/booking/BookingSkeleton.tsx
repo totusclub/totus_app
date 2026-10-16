@@ -3,9 +3,13 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader, SkeletonBox, SkeletonGroup } from '../UI';
 import { useTheme } from '../../hooks/useTheme';
+import { BookingSlowHint } from './components/BookingStatus';
 
-/** Mirrors the booking screen: contacts card, tourist forms, order summary, footer CTA. */
-const BookingSkeleton: React.FC = () => {
+/**
+ * Mirrors the booking screen: contacts card, tourist forms, order summary, footer CTA.
+ * slowHint — актуализация у туроператора идёт дольше обычного: подсказка над заглушками.
+ */
+const BookingSkeleton: React.FC<{ slowHint?: boolean }> = ({ slowHint = false }) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -65,6 +69,7 @@ const BookingSkeleton: React.FC = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
+        {slowHint ? <BookingSlowHint /> : null}
         <SkeletonGroup>
           <View style={[styles.formCard, { backgroundColor: theme.cardBackground }]}>
             <View style={styles.sectionHeader}>

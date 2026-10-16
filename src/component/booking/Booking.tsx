@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -14,14 +14,24 @@ import { RootState } from '../../modules/store';
 import type { BookingRouteParams, BookingFormData, Tourist } from '../../types/booking';
 import { ContactSection, TouristsSection, BookingFooter, BookingOrderSummary, BookingLegalInfo } from './components';
 import {
+  BookingLoadError,
+  BookingSubmitUnavailable,
+  BookingUnavailable,
+} from './components/BookingStatus';
+import {
   createOrder,
   validateTourist,
   prebuildOrder,
   prebookPackage,
   PackagesActualize,
   PackagesActualizeFlight,
-  getOrdersUsers,
 } from '../../modules/api/levelTravelApi';
+import {
+  classifyBookingLoadFailure,
+  getOfferSummary,
+  isOfferUnavailablePayload,
+} from '../../utils/bookingOffer';
+import { backToFlights, backToRooms } from '../../navigation/historyNavigation';
 import BookingSkeleton from './BookingSkeleton';
 import { useTheme } from '../../hooks/useTheme';
 import { isHotelOnlySearch } from '../../utils/bookingFlowUtils';
@@ -40,14 +50,15 @@ function extractOrderIdFromResponse(orderResult: any): number | string | null {
   );
 }
 
-function pickLatestOrderId(orders: any[]): number | string | null {
-  if (!Array.isArray(orders) || orders.length === 0) return null;
-  const sorted = [...orders].sort((a, b) => {
-    const da = new Date(a?.created_at || a?.updated_at || 0).getTime();
-    const db = new Date(b?.created_at || b?.updated_at || 0).getTime();
-    return db - da;
-  });
-  return sorted[0]?.id ?? sorted[0]?.order_id ?? null;
+/** Достаёт текст ошибки из разных форм ответа (строка, { message }, { error }, { errors: [] }). */
+function pickErrorText(value: any): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) return value.filter(Boolean).map(String).join('; ');
+  if (typeof value === 'object') {
+    return pickErrorText(value.message) || pickErrorText(value.error) || pickErrorText(value.errors);
+  }
+  return '';
 }
 
 function canSkipPrebook(errorText: string, result?: any): boolean {
@@ -68,12 +79,20 @@ export const Booking: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [packageOverride, setPackageOverride] = useState<any>(null);
+  /** Тур продали, пока заполняли форму: заказ не создавали. */
+  const [submitUnavailable, setSubmitUnavailable] = useState(false);
+  /** Второе нажатие «Отправить запрос», пока идёт первое, ничего не отправляет (state обновится позже). */
+  const submittingRef = useRef(false);
 
   const {
     packageData: loadedPackage,
     packageId,
     flightPairId,
     dataLoading,
+    loadState,
+    unavailablePackage,
+    slowLoading,
+    retry,
     tourists: initialTourists,
   } = useBooking(route.params || {});
 
@@ -144,8 +163,19 @@ export const Booking: React.FC = () => {
     [updateTourist, tourists, clearTouristError],
   );
 
+  const handleOtherFlight = useCallback(() => {
+    backToFlights(navigation, {
+      packageId: packageId ?? route.params?.packageInfo?.id,
+      searchType,
+      hotelMeta: route.params?.hotelMeta,
+      searchContext: route.params?.searchContext,
+    });
+  }, [navigation, packageId, searchType, route.params]);
+
+  const handleRooms = useCallback(() => backToRooms(navigation), [navigation]);
+
   const handleSubmit = useCallback(async () => {
-    if (loading || !packageId) return;
+    if (loading || submittingRef.current || !packageId || submitUnavailable) return;
 
     const formData: BookingFormData = { email, phone, tourists };
     const validationErrors = validateBookingForm(formData);
@@ -156,6 +186,7 @@ export const Booking: React.FC = () => {
 
     setErrors({});
     setLoading(true);
+    submittingRef.current = true;
 
     try {
       // 1) Re-actualize for LT freshness
@@ -164,11 +195,9 @@ export const Booking: React.FC = () => {
           ? await PackagesActualizeFlight(packageId, flightPairId)
           : await PackagesActualize(packageId, hotelOnly ? 'hotel' : 'package');
 
-        if ((actualizeResult as any)?.success === false) {
-          setErrors({
-            general:
-              'Не удалось актуализировать предложение. Пожалуйста, обновите и попробуйте снова.',
-          });
+        if (isOfferUnavailablePayload(actualizeResult)) {
+          // Заказ не создаём; под формой — «Этот тур только что раскупили» и куда перейти.
+          setSubmitUnavailable(true);
           setLoading(false);
           return;
         }
@@ -178,10 +207,15 @@ export const Booking: React.FC = () => {
         if (refreshed) {
           setPackageOverride(refreshed);
         }
-      } catch {
-        setErrors({
-          general: 'Не удалось актуализировать предложение. Пожалуйста, попробуйте еще раз.',
-        });
+      } catch (actualizeError) {
+        if (classifyBookingLoadFailure(actualizeError) === 'unavailable') {
+          setSubmitUnavailable(true);
+        } else {
+          setErrors({
+            general:
+              'Не удалось проверить тур у туроператора. Заказ не создан — нажмите «Отправить запрос» ещё раз.',
+          });
+        }
         setLoading(false);
         return;
       }
@@ -383,27 +417,30 @@ export const Booking: React.FC = () => {
 
       const orderResult = await createOrder(dataOrderCreate as any);
 
-      if (orderResult?.success === false || orderResult?.isAxiosError) {
-        const createMessage =
-          orderResult?.error?.message ||
-          orderResult?.response?.data?.message ||
-          orderResult?.message ||
-          'Не удалось создать заказ. Пожалуйста, попробуйте еще раз.';
+      // totus_API отдаёт отказ Level.Travel как 200 { error: ... } — это не успех (как на сайте).
+      if (
+        orderResult?.success === false ||
+        orderResult?.isAxiosError ||
+        Boolean(orderResult?.error)
+      ) {
+        const reason =
+          pickErrorText(orderResult?.error) ||
+          pickErrorText(orderResult?.response?.data) ||
+          pickErrorText(orderResult?.message);
+        const createMessage = /prebook/i.test(reason)
+          ? 'Не удалось закрепить бронь у поставщика. Выберите другой вариант или попробуйте позже.'
+          : reason
+            ? `Не удалось создать заказ у туроператора: ${reason}`
+            : 'Не удалось создать заказ. Пожалуйста, попробуйте еще раз.';
         setErrors({ general: String(createMessage) });
         setLoading(false);
         return;
       }
 
-      let orderId = extractOrderIdFromResponse(orderResult);
-
-      if (!orderId && (user as any)?.id) {
-        try {
-          const userOrders = await getOrdersUsers((user as any).id);
-          orderId = pickLatestOrderId((userOrders as any) || []);
-        } catch {
-          /* ignore */
-        }
-      }
+      // Номер заказа — только из ответа на создание. Прежний запасной вариант «последний заказ
+      // пользователя» уводил на уже существующий старый заказ, когда туроператор отказывал
+      // в создании нового (на сайте убран так же).
+      const orderId = extractOrderIdFromResponse(orderResult);
 
       if (!orderId) {
         setErrors({
@@ -427,10 +464,12 @@ export const Booking: React.FC = () => {
           'Произошла ошибка при отправке заказа. Пожалуйста, попробуйте еще раз.',
       });
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }, [
     loading,
+    submitUnavailable,
     email,
     phone,
     tourists,
@@ -443,8 +482,34 @@ export const Booking: React.FC = () => {
     packageData,
   ]);
 
+  if (loadState === 'unavailable' || loadState === 'error' || loadState === 'offline') {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <AppHeader />
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <TabletCentered>
+            {loadState === 'unavailable' ? (
+              <BookingUnavailable
+                summary={getOfferSummary(unavailablePackage)}
+                onOtherFlight={hotelOnly ? undefined : handleOtherFlight}
+                onRooms={handleRooms}
+              />
+            ) : (
+              <BookingLoadError
+                offline={loadState === 'offline'}
+                onRetry={retry}
+                onOtherFlight={hotelOnly ? undefined : handleOtherFlight}
+                onRooms={handleRooms}
+              />
+            )}
+          </TabletCentered>
+        </ScrollView>
+      </View>
+    );
+  }
+
   if (dataLoading || !packageData) {
-    return <BookingSkeleton />;
+    return <BookingSkeleton slowHint={slowLoading} />;
   }
 
   return (
@@ -481,16 +546,24 @@ export const Booking: React.FC = () => {
           </View>
         ) : null}
 
+        {submitUnavailable ? (
+          <BookingSubmitUnavailable
+            onOtherFlight={hotelOnly ? undefined : handleOtherFlight}
+            onRooms={handleRooms}
+          />
+        ) : null}
+
         <BookingOrderSummary
           packageData={packageData}
           selectedFlight={route.params?.flightData}
+          isHotelOnly={hotelOnly}
         />
         <BookingLegalInfo />
         </TabletCentered>
       </ScrollView>
 
       <BookingFooter
-        disabled={loading || !email || !phone}
+        disabled={loading || !email || !phone || submitUnavailable}
         loading={loading}
         onSubmit={handleSubmit}
       />

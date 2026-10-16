@@ -43,6 +43,8 @@ type TicketsRoute = RouteProp<
         kids: number;
         kidsAges?: number[];
       };
+      /** «Выбрать другой перелёт» с бронирования — список загружается заново. */
+      refreshAt?: number;
     };
   },
   'tickets'
@@ -100,10 +102,20 @@ const Tickets: React.FC = () => {
     loading,
     loadingMore,
     error,
+    listView,
     hasMore,
     loadMore,
     refetch,
   } = useTicketsData(packageId, selectedFilters, searchType);
+
+  // Вернулись с бронирования («тур недоступен» → «Выбрать другой перелёт»): список мог устареть.
+  const refreshAt = route.params?.refreshAt;
+  const lastRefreshRef = React.useRef(refreshAt);
+  useEffect(() => {
+    if (refreshAt == null || refreshAt === lastRefreshRef.current) return;
+    lastRefreshRef.current = refreshAt;
+    refetch();
+  }, [refreshAt, refetch]);
 
   const hasActiveFilters = useMemo(
     () =>
@@ -208,6 +220,8 @@ const Tickets: React.FC = () => {
       // Navigate to ticket details screen
       (navigation as any).navigate('ticketDetails', {
         flightData: rawFlight,
+        // Лёгкий ответ (?view=app): пересадки и полные данные рейса экран рейса догрузит сам.
+        flightIsSlim: listView,
         packageInfo,
         hotelMeta,
         searchContext: normalizedSearchContext,
@@ -218,6 +232,7 @@ const Tickets: React.FC = () => {
     },
     [
       allFlights,
+      listView,
       flightPriceMap,
       packagePrice,
       packageInfo,
@@ -280,9 +295,10 @@ const Tickets: React.FC = () => {
         hasActiveFilters={hasActiveFilters}
         onResetFilters={handleResetFilters}
         onRetry={refetch}
+        errorMessage={error}
       />
     );
-  }, [showEmptyOrError, hasActiveFilters, handleResetFilters, refetch]);
+  }, [showEmptyOrError, hasActiveFilters, handleResetFilters, refetch, error]);
 
   const ListHeaderSkeleton = useMemo(
     () => wrapTablet(<TicketsListHeaderSkeleton />, styles.headerTablet),

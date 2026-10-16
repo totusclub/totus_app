@@ -123,3 +123,44 @@ export function returnAfterLogin(navigation: Nav, returnTo: string, returnParams
   }
   navigation.navigate(returnTo, returnParams);
 }
+
+/**
+ * «Выбрать другой перелёт» на бронировании (тур недоступен / раскупили): назад к списку перелётов
+ * этого же тура, который уже открыт в стеке, — со свежей загрузкой (`refreshAt`); если списка
+ * в стеке нет — открыть его.
+ */
+export function backToFlights(
+  navigation: Nav,
+  params: { packageId?: number | null; searchType?: string; hotelMeta?: unknown; searchContext?: unknown },
+) {
+  const routes = stackState(navigation)?.routes ?? [];
+  const existing = [...routes].reverse().find(r => r.name === 'tickets');
+  if (existing) {
+    navigation.popTo('tickets', { ...(existing.params || {}), refreshAt: Date.now() });
+    return;
+  }
+  navigation.navigate('tickets', {
+    packageId: params.packageId ?? undefined,
+    searchType: params.searchType === 'hotel' ? 'hotel' : 'package',
+    hotelMeta: params.hotelMeta,
+    searchContext: params.searchContext,
+    refreshAt: Date.now(),
+  });
+}
+
+/** «Вернуться к номерам»: к странице отеля в стеке, иначе просто назад. */
+export function backToRooms(navigation: Nav) {
+  if (hasRouteInStack(navigation, 'hotel')) {
+    navigation.popTo('hotel');
+    return;
+  }
+  if (navigation.canGoBack?.()) {
+    navigation.goBack();
+    return;
+  }
+  try {
+    navigation.popToTop();
+  } catch {
+    /* экран — корень стека, закрывать нечего */
+  }
+}

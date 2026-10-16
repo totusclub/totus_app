@@ -277,6 +277,26 @@ export async function getHotelReviews(
 }
 
 // Packages API
+
+/**
+ * Таймауты шагов бронирования (как на сайте, totus_WEB #88). Сервер (totus_API #39) ждёт
+ * Level.Travel 30–45 с и отвечает понятной ошибкой (code: lt_timeout / lt_unreachable /
+ * lt_error); здесь — с запасом сверху, чтобы экран не висел, если ответа нет вовсе
+ * (пропала сеть, оборвалось соединение). У createOrder / createPay таймаута нет: заказ мог
+ * создаться, а приложение решило бы, что нет, — и человек оформил бы второй.
+ */
+export const LT_CLIENT_TIMEOUT_MS = {
+  packageDetails: 40000,
+  actualize: 55000,
+  flights: 75000,
+  selectedFlight: 75000,
+  prebuild: 55000,
+  prebook: 75000,
+  validateTourists: 40000,
+} as const;
+
+type RequestOptions = { signal?: AbortSignal };
+
 export async function createPackage(
   data: CreatePackageParams,
 ): Promise<PackageDetails> {
@@ -289,7 +309,10 @@ export async function createPackage(
     tour_id: data.tour_id,
   };
 
-  const response = await get<PackageDetails>(`/packages/package_details`, params);
+  const response = await instance.get<PackageDetails>(`/packages/package_details`, {
+    params,
+    timeout: LT_CLIENT_TIMEOUT_MS.packageDetails,
+  });
 
   return response.data;
 }
@@ -297,6 +320,7 @@ export async function createPackage(
 export async function PackagesActualize(
   id: number,
   searchType: 'package' | 'hotel' = 'package',
+  options?: RequestOptions,
 ): Promise<PackageDetails> {
   if (!id) {
     throw new Error('Missing package_id');
@@ -307,13 +331,24 @@ export async function PackagesActualize(
     search_type: searchType,
   };
 
-  const response = await get<PackageDetails>(`/packages/actualize`, params);
+  const response = await instance.get<PackageDetails>(`/packages/actualize`, {
+    params,
+    timeout: LT_CLIENT_TIMEOUT_MS.actualize,
+    ...(options?.signal ? { signal: options.signal } : {}),
+  });
 
   return response.data;
 }
 
+/**
+ * options.view = 'app' — лёгкий ответ totus_API для экрана «Перелёты» (без srcset, источников
+ * багажа, min_fuel_charge_by_tours и т. п.; у популярного тура вместо ~12 МБ — в разы меньше).
+ * Старый API параметр не знает и отдаёт полный ответ — экран работает и с ним.
+ * Подробности рейса (пересадки) экран рейса берёт отдельно — getSelectedFlight.
+ */
 export async function Packagesflights(
   params: PackagesFlightsParams,
+  options?: RequestOptions & { view?: 'app' },
 ): Promise<any> {
   if (!params) {
     throw new Error('Missing package_id');
@@ -335,13 +370,49 @@ export async function Packagesflights(
   }
   body.package_id = Number(packageId) || packageId;
 
-  const response = await post<any>(`/packages/flights`, body);
+  const response = await instance.post<any>(`/packages/flights`, body, {
+    ...(options?.view ? { params: { view: options.view } } : {}),
+    timeout: LT_CLIENT_TIMEOUT_MS.flights,
+    ...(options?.signal ? { signal: options.signal } : {}),
+  });
   return response.data;
+}
+
+/**
+ * Один выбранный перелёт пакета со всеми полями (пересадки, багаж) — экран рейса и бронирование.
+ * totus_API ?view=pair отдаёт только его, а не весь список (у популярного тура ~2000 рейсов,
+ * 12 МБ). Старый API вернёт полный список — рейс всё равно найдётся в нём.
+ * null — перелёта в ответе нет (продан / сменился).
+ */
+export async function getSelectedFlight(
+  packageId: unknown,
+  flightPairId: unknown,
+  options?: RequestOptions,
+): Promise<Record<string, any> | null> {
+  const id = Number(packageId);
+  const pairId = String(flightPairId ?? '').trim();
+  if (!Number.isFinite(id) || id <= 0) {
+    throw new Error('Missing or invalid package_id');
+  }
+  if (!pairId) return null;
+
+  const response = await instance.post<any>(
+    `/packages/flights`,
+    { package_id: Math.trunc(id) },
+    {
+      params: { view: 'pair', flight_pair_id: pairId },
+      timeout: LT_CLIENT_TIMEOUT_MS.selectedFlight,
+      ...(options?.signal ? { signal: options.signal } : {}),
+    },
+  );
+  const flights: any[] = Array.isArray(response.data?.flights) ? response.data.flights : [];
+  return flights.find(f => String(f?.flight_pair_id) === pairId) || null;
 }
 
 export async function PackagesActualizeFlight(
   id: number,
   f_id: number,
+  options?: RequestOptions,
 ): Promise<PackageDetails> {
   if (!id) {
     throw new Error('Missing package_id');
@@ -356,7 +427,11 @@ export async function PackagesActualizeFlight(
     page: 1,
   };
 
-  const response = await get<PackageDetails>(`/packages/actualize`, params);
+  const response = await instance.get<PackageDetails>(`/packages/actualize`, {
+    params,
+    timeout: LT_CLIENT_TIMEOUT_MS.actualize,
+    ...(options?.signal ? { signal: options.signal } : {}),
+  });
 
   return response.data;
 }
@@ -369,7 +444,9 @@ export async function validateTourist(
     if (!params) {
       throw new Error('Missing params');
     }
-    const response = await post<any>(`/validate-tourists`, params);
+    const response = await instance.post<any>(`/validate-tourists`, params, {
+      timeout: LT_CLIENT_TIMEOUT_MS.validateTourists,
+    });
     return response.data;
   } catch (err) {
     return err;
@@ -383,7 +460,9 @@ export async function prebuildOrder(
   if (!params?.package_id) {
     throw new Error('Missing package_id');
   }
-  const response = await post<any>(`/orders/prebuild`, params);
+  const response = await instance.post<any>(`/orders/prebuild`, params, {
+    timeout: LT_CLIENT_TIMEOUT_MS.prebuild,
+  });
   return response.data;
 }
 
@@ -398,7 +477,9 @@ export async function prebookPackage(
     throw new Error('Missing package_id');
   }
   try {
-    const response = await post<any>(`/packages/prebook`, params);
+    const response = await instance.post<any>(`/packages/prebook`, params, {
+      timeout: LT_CLIENT_TIMEOUT_MS.prebook,
+    });
     return response.data;
   } catch (err: any) {
     return {
