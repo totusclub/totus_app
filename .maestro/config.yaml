@@ -1,0 +1,5 @@
+# Maestro: ежедневный прогон приложения Totus Club (iPhone, iPad, Android).
+# Запуск — scripts/maestro-checkup.sh (сам находит устройства и передаёт APP_ID).
+# Описание сценариев и правила — .maestro/README_RU.md.
+flows:
+  - "flows/*"

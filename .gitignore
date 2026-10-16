@@ -137,3 +137,6 @@ android/keystores/
 .turbo/
 tmp/
 temp/
+
+# --- Maestro run reports (scripts/maestro-checkup.sh) ---
+reports/

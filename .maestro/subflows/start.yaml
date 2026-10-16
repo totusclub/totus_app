@@ -1,0 +1,21 @@
+# Общий старт каждого сценария: перезапуск приложения (без очистки данных — вход
+# QA-учёткой, если он есть, сохраняется), онбординг при необходимости, системные окна,
+# ожидание формы поиска с городом вылета и направлением по умолчанию.
+appId: ${APP_ID}
+---
+- launchApp:
+    appId: ${APP_ID}
+    stopApp: true
+    permissions:
+      notifications: deny
+- runFlow: dismiss_system_prompts.yaml
+- runFlow:
+    when:
+      visible: "Найдите тур"
+    file: onboarding.yaml
+- runFlow: dismiss_system_prompts.yaml
+- extendedWaitUntil:
+    visible: "Найти"
+    timeout: 30000
+    label: "Главная: форма поиска с кнопкой «Найти» (до 30 с)"
+- runFlow: dismiss_system_prompts.yaml
