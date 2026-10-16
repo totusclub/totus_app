@@ -7,6 +7,9 @@
  *
  * Если Яндекс не отдал почту — это не тупик: предлагаем повторить вход с экраном
  * прав (force_confirm) либо сразу войти по email.
+ *
+ * Ошибку («Не получилось войти») показываем, только если человек так и не вошёл:
+ * за одну попытку может прийти и ticket, и запоздалая ссылка с ошибкой (yandexReturn.ts).
  * Макеты: claude/YANDEX_AUTH_DESIGN_RU.md.
  */
 import React, {useCallback, useEffect, useRef, useState} from 'react';
@@ -18,11 +21,13 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import {useDispatch} from 'react-redux';
+import {useDispatch, useStore} from 'react-redux';
 import {jwtDecode} from 'jwt-decode';
 import {AppText, AppButton, AppInput} from '../../component/UI';
 import {useTheme} from '../../hooks/useTheme';
 import {setAuth} from '../store/slices/auth';
+import type {RootState} from '../store';
+import {log as crashLog} from '../crashReporting';
 import {navigateRoot} from '../../navigation/navigationRef';
 import {formatRuPhoneInput, normalizeRuPhone, RU_PHONE_HINT} from '../../utils/phone';
 import {
@@ -31,6 +36,7 @@ import {
   yandexExchange,
   yandexStartUrl,
 } from '../api/yandexAuth';
+import {decideYandexLink, shouldShowExchangeError} from './yandexReturn';
 import { FONT_HEADING } from '../../theme/fonts';
 
 type Stage = 'idle' | 'loading' | 'phone' | 'error';
@@ -47,7 +53,9 @@ const DEFAULT_ERROR = 'Не получилось войти через Янде�
 const YandexAuthBridge: React.FC = () => {
   const {theme} = useTheme();
   const dispatch = useDispatch();
+  const store = useStore<RootState>();
   const handled = useRef<Set<string>>(new Set());
+  const exchangesInFlight = useRef(0);
 
   const [stage, setStage] = useState<Stage>('idle');
   const [errorCode, setErrorCode] = useState('');
@@ -55,31 +63,61 @@ const YandexAuthBridge: React.FC = () => {
   const [phoneError, setPhoneError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const isAuthorized = useCallback(() => Boolean(store.getState().auth?.accessToken), [store]);
+
   const handleUrl = useCallback(
     async (url?: string | null) => {
       if (!url) return;
-      const parsed = parseYandexDeepLink(url);
-      if (!parsed) return;
+      const decision = decideYandexLink(parseYandexDeepLink(url), {
+        isAuthorized: isAuthorized(),
+        exchangeInFlight: exchangesInFlight.current > 0,
+        handledTickets: handled.current,
+      });
 
-      if (parsed.error) {
-        setErrorCode(parsed.error);
+      if (decision.action === 'skip') return;
+      if (decision.action === 'ignoreError') {
+        crashLog(`Yandex ID: error link ignored (${decision.reason}): ${decision.code}`);
+        return;
+      }
+      if (decision.action === 'showError') {
+        crashLog(`Yandex ID: error link: ${decision.code}`);
+        setErrorCode(decision.code);
         setStage('error');
         return;
       }
-      const ticket = parsed.ticket;
-      if (!ticket || handled.current.has(ticket)) return;
-      handled.current.add(ticket);
 
+      const ticket = decision.ticket;
+      handled.current.add(ticket);
+      exchangesInFlight.current += 1;
       setStage('loading');
+
+      let data: Awaited<ReturnType<typeof yandexExchange>>;
+      let token: string | undefined;
+      let user: ReturnType<typeof jwtDecode>;
       try {
-        const data = await yandexExchange(ticket);
-        const token = data.accessToken || data.authToken;
+        data = await yandexExchange(ticket);
+        token = data?.accessToken || data?.authToken;
         if (!data?.auth || !token) {
-          setErrorCode('ticket_invalid');
-          setStage('error');
+          throw Object.assign(new Error('ticket_invalid'), {yandexCode: 'ticket_invalid'});
+        }
+        user = jwtDecode(token);
+      } catch (error: any) {
+        exchangesInFlight.current -= 1;
+        const code = error?.yandexCode || error?.response?.data?.error || 'yandex_failed';
+        if (!shouldShowExchangeError(isAuthorized())) {
+          // Вход уже удался другим ticket этой попытки — окно ошибки не показываем.
+          crashLog(`Yandex ID: exchange error ignored (authorized): ${code}`);
+          setStage(current => (current === 'loading' ? 'idle' : current));
           return;
         }
-        const user = jwtDecode(token);
+        crashLog(`Yandex ID: exchange failed: ${code}`);
+        setErrorCode(code);
+        setStage('error');
+        return;
+      }
+      exchangesInFlight.current -= 1;
+
+      try {
         dispatch(
           setAuth({
             token,
@@ -87,22 +125,32 @@ const YandexAuthBridge: React.FC = () => {
             user,
           }),
         );
-
-        if (data.needsPhone) {
-          setStage('phone');
+      } catch (error: any) {
+        // Подписчик store упал уже после записи токенов — вход при этом состоялся.
+        crashLog(`Yandex ID: setAuth listener failed: ${error?.message || error}`);
+        if (!isAuthorized()) {
+          setErrorCode('yandex_failed');
+          setStage('error');
           return;
         }
-        setStage('idle');
+      }
+
+      if (data.needsPhone) {
+        setStage('phone');
+        return;
+      }
+      setStage('idle');
+      // Вход уже состоялся: сбой перехода на «Аккаунт» — не ошибка входа.
+      try {
         navigateRoot('tab', {
           screen: 'AccountStackScreen',
           params: {screen: 'account'},
         });
       } catch (error: any) {
-        setErrorCode(error?.response?.data?.error || 'yandex_failed');
-        setStage('error');
+        crashLog(`Yandex ID: navigation after sign-in failed: ${error?.message || error}`);
       }
     },
-    [dispatch],
+    [dispatch, isAuthorized],
   );
 
   useEffect(() => {
