@@ -1,0 +1,36 @@
+# Запуск приложения и вкладки. Гость: «Поиск», «Заказы», «Аккаунт» (→ экран «Вход»).
+# С QA-учёткой вкладка «Аккаунт» открывает профиль — оба варианта считаются нормой.
+appId: ${APP_ID}
+name: "01 Запуск и вкладки"
+tags:
+  - daily
+---
+- runFlow: ../subflows/start.yaml
+- assertVisible:
+    text: ".*Москва.*"
+    label: "Город вылета по умолчанию — Москва"
+- assertVisible:
+    text: ".*Египет.*"
+    label: "Направление по умолчанию — Египет"
+- takeScreenshot: 01_home
+- tapOn:
+    text: "Заказы"
+    label: "Вкладка «Заказы»"
+- assertNotVisible:
+    text: "Ошибка"
+    label: "«Заказы» открылись без ошибки"
+- takeScreenshot: 01_orders
+- tapOn:
+    text: "Аккаунт.*"
+    label: "Вкладка «Аккаунт»"
+- extendedWaitUntil:
+    visible: ".*(Вход|Выйти|Документы|Чат с поддержкой).*"
+    timeout: 15000
+    label: "«Аккаунт»: экран входа (гость) или профиль (QA-учётка)"
+- takeScreenshot: 01_account
+- tapOn:
+    text: "Поиск"
+    label: "Назад на вкладку «Поиск»"
+- assertVisible:
+    text: "Найти"
+    label: "Форма поиска на месте"

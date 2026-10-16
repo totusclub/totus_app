@@ -1,0 +1,31 @@
+# Мила (вкладка «Totus AI») — только с QA-учёткой на устройстве: вкладка видна
+# вошедшему пользователю с доступом к ИИ. Проверяем, что чат открылся и подключён
+# к серверу и модели. Сообщения НЕ отправляем: каждое — платный запрос к модели.
+appId: ${APP_ID}
+name: "04 Мила: чат открывается и онлайн"
+tags:
+  - auth
+---
+- runFlow: ../subflows/start.yaml
+- assertVisible:
+    text: "Totus AI.*"
+    label: "Вкладка «Totus AI» есть (нужен вход QA-учёткой с доступом к ИИ)"
+- tapOn:
+    text: "Totus AI.*"
+    label: "Открыть «Totus AI»"
+- extendedWaitUntil:
+    visible: "Мила · Тотус клуб"
+    timeout: 15000
+    label: "Чат Милы открылся"
+- extendedWaitUntil:
+    visible: "Онлайн · подбор туров"
+    timeout: 20000
+    label: "Мила онлайн: сокет подключён и модель включена (не «Переподключение…» и не «Локальный режим»)"
+- assertVisible:
+    text: "Спросите совет или опишите тур…"
+    label: "Поле ввода на месте"
+- takeScreenshot: 04_mila
+- tapOn:
+    text: "Назад"
+    optional: true
+    label: "Выйти из чата"

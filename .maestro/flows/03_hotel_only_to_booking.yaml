@@ -1,0 +1,75 @@
+# «Отель» (без перелёта): поиск → отель → номер и предложение → форма бронирования.
+# Форму НЕ заполняем и «Отправить запрос» НЕ нажимаем.
+appId: ${APP_ID}
+name: "03 Отель без перелёта: поиск → отель → бронирование"
+tags:
+  - daily
+---
+- runFlow: ../subflows/start.yaml
+- tapOn:
+    text: "(Отель|Отель.*Без перелёта.*)"
+    label: "Режим «Отель» (без перелёта)"
+- assertVisible:
+    text: ".*Дата заезда.*"
+    label: "В режиме «Отель» поле «Дата заезда»"
+- tapOn:
+    text: "Найти"
+    label: "«Найти»"
+
+- extendedWaitUntil:
+    visible: "(Найдено \\d+ отел.*|Ошибка)"
+    timeout: 90000
+    label: "Выдача отелей: «Найдено N отелей» (до 90 с)"
+- assertNotVisible:
+    text: "Ошибка"
+    label: "Выдача не пустая"
+- takeScreenshot: 03_search_results
+- runFlow: ../subflows/dismiss_system_prompts.yaml
+- tapOn:
+    text: ".*от \\d+ .*ноч.*"
+    index: 0
+    label: "Открыть первый отель"
+
+- extendedWaitUntil:
+    visible: "Выбрать номер"
+    timeout: 30000
+    label: "Страница отеля: «Выбрать номер» (до 30 с)"
+- assertVisible:
+    text: ".*Цена за проживание.*"
+    label: "Цена указана за проживание (режим «Отель»)"
+- tapOn:
+    text: "Выбрать номер"
+    label: "«Выбрать номер» — прокрутка к номерам"
+- extendedWaitUntil:
+    visible: "(Все варианты|К сожалению, для данного отеля нет доступных номеров)"
+    timeout: 45000
+    label: "Номера загрузились (до 45 с)"
+- assertNotVisible:
+    text: "К сожалению, для данного отеля нет доступных номеров"
+    label: "У первого отеля есть номера"
+- takeScreenshot: 03_hotel_rooms
+- tapOn:
+    text: "Все варианты"
+    index: 0
+    label: "Первый номер: «Все варианты»"
+- extendedWaitUntil:
+    visible: ".*\\d+ ночей.*"
+    timeout: 20000
+    label: "Окно предложений открылось"
+- tapOn:
+    text: ".*\\d+ ночей.*"
+    index: 0
+    label: "Выбрать первое предложение"
+- tapOn:
+    text: "Выбрать .*₽"
+    index: 1
+    label: "Кнопка «Выбрать N ₽» (вторая из двух одинаковых надписей)"
+
+- extendedWaitUntil:
+    visible: "(Отправить запрос|Ваш заказ|Туристы|Вход)"
+    timeout: 45000
+    label: "Форма бронирования (или «Вход») открылась, до 45 с"
+- assertNotVisible:
+    text: "Не удалось выполнить (пребук перелёта|предпросмотр заказа).*"
+    label: "Без ошибки предпросмотра заказа"
+- takeScreenshot: 03_booking

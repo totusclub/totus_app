@@ -1,0 +1,38 @@
+# Чистый запуск: стираем данные приложения и проходим онбординг как новый пользователь.
+# ВНИМАНИЕ: clearState выходит из аккаунта QA-учётки. Поэтому тег «fresh» не входит
+# в ежедневный прогон — запускать вручную: scripts/maestro-checkup.sh --fresh
+appId: ${APP_ID}
+name: "00 Чистый запуск и онбординг"
+tags:
+  - fresh
+---
+- launchApp:
+    appId: ${APP_ID}
+    clearState: true
+    stopApp: true
+    permissions:
+      notifications: deny
+- runFlow: ../subflows/dismiss_system_prompts.yaml
+- extendedWaitUntil:
+    visible: "Найдите тур"
+    timeout: 20000
+    label: "Онбординг открылся после установки (до 20 с)"
+- runFlow: ../subflows/onboarding.yaml
+- runFlow: ../subflows/dismiss_system_prompts.yaml
+- extendedWaitUntil:
+    visible: "Найти"
+    timeout: 30000
+    label: "После онбординга сразу главная с поиском — без экрана PIN-кода"
+- assertNotVisible:
+    text: "Введите пароль"
+    label: "Нет старого экрана PIN-кода (убран в totus_APP #29)"
+- assertVisible:
+    text: "Поиск"
+    label: "Вкладка «Поиск»"
+- assertVisible:
+    text: "Заказы"
+    label: "Вкладка «Заказы»"
+- assertVisible:
+    text: "Аккаунт.*"
+    label: "Вкладка «Аккаунт»"
+- takeScreenshot: 00_after_onboarding
