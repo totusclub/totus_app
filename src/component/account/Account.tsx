@@ -411,7 +411,7 @@ const AccountScreen = () => {
     const loyaltyIdToCopy = String(loyaltyId).replace(/\s/g, ''); // Remove spaces for copy
     try {
       Clipboard.setString(loyaltyIdToCopy);
-      Alert.alert('Скопировано', 'Loyalty ID скопирован в буфер обмена');
+      Alert.alert('Скопировано', 'Номер участника программы лояльности скопирован в буфер обмена.');
     } catch (error) {
       console.error('Error copying loyalty ID:', error);
       Alert.alert('Ошибка', 'Не удалось скопировать Loyalty ID');
