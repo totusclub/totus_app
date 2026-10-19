@@ -359,7 +359,7 @@ const CallsScreen: React.FC = () => {
     const loyaltyIdToCopy = currentLoyaltyId.replace(/\s+/g, ''); // Remove spaces for copy
     try {
       Clipboard.setString(loyaltyIdToCopy);
-      Alert.alert('Скопировано', 'Номер карты лояльности скопирован в буфер обмена');
+      Alert.alert('Скопировано', 'Номер участника программы лояльности скопирован в буфер обмена.');
     } catch (error) {
       console.error('Error copying loyalty ID:', error);
       Alert.alert('Ошибка', 'Не удалось скопировать номер карты лояльности');
