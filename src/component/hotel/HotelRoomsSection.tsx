@@ -174,6 +174,7 @@ const HotelRoomsSection: React.FC<HotelRoomsSectionProps> = ({
             <TabletGrid
               items={displayRooms}
               columns={columns}
+              rowStyle={styles.gridRowStretch}
               keyExtractor={(room) => String(room.ID)}
               renderItem={(room) => {
                 const isAiFoundRoom = isSameHotelRoom(room, selectedAiRoom);
@@ -197,6 +198,7 @@ const HotelRoomsSection: React.FC<HotelRoomsSectionProps> = ({
                     roomFeatures={roomFeatures}
                     showAiBadge={isAiFoundRoom}
                     aiPriceChange={aiPriceChange}
+                    equalHeight
                     onViewAllOptions={() => onViewAllOptions(room, selectedDate)}
                     onMoreDetails={() => onMoreDetails(room)}
                   />
@@ -257,6 +259,11 @@ const styles = StyleSheet.create({
   },
   roomsContainer: {
     gap: 16,
+  },
+  // iPad: карточки ряда тянутся до самой высокой (фото с точками, лишняя строка
+  // «Быстрое подтверждение»), цена и «Все варианты» внизу — все одной высоты.
+  gridRowStretch: {
+    alignItems: 'stretch',
   },
   emptyWrap: {
     gap: 12,

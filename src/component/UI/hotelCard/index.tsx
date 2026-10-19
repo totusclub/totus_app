@@ -88,6 +88,8 @@ type HotelCardProps = {
     aiPriceChange?: AiPriceChange | null;
     // iPad grid: the card fills its grid cell, the title and the tags reserve a fixed
     // height, and the price is pinned to the bottom — every card in a row lines up.
+    // Room cards (type="room"): the card fills the cell, price + «Все варианты» are pinned
+    // to the bottom (rooms grid on the hotel page, 19.10.2026).
     equalHeight?: boolean;
 
 };
@@ -190,6 +192,9 @@ const HotelCard: React.FC<HotelCardProps> = ({
         styles.card,
         isRoomCard && styles.roomCard,
         { backgroundColor: theme.cardBackground },
+        // iPad, сетка номеров: карточка тянется на высоту ряда (самой высокой карточки),
+        // цена и «Все варианты» прижаты к низу — все карточки ряда одной высоты.
+        equalHeight && styles.cardEqualHeight,
     ];
 
     const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -783,7 +788,7 @@ const HotelCard: React.FC<HotelCardProps> = ({
                         )}
                     </View>
                 ) : (
-                    <View style={styles.content}>
+                    <View style={[styles.content, equalHeight && isRoomCard && styles.contentEqualHeight]}>
                         {!isRoomCard && (
                             <>
                                 <View style={styles.ratingRow}>
@@ -835,7 +840,7 @@ const HotelCard: React.FC<HotelCardProps> = ({
 
                         {/* Show price only for room cards */}
                         {isRoomCard && (
-                            <View style={styles.roomPriceWrap}>
+                            <View style={[styles.roomPriceWrap, equalHeight && styles.priceSectionBottom]}>
                                 <View style={styles.priceSection}>
                                     <AppText style={styles.priceText}>{hotel.price}</AppText>
                                     <AppText style={[styles.priceSubtext, { color: theme.textTertiary }]}>{hotel.dateRange}</AppText>
