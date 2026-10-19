@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { LayoutChangeEvent, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { AppText } from '../UI';
 import { FONT_HEADING } from '../../theme/fonts';
@@ -45,6 +45,19 @@ export const LOYALTY_CARD_COLORS = {
   },
 } as const;
 
+/** Ширина карты в макете телефона, от неё считается увеличение на iPad. */
+export const LOYALTY_CARD_BASE_WIDTH = 359;
+export const LOYALTY_CARD_MAX_SCALE = 1.35;
+
+/**
+ * Во сколько раз крупнее текст и значки на карте шириной `width` (iPad, макет 19.10.2026,
+ * вариант Б): растут вместе с картой, не больше 1.35×; на телефоне — 1.
+ */
+export function loyaltyCardScale(width: number, isTablet?: boolean): number {
+  if (!isTablet || !Number.isFinite(width) || width <= LOYALTY_CARD_BASE_WIDTH) return 1;
+  return Math.min(LOYALTY_CARD_MAX_SCALE, Math.floor((width / LOYALTY_CARD_BASE_WIDTH) * 100) / 100);
+}
+
 /** Номер группами по 4: «5281 0473 9916 2045». */
 export function formatLoyaltyNumber(value: string | number | undefined | null): string {
   const cleaned = String(value ?? '').replace(/\s/g, '');
@@ -79,10 +92,33 @@ type LoyaltyCardProps = {
 const LoyaltyCard: React.FC<LoyaltyCardProps> = ({ number, name, isDark, isTablet, onCopy }) => {
   const c = isDark ? LOYALTY_CARD_COLORS.dark : LOYALTY_CARD_COLORS.light;
   const initials = loyaltyInitials(name);
+  // iPad: карта на всю ширину колонки (пропорция 1,586 : 1 из aspectRatio), текст растёт вместе с ней.
+  // Раньше maxWidth 520 применялся после aspectRatio — высота считалась от ширины колонки (~930),
+  // и карта выходила 520 × 585.
+  const [width, setWidth] = useState(0);
+  const k = loyaltyCardScale(width, isTablet);
+  const kb = Math.min(k, 1.15); // кнопка «Скопировать» и скругление — чуть сдержаннее
+  const onLayout = (e: LayoutChangeEvent) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    if (w > 0 && w !== width) setWidth(w);
+  };
+  const sz = (fontSize: number, lineHeight: number, letterSpacing?: number) =>
+    k === 1
+      ? null
+      : {
+          fontSize: fontSize * k,
+          lineHeight: lineHeight * k,
+          ...(letterSpacing != null ? { letterSpacing: letterSpacing * k } : null),
+        };
   return (
     <View
       accessibilityLabel="Карта лояльности"
-      style={[styles.card, isTablet && styles.cardTablet, { backgroundColor: c.bg, borderColor: c.border }]}>
+      onLayout={onLayout}
+      style={[
+        styles.card,
+        k !== 1 && { borderRadius: 20 * Math.min(k, 1.2) },
+        { backgroundColor: c.bg, borderColor: c.border },
+      ]}>
       <Svg
         style={StyleSheet.absoluteFill}
         width="100%"
@@ -94,19 +130,23 @@ const LoyaltyCard: React.FC<LoyaltyCardProps> = ({ number, name, isDark, isTable
         <Path d={RING_B} fill={c.ringB} fillOpacity={c.ringBOpacity} />
       </Svg>
 
-      <View style={styles.content}>
+      <View
+        style={[
+          styles.content,
+          k !== 1 && { paddingTop: 20 * k, paddingHorizontal: 20 * k, paddingBottom: 16 * k },
+        ]}>
         <View style={styles.header}>
-          <View style={styles.titleCol}>
+          <View style={[styles.titleCol, k !== 1 && { gap: 4 * k }]}>
             <AppText
-              style={[styles.title, { color: c.ink }]}
+              style={[styles.title, sz(26, 30, 0.5), { color: c.ink }]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.75}>
               Карта лояльности
             </AppText>
-            <AppText style={[styles.club, { color: c.brand }]}>Totus Club</AppText>
+            <AppText style={[styles.club, sz(11, 14, 1.8), { color: c.brand }]}>Totus Club</AppText>
           </View>
-          <Svg width={52} height={28} style={styles.bird} viewBox="0 0 73 39" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Svg width={52 * k} height={28 * k} style={styles.bird} viewBox="0 0 73 39" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             {BIRD.map((d) => (
               <Path key={d.slice(0, 12)} d={d} fill={c.bird} />
             ))}
@@ -116,7 +156,7 @@ const LoyaltyCard: React.FC<LoyaltyCardProps> = ({ number, name, isDark, isTable
         <View style={styles.numberBlock}>
           <View style={styles.numberRow}>
             <AppText
-              style={[styles.number, { color: c.ink }]}
+              style={[styles.number, sz(21, 26, 1.5), { color: c.ink }]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.7}>
@@ -127,8 +167,12 @@ const LoyaltyCard: React.FC<LoyaltyCardProps> = ({ number, name, isDark, isTable
               accessibilityLabel="Скопировать номер карты"
               onPress={onCopy}
               activeOpacity={0.7}
-              style={[styles.copyButton, { backgroundColor: c.copyBg, borderColor: c.copyBorder }]}>
-              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+              style={[
+                styles.copyButton,
+                kb !== 1 && { width: 44 * kb, height: 44 * kb, borderRadius: 22 * kb },
+                { backgroundColor: c.copyBg, borderColor: c.copyBorder },
+              ]}>
+              <Svg width={20 * kb} height={20 * kb} viewBox="0 0 24 24" fill="none">
                 <Path
                   d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"
                   stroke={c.ink}
@@ -146,16 +190,20 @@ const LoyaltyCard: React.FC<LoyaltyCardProps> = ({ number, name, isDark, isTable
               </Svg>
             </TouchableOpacity>
           </View>
-          <AppText style={[styles.caption, { color: c.sub }]}>Ваш персональный номер</AppText>
+          <AppText style={[styles.caption, sz(13, 16), { color: c.sub }]}>Ваш персональный номер</AppText>
         </View>
 
-        <View style={[styles.footer, { borderTopColor: c.line }]}>
-          <AppText style={[styles.name, { color: c.ink }]} numberOfLines={1}>
+        <View style={[styles.footer, k !== 1 && { paddingTop: 12 * k }, { borderTopColor: c.line }]}>
+          <AppText style={[styles.name, sz(16, 20), { color: c.ink }]} numberOfLines={1}>
             {name}
           </AppText>
           {initials ? (
-            <View style={styles.monogram}>
-              <AppText style={styles.monogramText}>{initials}</AppText>
+            <View
+              style={[
+                styles.monogram,
+                k !== 1 && { width: 32 * k, height: 32 * k, borderRadius: 16 * k },
+              ]}>
+              <AppText style={[styles.monogramText, sz(12, 14, 0.5)]}>{initials}</AppText>
             </View>
           ) : null}
         </View>
@@ -171,9 +219,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     overflow: 'hidden',
-  },
-  cardTablet: {
-    maxWidth: 520,
   },
   content: {
     flex: 1,
