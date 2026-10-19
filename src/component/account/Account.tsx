@@ -778,7 +778,9 @@ const AccountScreen = () => {
           { paddingBottom: insets.bottom + 20 },
         ]}
         showsVerticalScrollIndicator={false}>
-        <TabletColumns sideWidth={380} side={settingsBlocks}>
+        {/* iPad: карта и меню — один блок до 960 точек по центру (макет «Карта лояльности на iPad»,
+            вариант Б, утверждён 19.10.2026); на телефоне TabletColumns ничего не оборачивает. */}
+        <TabletColumns sideWidth={380} gap={24} side={settingsBlocks} style={styles.tabletBlock}>
         {/* Карта лояльности: светлая тема — вариант C, тёмная — B (макет 15.10.2026) */}
         <LoyaltyCard
           number={loyaltyId}
@@ -936,6 +938,11 @@ const styles = StyleSheet.create({
   // iPad only
   scrollContentTablet: {
     padding: 24,
+  },
+  tabletBlock: {
+    width: '100%',
+    maxWidth: 960,
+    alignSelf: 'center',
   },
 });
 

@@ -81,5 +81,39 @@ check('номер группами по 4, пустой — нули; иници
   assert.equal(ini(''), '');
 });
 
+console.log('Карта лояльности на iPad (макет 19.10.2026, вариант Б)');
+
+check('iPad: без maxWidth 520 — высота не считается от ширины колонки (было 520 × 585)', () => {
+  assert.ok(!/maxWidth:\s*520/.test(cardCode), 'maxWidth 520 вернулся');
+  assert.ok(!/cardTablet/.test(cardCode), 'cardTablet вернулся');
+  assert.match(cardCode, /width: '100%',\s*aspectRatio: 1\.586/);
+});
+
+check('iPad: карта и меню — один блок до 960 точек по центру, меню 380, промежуток 24', () => {
+  assert.match(account, /<TabletColumns sideWidth=\{380\} gap=\{24\} side=\{settingsBlocks\} style=\{styles\.tabletBlock\}>/);
+  assert.match(account, /tabletBlock: \{\s*width: '100%',\s*maxWidth: 960,\s*alignSelf: 'center',\s*\}/);
+});
+
+check('iPad: текст растёт с картой до 1.35×, телефон — 1×', () => {
+  const m = /export function loyaltyCardScale\(width: number, isTablet\?: boolean\): number \{([\s\S]*?)\n\}/.exec(card);
+  assert.ok(m, 'нет loyaltyCardScale');
+  const fn = new Function('LOYALTY_CARD_BASE_WIDTH', 'LOYALTY_CARD_MAX_SCALE', 'width', 'isTablet', m[1]);
+  const f = (w, t) => fn(359, 1.35, w, t);
+  assert.equal(f(556, false), 1);
+  assert.equal(f(343, true), 1);
+  assert.equal(f(400, true), 1.11);
+  assert.equal(f(556, true), 1.35);
+  assert.equal(f(1000, true), 1.35);
+  assert.equal(f(0, true), 1);
+});
+
+check('iPad: размеры текста, птицы, кнопки и инициалов берутся с увеличением', () => {
+  for (const re of [/styles\.title, sz\(26, 30, 0\.5\)/, /styles\.number, sz\(21, 26, 1\.5\)/, /styles\.name, sz\(16, 20\)/,
+    /styles\.caption, sz\(13, 16\)/, /styles\.club, sz\(11, 14, 1\.8\)/, /width=\{52 \* k\} height=\{28 \* k\}/,
+    /width: 44 \* kb, height: 44 \* kb/, /width: 32 \* k, height: 32 \* k/, /onLayout=\{onLayout\}/]) {
+    assert.match(cardCode, re);
+  }
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
