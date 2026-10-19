@@ -3,7 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import AuthStack from './authStack';
 import { useThemeContext } from '../context/ThemeContext';
 import { navigationRef } from './navigationRef';
-import YandexAuthBridge from '../modules/auth/YandexAuthBridge';
 
 export default function Navigation(): React.JSX.Element {
   const { theme, isDark } = useThemeContext();
@@ -41,8 +40,6 @@ export default function Navigation(): React.JSX.Element {
         },
       }}>
       <AuthStack />
-      {/* Возврат из браузера после входа через Яндекс ID (deep link totus://auth/yandex) */}
-      <YandexAuthBridge />
     </NavigationContainer>
   );
 }
