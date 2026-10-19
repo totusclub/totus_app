@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -36,6 +36,8 @@ const SignupScreen = () => {
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [captchaStatus, setCaptchaStatus] = useState<CaptchaStatus>('loading');
+  // Капча прокручивает форму к заданию Яндекса (картинка, поле, «Отправить» — над клавиатурой).
+  const scrollRef = useRef<ScrollView>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,6 +106,7 @@ const SignupScreen = () => {
       style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.content,
           {
@@ -135,6 +138,7 @@ const SignupScreen = () => {
 
           <YandexSmartCaptcha
             resetKey={captchaResetKey}
+            scrollRef={scrollRef}
             onTokenChange={token => {
               setCaptchaToken(token);
               if (token) setError(null);
