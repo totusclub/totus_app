@@ -2,7 +2,7 @@ import { createNavigationContainerRef, StackActions } from '@react-navigation/na
 
 /**
  * Root navigation ref — used by the floating AI chat (outside screen tree)
- * to open hotel details, by push taps and by the Yandex ID return.
+ * to open hotel details and by push taps.
  */
 export const navigationRef = createNavigationContainerRef();
 
