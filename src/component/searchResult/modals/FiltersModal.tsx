@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useContext, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,12 +7,30 @@ import {
   BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import FiltersModalContent from './FiltersModalContent';
 import { useTheme } from '../../../hooks/useTheme';
 import { useFiltersOpen } from '../FiltersOpenContext';
 
 /** SearchResultHeader: 40 content + 2 bottom border. */
 const SEARCH_HEADER_HEIGHT = 42;
+/** `Content` (UI/content): marginBottom when the bottom tab bar is shown. */
+const CONTENT_BOTTOM_MARGIN = 12;
+
+/**
+ * Part of the screen hidden by the bottom tab bar. The tab bar is
+ * `position: 'absolute'` (authStack getTabBarStyle), so the results screen —
+ * and this sheet — run under it: the screen ends at the bottom safe-area inset
+ * + 12, the tab bar starts at its full height (icons + labels + inset).
+ * Without the lift «Применить» sat under «Поиск / Заказы / Аккаунт»
+ * (iPhone, iPad portrait and Android). 0 outside a tab navigator.
+ */
+export function tabBarOverlap(tabBarHeight: number | undefined, bottomInset: number): number {
+  if (!tabBarHeight || tabBarHeight <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.round(tabBarHeight - bottomInset - CONTENT_BOTTOM_MARGIN));
+}
 
 /**
  * Mounts the full filter tree as soon as search facets arrive (collapsed,
@@ -23,6 +41,9 @@ const FiltersModal: React.FC = () => {
   const { theme } = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  // Measured tab bar height (undefined outside the tab navigator).
+  const tabBarHeight = useContext(BottomTabBarHeightContext);
+  const bottomOverlap = tabBarOverlap(tabBarHeight, insets.bottom);
   const {
     visible,
     shouldMountBody,
@@ -41,7 +62,8 @@ const FiltersModal: React.FC = () => {
    */
   const usableHeight =
     availableHeight > 0 ? availableHeight : windowHeight - insets.top;
-  const sheetHeight = Math.max(240, usableHeight - SEARCH_HEADER_HEIGHT);
+  // The sheet ends above the tab bar: same top edge (under the header), shorter by the overlap.
+  const sheetHeight = Math.max(240, usableHeight - SEARCH_HEADER_HEIGHT - bottomOverlap);
 
   useEffect(() => {
     if (!shouldMountBody) {
@@ -118,10 +140,12 @@ const FiltersModal: React.FC = () => {
             // Keep real height while closed so layout/onLayout still run
             // inside the height:0 clipped root (needed for bodyReady).
             height: sheetHeight,
+            // Lift above the absolute tab bar so «Применить» stays visible and tappable.
+            marginBottom: bottomOverlap,
           },
         ]}
         onLayout={handleBodyLayout}>
-        <FiltersModalContent onClose={close} />
+        <FiltersModalContent onClose={close} aboveTabBar={bottomOverlap > 0} />
       </View>
     </View>
   );
