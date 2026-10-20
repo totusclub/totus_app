@@ -61,6 +61,11 @@ type FiltersModalContentProps = {
   variant?: 'sheet' | 'sidebar';
   /** Current result count for the sidebar apply button. */
   resultCount?: number;
+  /**
+   * Sheet ends above the bottom tab bar (FiltersModal lifts it): the home
+   * indicator / nav bar inset is under the tab bar, not under «Применить».
+   */
+  aboveTabBar?: boolean;
 };
 
 const WIFI_LABELS: Record<string, string> = {
@@ -199,6 +204,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
   onClose,
   variant = 'sheet',
   resultCount,
+  aboveTabBar = false,
 }) => {
   const isSidebar = variant === 'sidebar';
   const { theme } = useTheme();
@@ -823,7 +829,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
         style={[
           styles.buttonContainer,
           {
-            paddingBottom: Math.max(insets.bottom, 12),
+            paddingBottom: aboveTabBar ? 12 : Math.max(insets.bottom, 12),
             borderTopColor: theme.borderLight,
           },
         ]}>
