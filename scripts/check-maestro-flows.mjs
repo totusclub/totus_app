@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = console.log.bind(console);
@@ -155,6 +156,33 @@ check('runner scripts/maestro-checkup.sh is executable and runs the daily tag', 
   assert.match(s, /daily/);
   assert.match(s, /app\.totus\.club/);
   assert.match(s, /com\.totus\.com/);
+});
+
+// Mac mini stand (scripts/qa-mac): scripts exist, are executable, parse as bash, never wipe app data,
+// never type into the app, keep secrets out and run read-only triage.
+const QA_MAC = ['scripts/qa-mac/setup.sh', 'scripts/qa-mac/run.sh'];
+for (const rel of QA_MAC) {
+  check(`${rel}: exists, executable, valid bash`, () => {
+    const p = path.join(root, rel);
+    assert.ok(fs.existsSync(p), `${rel} missing`);
+    assert.ok(fs.statSync(p).mode & 0o111, `${rel} is not executable`);
+    const r = spawnSync('bash', ['-n', p], {encoding: 'utf8'});
+    assert.equal(r.status, 0, `bash -n: ${r.stderr}`);
+  });
+}
+check('scripts/qa-mac/run.sh: no data wipe, no typing, read-only triage, no secrets', () => {
+  const s = read('scripts/qa-mac/run.sh');
+  assert.doesNotMatch(s, /--fresh|clearState|simctl erase|pm clear|-wipe-data/, 'the stand must keep app data (QA login)');
+  assert.doesNotMatch(s, /adb[^\n]*shell input text|simctl[^\n]*keyboard/, 'the stand must not type into the app');
+  assert.match(s, /claude -p --tools "Read,Glob,Grep"/, 'triage must be read-only');
+  assert.doesNotMatch(s, /(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_|sk-ant-)/, 'no tokens in scripts');
+  assert.match(s, /maestro-checkup\.sh" --out "\$RUN"/, 'one report per run (--out)');
+});
+check('scripts/maestro-checkup.sh: --out and --tags for the stand', () => {
+  const s = read('scripts/maestro-checkup.sh');
+  assert.match(s, /--out\) shift; OUT=/);
+  assert.match(s, /--tags\) shift; TAGS=/);
+  assert.match(s, /cd "\$OUT\/\$slug\/shots"/, 'screenshots go to the run folder, not the repo root');
 });
 
 out(`\n${passed} passed, ${failed} failed`);
