@@ -100,11 +100,22 @@ check('тексты, которые ждут сценарии Maestro (02, smoke
   for (const t of ["'Вход'", "'Войти'", '"Электронная почта"']) assert.ok(login.includes(t), t);
 });
 
-check('цвета из темы (обе темы), заголовки шрифтом FONT_HEADING', () => {
+check('цвета из темы (обе темы), заголовок шрифтом FONT_HEADING', () => {
   assert.match(login, /const segmentBackground = theme\.backgroundSecondary;/);
   assert.match(login, /const segmentActive = isDark \? theme\.border : theme\.surface;/);
-  assert.match(login, /logo: \{\s*fontFamily: FONT_HEADING/);
   assert.match(login, /title: \{\s*fontFamily: FONT_HEADING/);
+});
+
+check('вверху логотип Totus Club (как в шапке сайта), а не надпись «TOTUS CLUB»', () => {
+  assert.match(login, /import TotusLogo from '\.\.\/\.\.\/component\/UI\/icons\/totusLogo';/);
+  assert.match(login, /<TotusLogo width=\{149\} \/>/);
+  assert.ok(!login.includes('TOTUS CLUB'), 'надпись TOTUS CLUB осталась');
+  const logo = read('src/component/UI/icons/totusLogo.tsx');
+  assert.match(logo, /viewBox="0 0 149 44"/);
+  assert.equal((logo.match(/<Path d="/g) || []).length, 11, '11 контуров, как у логотипа сайта');
+  assert.match(logo, /fill="#FE732E"/);
+  assert.match(logo, /fill="#2BAAE2"/);
+  assert.match(logo, /accessibilityLabel="Totus Club"/);
 });
 
 out(`\n${passed} passed, ${failed} failed`);
