@@ -152,14 +152,19 @@ await check('ширина окна — по первому замеру (сме�
 
 out('Капча: экраны');
 
-for (const screen of ['LoginScreen', 'SignupScreen']) {
-  await check(`${screen}: ScrollView формы передан в капчу`, () => {
-    const s = code(read(`src/screens/auth/${screen}.tsx`));
-    assert.match(s, /const scrollRef = useRef<ScrollView>\(null\)/);
-    assert.match(s, /<ScrollView\s+ref=\{scrollRef\}/);
-    assert.match(s, /<YandexSmartCaptcha[\s\S]*?scrollRef=\{scrollRef\}/);
-  });
-}
+// Вход и регистрация — один экран с переключателем (LoginScreen.tsx, AuthScreen); маршрут signup
+// открывает его же на вкладке «Регистрация».
+await check('LoginScreen (вход и регистрация): ScrollView формы передан в капчу', () => {
+  const s = code(read('src/screens/auth/LoginScreen.tsx'));
+  assert.match(s, /const scrollRef = useRef<ScrollView>\(null\)/);
+  assert.match(s, /<ScrollView\s+ref=\{scrollRef\}/);
+  assert.match(s, /<YandexSmartCaptcha[\s\S]*?scrollRef=\{scrollRef\}/);
+});
+
+await check('SignupScreen: тот же экран на вкладке «Регистрация»', () => {
+  const s = code(read('src/screens/auth/SignupScreen.tsx'));
+  assert.match(s, /<AuthScreen initialMode="signup" \/>/);
+});
 
 out(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
