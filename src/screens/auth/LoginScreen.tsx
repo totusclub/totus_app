@@ -23,6 +23,7 @@ import { loginUser, signupUser } from '../../modules/store/actions/auth';
 import { ELoginDataType } from '../../types/auth';
 import { AppDispatch } from '../../modules/store';
 import { TabletCentered } from '../../component/UI/tablet';
+import TotusLogo from '../../component/UI/icons/totusLogo';
 import { FONT_HEADING } from '../../theme/fonts';
 
 export type AuthMode = 'login' | 'signup';
@@ -213,7 +214,8 @@ export const AuthScreen = ({ initialMode = 'login' }: { initialMode?: AuthMode }
         showsVerticalScrollIndicator={false}>
         <TabletCentered>
         <View style={styles.header}>
-          <AppText style={[styles.logo, { color: theme.brand }]}>TOTUS CLUB</AppText>
+          {/* Логотип Totus Club, как в шапке сайта */}
+          <TotusLogo width={149} />
           <AppText style={[styles.title, { color: theme.text }]}>Добро пожаловать</AppText>
         </View>
 
@@ -338,12 +340,7 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 20,
-    gap: 8,
-  },
-  logo: {
-    fontFamily: FONT_HEADING,
-    fontSize: 20,
-    letterSpacing: 2.8,
+    gap: 12,
   },
   title: {
     fontFamily: FONT_HEADING,
