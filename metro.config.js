@@ -9,8 +9,8 @@ const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
  */
 const projectRoot = __dirname;
 
-// Мила (@tosmedia/ai-assistant-native) берёт Text / TextInput из react-native без fontFamily.
-// Для файлов пакета react-native подменяется обёрткой со шрифтами приложения — как у Милы на сайте.
+// Маша (@tosmedia/ai-assistant-native) берёт Text / TextInput из react-native без fontFamily.
+// Для файлов пакета react-native подменяется обёрткой со шрифтами приложения — как у Маши на сайте.
 const MILA_PACKAGE = `${path.sep}@tosmedia${path.sep}ai-assistant-native${path.sep}`;
 const RN_WITH_APP_FONTS = path.resolve(projectRoot, 'src/theme/reactNativeWithAppFonts.ts');
 

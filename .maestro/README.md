@@ -24,7 +24,7 @@ PR с правками теста (`.maestro/`, `scripts/ci/`, сам workflow) 
   Перенести его в `.github/workflows/mobile-qa.yml` (в веб-интерфейсе GitHub: открыть файл → карандаш →
   поменять путь в поле имени → Commit).
 - Секрет `AI_REPO_TOKEN` (Settings → Secrets and variables → Actions): fine-grained PAT, доступ только к
-  `tosmedia/totus_ai_v2`, Contents: Read-only. Из него собирается пакет Милы `@tosmedia/ai-assistant-native`
+  `tosmedia/totus_ai_v2`, Contents: Read-only. Из него собирается пакет Маши `@tosmedia/ai-assistant-native`
   (в `package.json` он указан как локальный архив `../totus_ai_v2/...-1.2.2.tgz`, которого нет в Git).
 - Для iOS — `ios/totusClubApp.xcodeproj` в Git. Пока его нет, iPhone и iPad в отчёте помечены ⚠️ «не собирается».
 

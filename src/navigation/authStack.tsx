@@ -373,7 +373,7 @@ const AuthStack = () => {
       <Stack.Screen name="checkout" component={CheckoutScreen} />
       <Stack.Screen name="pendingPayment" component={PendingPaymentScreen} />
       <Stack.Screen name="hotelFromAi" component={HotelScreen} />
-      {/* Заказ, открытый не из списка «Заказы» (чат Милы, оплата, поддержка, push): поверх вкладок,
+      {/* Заказ, открытый не из списка «Заказы» (чат Маши, оплата, поддержка, push): поверх вкладок,
           «Назад» — на экран, с которого пришли (src/navigation/historyNavigation.ts). */}
       <Stack.Screen name="orderDetails" component={OrderDetailsScreen} />
       <Stack.Screen name="tab" component={TabBar} />

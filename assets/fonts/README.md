@@ -23,7 +23,7 @@
 сами выделяют эти знаки во вложенный `Text` со шрифтом `TotusSymbols-*` (`src/component/UI/text/symbolRuns.tsx`).
 Файлы собирает `scripts/build-symbols-font.py` из файлов сайта (`GolosSymbols-*.woff2`, `scripts/ruble-glyph.json`).
 
-Мила (`@tosmedia/ai-assistant-native`) своего шрифта не задаёт. Как на сайте, где её «Golos Text» = Museo,
+Маша (`@tosmedia/ai-assistant-native`) своего шрифта не задаёт. Как на сайте, где её «Golos Text» = Museo,
 в приложении Metro подставляет пакету `Text` / `TextInput` со шрифтами приложения
 (`metro.config.js` → `src/theme/reactNativeWithAppFonts.ts`); сам пакет не меняется.
 

@@ -4,7 +4,7 @@
 #
 # Использование (из корня totus_APP, на Mac с Maestro, Xcode и adb):
 #   scripts/maestro-checkup.sh            # ежедневный набор (тег daily) на всех устройствах
-#   scripts/maestro-checkup.sh --auth     # плюс Мила и чат поддержки (нужен вход QA-учёткой)
+#   scripts/maestro-checkup.sh --auth     # плюс Маша и чат поддержки (нужен вход QA-учёткой)
 #   scripts/maestro-checkup.sh --fresh    # только чистый запуск и онбординг (выходит из аккаунта!)
 #   scripts/maestro-checkup.sh --only ios | --only android
 #
