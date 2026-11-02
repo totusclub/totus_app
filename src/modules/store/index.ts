@@ -24,9 +24,18 @@ const notificationsPersistConfig = {
   whitelist: ['prompted', 'unread'],
 };
 
+// Поиск: сохраняем только параметры формы (куда, даты, ночи, туристы, тип) и название направления.
+// Выдачу, статус и «идёт поиск» не сохраняем — после перезапуска не будет старого списка
+// и вечной заглушки (план HOTEL_SEARCH_PROGRESSIVE, этап 4).
+const searchPersistConfig = {
+  key: 'search',
+  storage: AsyncStorage,
+  whitelist: ['searchParams', 'headerName'],
+};
+
 const rootReducer = combineReducers({
   auth: authReducer,
-  search: searchReducer,
+  search: persistReducer(searchPersistConfig, searchReducer),
   destinations: destinationsReducer,
   departures: departuresReducer,
   supportChat: supportChatReducer,
@@ -36,7 +45,7 @@ const rootReducer = combineReducers({
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: ['auth', 'search', 'supportChat'],
+  whitelist: ['auth', 'supportChat'],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
