@@ -3,10 +3,11 @@ import {
   View,
   StyleSheet,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { SkeletonBox, SkeletonGroup } from '../UI';
+import { AppText } from '../UI';
 import SortModal from './modals/SortModal';
 import HotelCard, { HotelInfo } from './HotelCard';
 import ListHeader from './ListHeader';
@@ -171,7 +172,8 @@ const ResultList: React.FC = () => {
   const { allMyHotels, hotels, loading, requestId, searchParams, searchingOperators } = useSelector(
     (state: RootState) => state.search,
   );
-  // Постепенная выдача: поиск ещё идёт — «Найдено N отелей · Ищем ещё у M операторов» (Р4).
+  // Постепенная выдача: поиск ещё идёт — «Ищем ещё у M операторов» (Р4). Телефон — полосой под
+  // строкой сортировки, iPad — плашкой рядом с «Найдено N отелей» (макет «Выдача: индикатор загрузки»).
   const searchingMore = PROGRESSIVE_SEARCH_ENABLED && Number(searchingOperators ?? 0) > 0;
 
   // Сколько карточек человек уже видел (до нижнего края экрана) — их новые отели не сдвигают (Р1).
@@ -431,12 +433,18 @@ const ResultList: React.FC = () => {
           data={Array.from({ length: isTablet ? columns * 3 : 5 })} // Show 5 skeleton cards
           contentContainerStyle={[styles.listContent, isTablet && styles.listContentTablet]}
           ListHeaderComponent={() => (
-            <SkeletonGroup>
-              <View style={[styles.headerSkeleton, isTablet && styles.headerTablet]}>
-                <SkeletonBox width={150} height={38} radius={18} />
-                <SkeletonBox width={126} height={16} />
+            // Отелей ещё нет: «Ищем подходящие отели» над заглушками (текст как на сайте, totus_WEB #94).
+            <View style={isTablet ? styles.headerTablet : undefined}>
+              <View
+                accessibilityRole="text"
+                accessibilityLiveRegion="polite"
+                style={[styles.loadingStatus, { backgroundColor: theme.cardBackground }]}>
+                <ActivityIndicator size="small" color={theme.brand} />
+                <AppText style={[styles.loadingStatusText, isTablet && styles.loadingStatusTextTablet, { color: theme.text }]}>
+                  Ищем подходящие отели
+                </AppText>
               </View>
-            </SkeletonGroup>
+            </View>
           )}
           renderItem={() => wrapTablet(<HotelCardSkeleton />)}
           keyExtractor={(_, index) => `skeleton-${index}`}
@@ -456,9 +464,7 @@ const ResultList: React.FC = () => {
               selectedSortLabel={selectedOption.label}
               resultCount={hotels?.hotels_count || transformedHotels.length}
               {...(searchingMore
-                ? {
-                    resultText: `Найдено ${hotels?.hotels_count || transformedHotels.length} отелей · ${formatOperatorsLeft(Number(searchingOperators))}`,
-                  }
+                ? { searchingText: formatOperatorsLeft(Number(searchingOperators)) }
                 : {})}
               onSortPress={() => setSortModalVisible(true)}
               {...(isTablet ? { tablet: true } : {})}
@@ -585,11 +591,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingTop: 16,
   },
-  headerSkeleton: {
+  loadingStatus: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
+    minHeight: 52,
+    paddingHorizontal: 16,
+    borderRadius: 16,
     marginBottom: 16,
+  },
+  loadingStatusText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  loadingStatusTextTablet: {
+    fontSize: 16,
   },
   // iPad grid: 24 screen padding = 16 (list) + 8 (cell); 16 gap between columns = 8 + 8.
   listContentTablet: {
