@@ -66,7 +66,14 @@ type FiltersModalContentProps = {
    * indicator / nav bar inset is under the tab bar, not under «Применить».
    */
   aboveTabBar?: boolean;
+  /** iPad sidebar: сколько фильтров применено (число у заголовка «Фильтры»). */
+  activeCount?: number;
 };
+
+/** iPad sidebar: сколько вариантов показывать в разделе до «Ещё N». */
+const SIDEBAR_LIST_LIMIT = 5;
+/** iPad sidebar: разделы, открытые сразу (остальные свёрнуты, если в них ничего не выбрано). */
+const SIDEBAR_OPEN_BY_DEFAULT = new Set<string>(['stars', 'meals']);
 
 const WIFI_LABELS: Record<string, string> = {
   FREE: 'Бесплатный Wi-Fi',
@@ -208,8 +215,12 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
   variant = 'sheet',
   resultCount,
   aboveTabBar = false,
+  activeCount = 0,
 }) => {
   const isSidebar = variant === 'sidebar';
+  // iPad sidebar: какие разделы открыты и где показан весь список (по нажатию «Ещё N»).
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [expandedLists, setExpandedLists] = useState<Record<string, boolean>>({});
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch<AppDispatch>();
@@ -604,11 +615,82 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
   };
 
   if (isSidebar) {
+    // iPad, макет «Выдача — вариант A» (утверждён 02.11.2026): заголовок и кнопка «Показать»
+    // закреплены, между ними прокрутка; разделы сворачиваются, длинные списки — 5 пунктов и «Ещё N».
     const count = resultCount ?? hotels?.hotels_count ?? 0;
+    const isOpen = (id: string, selected: string[]) =>
+      openSections[id] ?? (SIDEBAR_OPEN_BY_DEFAULT.has(id) || selected.length > 0);
+    const toggleSection = (id: string, selected: string[]) =>
+      setOpenSections(prev => ({ ...prev, [id]: !isOpen(id, selected) }));
+
+    const renderSectionHeader = (id: string, title: string, selected: string[]) => {
+      const open = isOpen(id, selected);
+      return (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => toggleSection(id, selected)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          style={sidebarStyles.sectionHeader}>
+          <AppText style={[sidebarStyles.sectionTitle, { color: theme.text }]}>{title}</AppText>
+          {!open && selected.length > 0 ? (
+            <View style={[sidebarStyles.sectionBadge, { backgroundColor: theme.brand }]}>
+              <AppText style={sidebarStyles.sectionBadgeText}>{selected.length}</AppText>
+            </View>
+          ) : null}
+          <AppIcon name={open ? 'arrowUp' : 'arrowDown'} size={18} color={theme.textTertiary} accent={false} />
+        </TouchableOpacity>
+      );
+    };
+
+    const renderSidebarSection = (
+      id: string,
+      title: string,
+      options: { label: string; value: string; count?: number; disabled?: boolean; icon?: TotusIconKey | null }[],
+      selected: string[],
+      stateKey: keyof FilterState,
+    ) => {
+      if (!options.length) return null;
+      const open = isOpen(id, selected);
+      const hiddenSelected = options.slice(SIDEBAR_LIST_LIMIT).some(o => selected.includes(o.value));
+      const showAll = expandedLists[id] || hiddenSelected || options.length <= SIDEBAR_LIST_LIMIT + 1;
+      const visible = showAll ? options : options.slice(0, SIDEBAR_LIST_LIMIT);
+      const hidden = options.length - visible.length;
+      return (
+        <View key={id} style={[sidebarStyles.section, { borderBottomColor: theme.borderSecondary }]}>
+          {renderSectionHeader(id, title, selected)}
+          {open ? (
+            <View style={sidebarStyles.sectionBody}>
+              {renderCheckRows(visible, selected, stateKey)}
+              {hidden > 0 ? (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setExpandedLists(prev => ({ ...prev, [id]: true }))}
+                  style={sidebarStyles.moreButton}>
+                  <AppText style={[sidebarStyles.moreText, { color: theme.brand }]}>Ещё {hidden}</AppText>
+                  <AppIcon name="arrowDown" size={14} color={theme.brand} accent={false} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      );
+    };
+
+    const starTiles = [...starOptions].sort((a, b) => Number(a.value) - Number(b.value));
+    const starsOpen = isOpen('stars', filters.stars);
+
     return (
       <View style={sidebarStyles.container}>
-        <View style={sidebarStyles.header}>
-          <AppText style={[sidebarStyles.headerTitle, { color: theme.text }]}>Фильтры</AppText>
+        <View style={[sidebarStyles.header, { borderBottomColor: theme.borderSecondary }]}>
+          <View style={sidebarStyles.headerTitleRow}>
+            <AppText style={[sidebarStyles.headerTitle, { color: theme.text }]}>Фильтры</AppText>
+            {activeCount > 0 ? (
+              <View style={[sidebarStyles.headerBadge, { backgroundColor: theme.brand }]}>
+                <AppText style={sidebarStyles.sectionBadgeText}>{activeCount}</AppText>
+              </View>
+            ) : null}
+          </View>
           <TouchableOpacity
             onPress={handleResetLocal}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -616,53 +698,101 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
           </TouchableOpacity>
         </View>
 
-        {hasPriceFilter && (
-          <View style={sidebarStyles.section}>
-            <RangeSlider
-              label="Цена за тур"
-              min={filters.priceMin}
-              max={filters.priceMax}
-              minValue={priceBounds.min}
-              maxValue={priceBounds.max}
-              onMinChange={value => setFilters(prev => ({ ...prev, priceMin: value }))}
-              onMaxChange={value => setFilters(prev => ({ ...prev, priceMax: value }))}
+        <ScrollView
+          style={sidebarStyles.scroll}
+          contentContainerStyle={sidebarStyles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          {hasPriceFilter && (
+            <View style={[sidebarStyles.section, sidebarStyles.sectionOpen, { borderBottomColor: theme.borderSecondary }]}>
+              <RangeSlider
+                compact
+                label="Цена за тур"
+                min={filters.priceMin}
+                max={filters.priceMax}
+                minValue={priceBounds.min}
+                maxValue={priceBounds.max}
+                onMinChange={value => setFilters(prev => ({ ...prev, priceMin: value }))}
+                onMaxChange={value => setFilters(prev => ({ ...prev, priceMax: value }))}
+              />
+            </View>
+          )}
+
+          {starTiles.length > 0 ? (
+            <View style={[sidebarStyles.section, { borderBottomColor: theme.borderSecondary }]}>
+              {renderSectionHeader('stars', 'Звёзды', filters.stars)}
+              {starsOpen ? (
+                <View style={sidebarStyles.starGrid}>
+                  {starTiles.map(option => {
+                    const isSelected = filters.stars.includes(option.value);
+                    return (
+                      <TouchableOpacity
+                        key={option.value}
+                        activeOpacity={0.7}
+                        disabled={option.disabled}
+                        onPress={() => toggleInList('stars', option.value)}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: isSelected, disabled: option.disabled }}
+                        accessibilityLabel={option.label}
+                        style={[
+                          sidebarStyles.starTile,
+                          {
+                            borderColor: isSelected ? theme.brand : theme.border,
+                            backgroundColor: isSelected ? theme.brand + '14' : theme.cardBackground,
+                            borderWidth: isSelected ? 1.5 : 1,
+                          },
+                          option.disabled && sidebarStyles.rowDisabled,
+                        ]}>
+                        <View style={sidebarStyles.starTileTop}>
+                          <AppText style={[sidebarStyles.starTileValue, { color: theme.text }]}>{option.value}</AppText>
+                          <AppIcon name="starFilled" size={13} color={theme.brand} />
+                        </View>
+                        {option.count != null ? (
+                          <AppText style={[sidebarStyles.starTileCount, { color: theme.textTertiary }]}>{option.count}</AppText>
+                        ) : null}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {renderSidebarSection('meals', 'Питание', mealsOptions, filters.meals, 'meals')}
+          {renderSidebarSection('beachLine', 'Линия пляжа', beachLineOptions, filters.beachLine, 'beachLine')}
+          {renderSidebarSection('amenities', 'Удобства', amenityOptions, filters.amenities, 'amenities')}
+          {renderSidebarSection('accommodationTypes', 'Тип размещения', accommodationOptions, filters.accommodationTypes, 'accommodationTypes')}
+          {renderSidebarSection('regions', 'Регион', regionsOptions, filters.regions, 'regions')}
+          {renderSidebarSection('rating', 'Рейтинг', ratingOptions, filters.rating, 'rating')}
+          {renderSidebarSection('providers', 'Туроператор', providerOptions, filters.providers, 'providers')}
+          {renderSidebarSection('wifi', 'Wi-Fi', wifiOptions, filters.wifi, 'wifi')}
+          {renderSidebarSection('beachSurface', 'Покрытие пляжа', beachSurfaceOptions, filters.beachSurface, 'beachSurface')}
+          {renderSidebarSection('beachType', 'Тип пляжа', beachTypeOptions, filters.beachType, 'beachType')}
+          {renderSidebarSection('category', 'Категория', categoryOptions, filters.category, 'category')}
+          {renderSidebarSection('confirmability', 'Подтверждение', confirmabilityOptions, filters.confirmability, 'confirmability')}
+
+          <View style={sidebarStyles.toggleRow}>
+            <Toggle
+              label="Быстрое подтверждение"
+              icon="instant"
+              value={filters.quickConfirmation}
+              onToggle={() =>
+                setFilters(prev => ({
+                  ...prev,
+                  quickConfirmation: !prev.quickConfirmation,
+                }))
+              }
             />
           </View>
-        )}
+        </ScrollView>
 
-        {renderChipSection('Звёзды', starOptions, filters.stars, 'stars')}
-        {renderChipSection('Питание', mealsOptions, filters.meals, 'meals')}
-        {renderChipSection('Линия пляжа', beachLineOptions, filters.beachLine, 'beachLine')}
-        {renderChipSection('Удобства', amenityOptions, filters.amenities, 'amenities')}
-        {renderChipSection('Тип размещения', accommodationOptions, filters.accommodationTypes, 'accommodationTypes')}
-        {renderChipSection('Регион', regionsOptions, filters.regions, 'regions')}
-        {renderChipSection('Рейтинг', ratingOptions, filters.rating, 'rating')}
-        {renderChipSection('Туроператор', providerOptions, filters.providers, 'providers')}
-        {renderChipSection('Wi-Fi', wifiOptions, filters.wifi, 'wifi')}
-        {renderChipSection('Покрытие пляжа', beachSurfaceOptions, filters.beachSurface, 'beachSurface')}
-        {renderChipSection('Тип пляжа', beachTypeOptions, filters.beachType, 'beachType')}
-        {renderChipSection('Категория', categoryOptions, filters.category, 'category')}
-        {renderChipSection('Подтверждение', confirmabilityOptions, filters.confirmability, 'confirmability')}
-
-        <View style={sidebarStyles.section}>
-          <Toggle
-            label="Быстрое подтверждение"
-            icon="instant"
-            value={filters.quickConfirmation}
-            onToggle={() =>
-              setFilters(prev => ({
-                ...prev,
-                quickConfirmation: !prev.quickConfirmation,
-              }))
-            }
+        <View style={[sidebarStyles.footer, { borderTopColor: theme.borderSecondary }]}>
+          <AppButton
+            title={`Показать ${count} ${hotelsWord(count)}`}
+            onPress={handleApply}
+            size="medium"
           />
         </View>
-
-        <AppButton
-          title={`Показать ${count} ${hotelsWord(count)}`}
-          onPress={handleApply}
-          size="medium"
-        />
       </View>
     );
   }
@@ -957,33 +1087,129 @@ const styles = StyleSheet.create({
   },
 });
 
-/** iPad sidebar only (Figma «iPad Landscape / List / Tours» → Filters panel). */
+/** iPad sidebar only (макет «Выдача — вариант A», утверждён 02.11.2026). */
 const sidebarStyles = StyleSheet.create({
   container: {
-    gap: 20,
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerTitle: {
     fontFamily: FONT_HEADING,
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '600',
-    lineHeight: 24,
+    lineHeight: 26,
+  },
+  headerBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   resetText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
   section: {
-    gap: 10,
+    borderBottomWidth: 1,
+  },
+  sectionOpen: {
+    paddingTop: 16,
+    paddingBottom: 14,
+  },
+  sectionHeader: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   sectionTitle: {
+    flex: 1,
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '700',
     lineHeight: 20,
+  },
+  sectionBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sectionBody: {
+    paddingBottom: 12,
+  },
+  moreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    minHeight: 36,
+  },
+  moreText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  starGrid: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingBottom: 16,
+  },
+  starTile: {
+    flex: 1,
+    height: 54,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+  },
+  starTileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  starTileValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  starTileCount: {
+    fontSize: 12,
+  },
+  toggleRow: {
+    paddingTop: 12,
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 18,
+    borderTopWidth: 1,
   },
   rows: {
     gap: 4,
@@ -992,7 +1218,7 @@ const sidebarStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    minHeight: 30,
+    minHeight: 36,
   },
   rowDisabled: {
     opacity: 0.4,
@@ -1000,15 +1226,15 @@ const sidebarStyles = StyleSheet.create({
   checkbox: {
     width: 20,
     height: 20,
-    borderRadius: 5,
+    borderRadius: 6,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowLabel: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 20,
   },
   rowCount: {
     fontSize: 13,
