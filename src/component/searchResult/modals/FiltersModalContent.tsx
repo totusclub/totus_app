@@ -120,6 +120,9 @@ const AMENITY_FILTERS: { key: string; label: string; apiKey: string }[] = [
   { key: 'no_single_men', label: 'Без одиноких мужчин', apiKey: 'filter_no_single_men' },
 ];
 
+/** Удобства только для тура: в поиске отелей не показываются и не отправляются (план поиска, этап 4). */
+const TOUR_ONLY_AMENITY_KEYS = new Set<string>(['direct_flight']);
+
 const MULTI_FILTER_KEYS = [
   'filter_hotel_type',
   'filter_meals',
@@ -218,6 +221,8 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
   );
   const apiFilters = hotels?.filters;
   const requestId = hotels?.request_id;
+  // Поиск отелей (без перелёта): «Прямой перелёт» не показываем и не отправляем — как на сайте.
+  const isHotelSearch = (searchType || hotels?.search_type) === 'hotel';
 
   const priceBounds = useMemo(() => {
     const min = Number(
@@ -421,6 +426,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
 
   const amenityOptions = useMemo(() => {
     return AMENITY_FILTERS.filter(a => {
+      if (isHotelSearch && TOUR_ONLY_AMENITY_KEYS.has(a.key)) return false;
       const facet = apiFilters?.[a.key];
       if (!Array.isArray(facet) || facet.length === 0) return false;
       const trueOpt = facet.find(
@@ -442,7 +448,7 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
         icon: amenityIcon(a.key),
       };
     });
-  }, [apiFilters]);
+  }, [apiFilters, isHotelSearch]);
 
   const hasPriceFilter =
     !!apiFilters?.prices && priceBounds.max >= priceBounds.min;
@@ -513,7 +519,8 @@ const FiltersModalContent: React.FC<FiltersModalContentProps> = ({
     };
 
     for (const a of AMENITY_FILTERS) {
-      filterParams[a.apiKey] = filters.amenities.includes(a.key) ? true : '';
+      const tourOnlyOff = isHotelSearch && TOUR_ONLY_AMENITY_KEYS.has(a.key);
+      filterParams[a.apiKey] = filters.amenities.includes(a.key) && !tourOnlyOff ? true : '';
     }
 
     dispatch(setAllMyHotels([]));
