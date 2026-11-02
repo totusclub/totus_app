@@ -15,6 +15,12 @@ import {
 } from './filterChips';
 
 const CHIP_TEXT_COLOR = '#FFFFFF';
+/** iPad (макет «Выдача — вариант A»): светлые чипы с крестиком справа; текст темнее бренда — читается на светлом фоне. */
+const TABLET_CHIP_TEXT_LIGHT = '#B4460F';
+
+/** «Любое подтверждение» — значение по умолчанию, на iPad чипом не показываем. */
+const isDefaultChip = (chip: FilterChip): boolean =>
+  chip.key === 'filter_confirmability' && chip.value === '3';
 
 /**
  * Horizontal row of the currently applied list filters (Figma "List / Tours").
@@ -35,7 +41,12 @@ const SelectedFiltersRow: React.FC = () => {
     (state: RootState) => state.search.searchParams?.search_type,
   );
 
-  const chips = useMemo(() => buildFilterChips(hotels), [hotels]);
+  const tabletChipText = theme.mode === 'dark' ? theme.brand : TABLET_CHIP_TEXT_LIGHT;
+
+  const chips = useMemo(() => {
+    const all = buildFilterChips(hotels);
+    return isTablet ? all.filter(chip => !isDefaultChip(chip)) : all;
+  }, [hotels, isTablet]);
 
   const handleRemove = (chip: FilterChip) => {
     // Same request shape as ResultList.handleSortSelect / handleResetFilters.
@@ -76,19 +87,35 @@ const SelectedFiltersRow: React.FC = () => {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[styles.content, isTablet && styles.contentTablet]}
         keyboardShouldPersistTaps="handled">
-        {chips.map(chip => (
-          <TouchableOpacity
-            key={`${chip.key}:${chip.value ?? ''}`}
-            activeOpacity={0.7}
-            disabled={loading}
-            onPress={() => handleRemove(chip)}
-            style={[styles.chip, { backgroundColor: theme.brand }]}>
-            <AppIcon name="close" size={20} color={CHIP_TEXT_COLOR} />
-            <AppText style={styles.chipText} numberOfLines={1}>
-              {chip.label}
-            </AppText>
-          </TouchableOpacity>
-        ))}
+        {chips.map(chip =>
+          isTablet ? (
+            <TouchableOpacity
+              key={`${chip.key}:${chip.value ?? ''}`}
+              activeOpacity={0.7}
+              disabled={loading}
+              onPress={() => handleRemove(chip)}
+              accessibilityRole="button"
+              accessibilityLabel={`Убрать фильтр ${chip.label}`}
+              style={[styles.chipTablet, { backgroundColor: theme.brand + '14', borderColor: theme.brand + '59' }]}>
+              <AppText style={[styles.chipTextTablet, { color: tabletChipText }]} numberOfLines={1}>
+                {chip.label}
+              </AppText>
+              <AppIcon name="close" size={14} color={tabletChipText} accent={false} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              key={`${chip.key}:${chip.value ?? ''}`}
+              activeOpacity={0.7}
+              disabled={loading}
+              onPress={() => handleRemove(chip)}
+              style={[styles.chip, { backgroundColor: theme.brand }]}>
+              <AppIcon name="close" size={20} color={CHIP_TEXT_COLOR} />
+              <AppText style={styles.chipText} numberOfLines={1}>
+                {chip.label}
+              </AppText>
+            </TouchableOpacity>
+          ),
+        )}
       </ScrollView>
     </View>
   );
@@ -122,5 +149,20 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 18,
     color: CHIP_TEXT_COLOR,
+  },
+  chipTablet: {
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingLeft: 12,
+    paddingRight: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  chipTextTablet: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 17,
   },
 });
