@@ -239,7 +239,7 @@ check('AppText и FontText выделяют знаки во вложенный T
   }
 });
 
-check('Мила (@tosmedia/ai-assistant-native) получает Text / TextInput со шрифтами приложения через Metro', () => {
+check('Маша (@tosmedia/ai-assistant-native) получает Text / TextInput со шрифтами приложения через Metro', () => {
   const metro = code(read('metro.config.js'));
   assert.match(metro, /ai-assistant-native/);
   assert.match(metro, /resolveRequest: \(context, moduleName, platform\) =>/);

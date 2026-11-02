@@ -10,7 +10,7 @@ export const InheritedFontContext = createContext<InheritedFont | undefined>(und
  * Text из react-native со шрифтом приложения (theme/fonts.ts). Остальные свойства
  * (allowFontScaling, numberOfLines и т.д.) не меняются — замена 1:1 для `import { Text }`.
  * Знаки, которых нет в Museo / Forum (₽, стрелки…), — «Totus Symbols», как на сайте (symbolRuns.tsx).
- * Этот же Text получает пакет Милы (metro.config.js → theme/reactNativeWithAppFonts.ts).
+ * Этот же Text получает пакет Маши (metro.config.js → theme/reactNativeWithAppFonts.ts).
  */
 export const FontText = forwardRef<React.ElementRef<typeof Text>, TextProps>(({ style, children, ...props }, ref) => {
   const inherited = useContext(InheritedFontContext);

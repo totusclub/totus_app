@@ -8,13 +8,13 @@ import { getAiReturnTab } from '../../utils/aiTabReturn';
 import { useAndroidImeResize } from '../../hooks/useAndroidImeResize';
 
 /**
- * AI tab screen — Totus Мила chat; back returns to the tab the user came from.
+ * AI tab screen — Totus Маша chat; back returns to the tab the user came from.
  * On focus: reload MySQL history. On blur: flush active chat to MySQL.
  */
 export default function TotusAiChatScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  // Android 15+: поле ввода Милы над клавиатурой (экран уменьшается нативно); iOS — без изменений
+  // Android 15+: поле ввода Маши над клавиатурой (экран уменьшается нативно); iOS — без изменений
   useAndroidImeResize();
 
   useEffect(() => {

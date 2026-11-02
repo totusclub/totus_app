@@ -1,4 +1,4 @@
-// Android: на экране Милы (AI) поле ввода над клавиатурой — тот же нативный режим, что в чате
+// Android: на экране Маши (AI) поле ввода над клавиатурой — тот же нативный режим, что в чате
 // поддержки (TotusKeyboardModule.setImeResize). iOS не меняется.
 // Запуск: node scripts/check-android-ai-keyboard.mjs (без npm install).
 import assert from 'node:assert/strict';
@@ -26,7 +26,7 @@ function check(name, fn) {
 const hook = code(read('src/hooks/useAndroidImeResize.ts'));
 const screen = code(read('src/screens/ai/TotusAiChatScreen.tsx'));
 
-console.log('Android: экран Милы и клавиатура');
+console.log('Android: экран Маши и клавиатура');
 
 check('хук: только Android, только пока экран в фокусе; включает и выключает нативный режим', () => {
   assert.match(hook, /Platform\.OS === 'android' \? NativeModules\.TotusKeyboard : undefined/);
@@ -37,7 +37,7 @@ check('хук: только Android, только пока экран в фок�
   assert.match(hook, /\}, \[isFocused\]\);/);
 });
 
-check('экран Милы использует хук; ChatScreen, отступы и навигация как раньше', () => {
+check('экран Маши использует хук; ChatScreen, отступы и навигация как раньше', () => {
   assert.match(screen, /import \{ useAndroidImeResize \} from '\.\.\/\.\.\/hooks\/useAndroidImeResize';/);
   assert.match(screen, /useAndroidImeResize\(\);/);
   assert.match(screen, /<ChatScreen\s+topInset=\{insets\.top\}\s+bottomInset=\{Math\.max\(insets\.bottom, 8\)\}\s+showBackButton\s+onBack=\{handleBack\}\s*\/>/);

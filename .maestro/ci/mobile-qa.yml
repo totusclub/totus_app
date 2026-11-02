@@ -8,7 +8,7 @@
 #          вручную — Actions → Mobile QA → Run workflow (выбор платформ);
 #          PR с правками теста — все платформы, отчёт только в артефактах (issue не трогается).
 # Секрет:  AI_REPO_TOKEN — fine-grained PAT только на чтение tosmedia/totus_ai_v2 (Contents: Read):
-#          из него собирается пакет Милы @tosmedia/ai-assistant-native (package.json ссылается на ../totus_ai_v2).
+#          из него собирается пакет Маши @tosmedia/ai-assistant-native (package.json ссылается на ../totus_ai_v2).
 # Подпись: не нужна — APK подписан debug-ключом, iOS собирается для симулятора без подписи.
 name: Mobile QA
 
@@ -69,7 +69,7 @@ jobs:
           TOKEN: ${{ secrets.AI_REPO_TOKEN }}
         run: |
           if [ -z "$TOKEN" ]; then
-            node totus_APP/scripts/ci/ensure-result.mjs "$OUT" blocked "Нет секрета AI_REPO_TOKEN (чтение tosmedia/totus_ai_v2) — не собрать пакет Милы"
+            node totus_APP/scripts/ci/ensure-result.mjs "$OUT" blocked "Нет секрета AI_REPO_TOKEN (чтение tosmedia/totus_ai_v2) — не собрать пакет Маши"
             exit 1
           fi
 
@@ -86,7 +86,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Зависимости (пакет Милы + npm ci)
+      - name: Зависимости (пакет Маши + npm ci)
         run: |
           mkdir -p "$OUT"
           {
@@ -177,7 +177,7 @@ jobs:
           token: ${{ secrets.AI_REPO_TOKEN }}
           path: totus_ai_v2
 
-      - name: Зависимости (пакет Милы + npm ci + pod install)
+      - name: Зависимости (пакет Маши + npm ci + pod install)
         if: steps.pre.outputs.ok == 'true'
         run: |
           {

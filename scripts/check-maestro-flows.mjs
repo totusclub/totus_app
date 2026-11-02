@@ -6,10 +6,10 @@
 //  - every flow in .maestro/flows has appId ${APP_ID}, a name and a known tag (daily / auth / fresh);
 //  - every runFlow file exists;
 //  - every on-screen text a flow waits for or taps exists in the app sources (src/), so a renamed
-//    button breaks this check before it breaks the morning run. Texts of the Мила package
+//    button breaks this check before it breaks the morning run. Texts of the Маша package
 //    (@tosmedia/ai-assistant-native) and of iOS/Android system dialogs are listed below;
 //  - flows never type text and never tap buttons that send, pay, log in or delete
-//    (no personal data, no real orders, no messages to Мила or to support staff);
+//    (no personal data, no real orders, no messages to Маша or to support staff);
 //  - the runner scripts/maestro-checkup.sh exists, is executable and runs the daily tag.
 
 import assert from 'node:assert/strict';
@@ -57,10 +57,10 @@ const allFlows = [...flows, ...subflows];
 // All app source text in one string (for "does this text exist in the app").
 const srcText = filesIn('src', ['.ts', '.tsx', '.js', '.jsx']).map(read).join('\n');
 
-// Texts that live outside src/: the Мила chat package (totus_ai_v2/packages/ai-assistant-native,
+// Texts that live outside src/: the Маша chat package (totus_ai_v2/packages/ai-assistant-native,
 // ChatPanel.tsx) and system dialogs (iOS App Tracking Transparency, permission prompts).
 const EXTERNAL_TEXTS = [
-  'Мила · Тотус клуб',
+  'Маша · Тотус клуб',
   'Онлайн · подбор туров',
   'Спросите совет или опишите тур…',
   'Назад',

@@ -302,7 +302,7 @@ await check('support chat → order card → Back → support chat', () => {
   assert.equal(app.where(), 'tab>AccountStackScreen>supportChat');
 });
 
-await check('Мила: hotel → … → payment success → «Открыть заказ» → Back → the chat (paid screens closed)', () => {
+await check('Маша: hotel → … → payment success → «Открыть заказ» → Back → the chat (paid screens closed)', () => {
   const app = fresh();
   app.tapTab('VoiceAssistantStackScreen');
   go(app, 'hotelFromAi', 'tickets', 'ticketDetails', 'booking', 'checkout', 'pendingPayment');
