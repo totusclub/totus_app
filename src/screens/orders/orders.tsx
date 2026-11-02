@@ -12,6 +12,7 @@ import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '../../component/UI';
 import OrderListItem from '../../component/orders/OrderListItem';
+import OrdersTabletList from '../../component/orders/OrdersTabletList';
 import { useTheme } from '../../hooks/useTheme';
 import { useLayout } from '../../hooks/useLayout';
 import { RootState } from '../../modules/store';
@@ -33,6 +34,15 @@ const ORDERS_SLOW_MS = 15000;
 const ORDERS_STORAGE_KEY = 'orders:list';
 const ORDERS_STORAGE_MAX_CHARS = 400000;
 let lastOrders: { userId: string; orders: Order[] } | null = null;
+
+/** «9 заказов», «1 заказ», «3 заказа» — подпись справа от заголовка на iPad. */
+function ordersCountLabel(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} заказ`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} заказа`;
+  return `${count} заказов`;
+}
 
 async function readStoredOrders(userId: string): Promise<Order[] | null> {
   try {
@@ -69,7 +79,8 @@ async function fetchOrdersList(userId: string): Promise<Order[]> {
 
 const OrdersScreen = () => {
   const { theme } = useTheme();
-  // iPad only: order cards in a 2/3-column grid; on phone everything below is a passthrough.
+  // iPad only: «Ожидают оплаты» карточками и «Все заказы» строками (OrdersTabletList,
+  // макет «Заказы — вариант A», 02.11.2026); на телефоне всё ниже — прежний список.
   const { isTablet, columns } = useLayout();
   const tabletCellStyle = [styles.cellTablet, { maxWidth: `${100 / columns}%` as `${number}%` }];
   const wrapTablet = (node: React.ReactElement) =>
@@ -189,9 +200,26 @@ const OrdersScreen = () => {
     );
   }
 
+  const showTabletList = isTablet && orders.length > 0;
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-      <AppText style={[styles.title, isTablet && styles.titleTablet, { color: theme.text }]}>Заказы</AppText>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: showTabletList ? theme.backgroundSecondary : theme.background, paddingTop: insets.top },
+      ]}>
+      {isTablet ? (
+        <View style={styles.titleRowTablet}>
+          <AppText style={[styles.title, styles.titleTablet, styles.titleTabletText, { color: theme.text }]}>Заказы</AppText>
+          {orders.length > 0 && (
+            <AppText style={[styles.countTablet, { color: theme.textTertiary }]}>
+              {ordersCountLabel(orders.length)}
+            </AppText>
+          )}
+        </View>
+      ) : (
+        <AppText style={[styles.title, { color: theme.text }]}>Заказы</AppText>
+      )}
       {loading && !refreshing ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator color={theme.brand} />
@@ -206,6 +234,13 @@ const OrdersScreen = () => {
             </>
           )}
         </View>
+      ) : showTabletList ? (
+        <OrdersTabletList
+          orders={orders}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.brand} />
+          }
+        />
       ) : (
         <FlatList
           key={isTablet ? `cols-${columns}` : undefined}
@@ -249,6 +284,15 @@ const styles = StyleSheet.create({
   title: { fontFamily: FONT_HEADING, fontSize: 24, fontWeight: '700', paddingHorizontal: 16, marginBottom: 12 },
   // iPad grid: 24 screen padding = 16 (list) + 8 (cell); 16 gap between columns = 8 + 8.
   titleTablet: { paddingHorizontal: 24 },
+  titleRowTablet: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    marginBottom: 12,
+  },
+  titleTabletText: { fontSize: 34, lineHeight: 40, marginBottom: 0 },
+  countTablet: { fontSize: 14, paddingHorizontal: 24 },
   rowTablet: { alignItems: 'flex-start' },
   cellTablet: { flex: 1, paddingHorizontal: 8 },
   loadingBox: { alignItems: 'center', marginTop: 40, paddingHorizontal: 24 },
