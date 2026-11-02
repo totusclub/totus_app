@@ -513,12 +513,17 @@ await check('slice: clearSearch (форма поиска) не обрывает 
 
 // ---------- 4. разметка и настройки ----------
 
-await check('список: ключ — id отеля, «Ищем ещё у N операторов», видимые карточки считает FlatList', () => {
+await check('список: ключ — id отеля, «Ищем ещё у N операторов» (телефон — полосой, iPad — плашкой), «Ищем подходящие отели», видимые карточки считает FlatList', () => {
   const src = read('src/component/searchResult/ResultList.tsx');
   assert.match(src, /keyExtractor=\{\(item, index\) => \(item\.id \? `hotel-\$\{item\.id\}` : `hotel-i-\$\{index\}`\)\}/);
   assert.match(src, /onViewableItemsChanged=\{onViewableItemsChanged\}/);
   assert.match(src, /setVisibleHotelCountProvider\(\(\) => maxSeenIndexRef\.current \+ 1\)/);
-  assert.match(src, /resultText: `Найдено \$\{hotels\?\.hotels_count \|\| transformedHotels\.length\} отелей · \$\{formatOperatorsLeft\(Number\(searchingOperators\)\)\}`/);
+  assert.match(src, /\{ searchingText: formatOperatorsLeft\(Number\(searchingOperators\)\) \}/);
+  // Телефон — отдельной полосой под строкой сортировки (в одну строку обрезалось), iPad — плашкой рядом.
+  const header = read('src/component/searchResult/ListHeader.tsx');
+  assert.match(header, /if \(!tablet && searchingBadge\) \{/);
+  assert.match(header, /\{tablet && searchingBadge \? \(/);
+  assert.match(src, />\s*Ищем подходящие отели\s*</, 'пока отелей нет — текст над заглушками');
 });
 
 await check('сохранение: после перезапуска — только параметры поиска, без старой выдачи', () => {
