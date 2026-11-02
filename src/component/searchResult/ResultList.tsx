@@ -23,6 +23,11 @@ import {
   normalizeSearchMealsToRoomCodes,
 } from '../../utils/hotelUtils/aiRoomPick';
 import { LIST_FILTER_PARAM_KEYS } from './modals/FiltersModalContent';
+import {
+  PROGRESSIVE_SEARCH_ENABLED,
+  formatOperatorsLeft,
+  setVisibleHotelCountProvider,
+} from '../../utils/progressiveSearch';
 
 type SortOption = {
   id: string;
@@ -163,9 +168,31 @@ const ResultList: React.FC = () => {
   // Track previous filter params to detect filter changes
   const prevFilterParamsRef = useRef<string | null>(null);
 
-  const { allMyHotels, hotels, loading, requestId, searchParams } = useSelector(
+  const { allMyHotels, hotels, loading, requestId, searchParams, searchingOperators } = useSelector(
     (state: RootState) => state.search,
   );
+  // Постепенная выдача: поиск ещё идёт — «Найдено N отелей · Ищем ещё у M операторов» (Р4).
+  const searchingMore = PROGRESSIVE_SEARCH_ENABLED && Number(searchingOperators ?? 0) > 0;
+
+  // Сколько карточек человек уже видел (до нижнего края экрана) — их новые отели не сдвигают (Р1).
+  const maxSeenIndexRef = useRef(-1);
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+      viewableItems.forEach(v => {
+        if (v.index != null && v.index > maxSeenIndexRef.current) {
+          maxSeenIndexRef.current = v.index;
+        }
+      });
+    },
+  ).current;
+  useEffect(() => {
+    maxSeenIndexRef.current = -1;
+  }, [requestId]);
+  useEffect(() => {
+    if (!PROGRESSIVE_SEARCH_ENABLED) return;
+    setVisibleHotelCountProvider(() => maxSeenIndexRef.current + 1);
+    return () => setVisibleHotelCountProvider(null);
+  }, []);
   // Get operators from hotels response
   const operators = hotels?.readyOperators || [];
   const activeSearchType = searchParams?.search_type || hotels?.search_type;
@@ -428,6 +455,11 @@ const ResultList: React.FC = () => {
             <ListHeader
               selectedSortLabel={selectedOption.label}
               resultCount={hotels?.hotels_count || transformedHotels.length}
+              {...(searchingMore
+                ? {
+                    resultText: `Найдено ${hotels?.hotels_count || transformedHotels.length} отелей · ${formatOperatorsLeft(Number(searchingOperators))}`,
+                  }
+                : {})}
               onSortPress={() => setSortModalVisible(true)}
               {...(isTablet ? { tablet: true } : {})}
             />
@@ -494,7 +526,9 @@ const ResultList: React.FC = () => {
               }}
             />
           )}
-          keyExtractor={(item, index) => `${item.id}-${index}`}
+          // Ключ — id отеля: при постепенной выдаче карточки не перемонтируются и не мигают.
+          keyExtractor={(item, index) => (item.id ? `hotel-${item.id}` : `hotel-i-${index}`)}
+          onViewableItemsChanged={onViewableItemsChanged}
           contentContainerStyle={[styles.listContent, isTablet && styles.listContentTablet]}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           showsVerticalScrollIndicator={false}
