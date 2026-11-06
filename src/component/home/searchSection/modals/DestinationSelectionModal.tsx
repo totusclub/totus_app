@@ -6,6 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { FontTextInput as TextInput } from '../../../UI/text/FontText';
 import Modal from 'react-native-modal';
@@ -27,6 +28,8 @@ import {
   type BrowseCountry,
 } from '../utils/countryImages';
 import { loadBrowseCountries } from '../utils/browseCountries';
+import { useLayout } from '../../../../hooks/useLayout';
+import { TabletSheetBackdrop, tabletListSheetHeight, tabletSheetStyles } from './tabletSheet';
 
 type DestinationSelectionModalProps = {
   visible: boolean;
@@ -49,7 +52,9 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
   fromCity = 'Moscow',
   searchType = 'package',
 }) => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
+  const { isTablet } = useLayout();
+  const { height: windowHeight } = useWindowDimensions();
   const dispatch = useDispatch<AppDispatch>();
   const { data, status, error } = useSelector(
     (state: RootState) => state.destinations,
@@ -241,12 +246,15 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
   // console.log('groupedResults', groupedResults)
   return (
     <Modal
-      style={styles.modal}
+      style={[styles.modal, isTablet && tabletSheetStyles.modal]}
       isVisible={visible}
       animationIn="fadeIn"
       animationOut="fadeOut"
+      avoidKeyboard={isTablet}
       backdropOpacity={0}
       hasBackdrop={false}>
+      {/* iPad: окно 540 по центру, список прокручивается внутри (tabletSheet.tsx) */}
+      {isTablet ? <TabletSheetBackdrop onClose={onClose} isDark={isDark} /> : null}
       <View
         style={[
           styles.modalContent,
@@ -255,6 +263,7 @@ const DestinationSelectionModal: React.FC<DestinationSelectionModalProps> = ({
             paddingTop: paddingTop + 20,
             paddingBottom: paddingBottom + 20,
           },
+          isTablet && [tabletSheetStyles.card, { height: tabletListSheetHeight(windowHeight) }],
         ]}>
         {/* Header */}
         <View style={styles.header}>
