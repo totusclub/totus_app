@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, AppButton } from '../../../UI';
 import { useTheme } from '../../../../hooks/useTheme';
 import { FONT_HEADING } from '../../../../theme/fonts';
+import { useLayout } from '../../../../hooks/useLayout';
+import { TabletSheetBackdrop, TABLET_SHEET_WIDTH, tabletSheetStyles } from './tabletSheet';
 
 type NightsSelectionModalProps = {
   visible: boolean;
@@ -37,9 +39,11 @@ const NightsSelectionModal: React.FC<NightsSelectionModalProps> = ({
   const [flexibleNights, setFlexibleNights] = useState(false);
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+  const { isTablet } = useLayout();
   const paddingBottom = insets.bottom;
   // Sheet has 20px outer padding + 12px slider padding on both sides.
-  const sliderLength = Math.max(200, windowWidth - 64);
+  // iPad: окно 540 по центру (tabletSheet.tsx) — ползунок по ширине окна, а не экрана.
+  const sliderLength = Math.max(200, (isTablet ? TABLET_SHEET_WIDTH : windowWidth) - 64);
 
   useEffect(() => {
     if (visible) {
@@ -176,6 +180,7 @@ const NightsSelectionModal: React.FC<NightsSelectionModalProps> = ({
       paddingBottom,
       ...(Platform.OS === 'android' ? { width: '100%' as const } : {}),
     },
+    isTablet && [tabletSheetStyles.card, styles.modalContentTablet],
   ];
 
   if (Platform.OS === 'android') {
@@ -203,7 +208,7 @@ const NightsSelectionModal: React.FC<NightsSelectionModalProps> = ({
 
   return (
     <Modal
-      style={styles.modal}
+      style={[styles.modal, isTablet && tabletSheetStyles.modal]}
       isVisible={visible}
       animationIn="fadeIn"
       animationOut="fadeOut"
@@ -218,6 +223,7 @@ const NightsSelectionModal: React.FC<NightsSelectionModalProps> = ({
         blurType={isDark ? 'dark' : 'light'}
         blurAmount={10}
       />
+      {isTablet ? <TabletSheetBackdrop onClose={onClose} isDark={isDark} blur={false} /> : null}
       <View style={sheetWrapperStyle}>{sheet}</View>
     </Modal>
   );
@@ -250,6 +256,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     elevation: Platform.OS === 'android' ? 16 : 0,
+  },
+  // iPad only: высота по содержимому (на телефоне шторка не ниже 320).
+  modalContentTablet: {
+    minHeight: undefined,
   },
   header: {
     marginBottom: 24,
