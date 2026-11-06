@@ -227,9 +227,8 @@ const DateSelectionModal: React.FC<DateSelectionModalProps> = ({
       animationOut="fadeOut"
       // onBackdropPress={onClose}
       // onSwipeComplete={onClose}
-      // iPad: без жеста смахивания — он перехватывал вертикальную прокрутку месяцев в окне.
-      swipeDirection={isTablet ? undefined : 'left'}
-      propagateSwipe={isTablet}
+      // Без жеста смахивания (телефон и iPad): swipeDirection перехватывал вертикальную прокрутку
+      // месяцев, а закрытия по смахиванию нет (onSwipeComplete выключен) — жест ничего не делал.
       backdropOpacity={0}
       hasBackdrop={false}>
       {isTablet ? <TabletSheetBackdrop onClose={onClose} isDark={isDark} /> : null}
