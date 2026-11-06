@@ -11,7 +11,7 @@ import {
   Linking,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppText, AppIcon } from '../../component/UI';
 import { RootState } from '../../modules/store';
@@ -29,6 +29,7 @@ import {
 } from '../../modules/voip/VoipService';
 import { callErrorText } from '../../modules/voip/callText';
 import { getUserById } from '../../modules/api/users';
+import { getMe, type MeProfile } from '../../modules/api/profile';
 import { useLayout } from '../../hooks/useLayout';
 import { TabletColumns } from '../../component/UI/tablet';
 
@@ -393,22 +394,48 @@ const AccountScreen = () => {
     }
   }, [fullAuth, accessToken, navigation, route.params]);
 
-  // Use user from state, or decode from token if not available
+  // Актуальный профиль из базы (GET /api/auth/me) — как на сайте. Перезапрашивается при каждом
+  // открытии «Аккаунта», чтобы изменённые имя и номер карты лояльности сразу попадали на карту.
+  // Данные в state.auth.user взяты из токена при входе и после правки профиля устаревают.
+  const [freshProfile, setFreshProfile] = useState<MeProfile | null>(null);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!fullAuth || !accessToken) {
+        setFreshProfile(null);
+        return undefined;
+      }
+      let cancelled = false;
+      getMe().then((profile) => {
+        if (!cancelled && profile) setFreshProfile(profile);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [fullAuth, accessToken]),
+  );
+
+  // Use user from state, or decode from token if not available; поверх — свежий профиль с сервера
   const user: DecodedToken | null = React.useMemo(() => {
+    let base: DecodedToken | null = null;
     if (userFromState) {
-      return userFromState as DecodedToken;
+      base = userFromState as DecodedToken;
+    } else if (accessToken) {
+      try {
+        base = jwtDecode<DecodedToken>(accessToken);
+      } catch (error) {
+        console.error('[AccountScreen] Error decoding token:', error);
+      }
     }
-    if (!accessToken) return null;
-    try {
-      return jwtDecode<DecodedToken>(accessToken);
-    } catch (error) {
-      console.error('[AccountScreen] Error decoding token:', error);
-      return null;
-    }
-  }, [accessToken, userFromState]);
+    if (!freshProfile) return base;
+    const fresh = Object.fromEntries(
+      Object.entries(freshProfile).filter(([, v]) => v !== undefined),
+    ) as DecodedToken;
+    return { ...(base || {}), ...fresh };
+  }, [accessToken, userFromState, freshProfile]);
 
   const handleCopyLoyaltyId = async () => {
     const loyaltyIdToCopy = String(loyaltyId).replace(/\s/g, ''); // Remove spaces for copy
+    if (!loyaltyIdToCopy) return; // номера ещё нет — карта показывает 0000 0000 0000 0000, как на сайте
     try {
       Clipboard.setString(loyaltyIdToCopy);
       Alert.alert('Скопировано', 'Номер участника программы лояльности скопирован в буфер обмена.');
@@ -525,8 +552,10 @@ const AccountScreen = () => {
     navigation.navigate(LEGAL_DOCUMENTS_ROUTE);
   };
 
-  const userName = user ? `${user.name || ''} ${user.l_name || ''}`.trim() : 'Пользователь';
-  const loyaltyId = user?.loyalty_id || user?.id || '0000 0000 0000 0000';
+  // Те же данные, что на карте сайта (totus_WEB, components/profile/menu.tsx): номер — loyalty_id
+  // (без подстановки внутреннего id пользователя), имя — «имя фамилия» без пустых частей.
+  const userName = [user?.name, user?.l_name].map((p) => String(p ?? '').trim()).filter(Boolean).join(' ');
+  const loyaltyId = String(user?.loyalty_id ?? '').trim();
 
   // Don't render if not authenticated (will redirect to login)
   if (!fullAuth || !accessToken) {
