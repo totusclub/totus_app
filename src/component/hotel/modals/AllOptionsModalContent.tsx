@@ -48,6 +48,11 @@ import { mealIcon } from '../../UI/icons/totus/ltIcons';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// В окне «Все варианты проживания» текст «Level.Travel» не показываем (решение владельца, 07.11.2026):
+// ни чип оператора, ни заголовок группы, ни строку оператора у предложения. Предложения остаются.
+const isHiddenSourceLabel = (label?: string | null) =>
+  String(label ?? '').trim().toLowerCase() === 'level.travel';
+
 type AllOptionsModalContentProps = {
   onClose: () => void;
   room: HotelRoom;
@@ -116,12 +121,15 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
 
     const resolved = resolveAiSelectedOffer(room, enrichedAiRoomPick, selectedDate ?? null);
     if (resolved?.offer.operator_name) {
-      setSelectedOperator(resolved.offer.operator_name);
+      // Чипа «Level.Travel» нет — фильтр по нему не включаем, остаётся «Все».
+      if (!isHiddenSourceLabel(resolved.offer.operator_name)) {
+        setSelectedOperator(resolved.offer.operator_name);
+      }
       setSelectedOffer(resolved.offer);
       return;
     }
 
-    if (enrichedAiRoomPick.operatorName) {
+    if (enrichedAiRoomPick.operatorName && !isHiddenSourceLabel(enrichedAiRoomPick.operatorName)) {
       setSelectedOperator(enrichedAiRoomPick.operatorName);
     }
   }, [room, enrichedAiRoomPick, selectedDate, isAiSelectedRoom]);
@@ -152,7 +160,10 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
   }, [room, selectedDate, searchContext?.nights]);
 
   // Extract all unique operators from filtered room
-  const operators = useMemo(() => extractOperators(filteredRoom), [filteredRoom]);
+  const operators = useMemo(
+    () => extractOperators(filteredRoom).filter((operator) => !isHiddenSourceLabel(operator)),
+    [filteredRoom],
+  );
 
   // Group offers by meal type, cheapest first (kedam-WEB priceList)
   const offersByMealType = useMemo(() => {
@@ -285,11 +296,13 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
         ]}>
         {offerGroups.map((group) => (
         <View key={group.source} style={styles.sourceGroup}>
+          {!isHiddenSourceLabel(group.label) ? (
           <View style={[styles.sourceGroupHeader, { borderBottomColor: theme.borderLight }]}>
             <AppText style={[styles.sourceGroupTitle, { color: theme.text }]}>
               {group.label}
             </AppText>
           </View>
+          ) : null}
         {group.sections.map(({ mealTypeId, mealType, offers }) => {
           const expandKey = `${group.source}:${mealTypeId}`;
           const showAll = Boolean(expandedMealTypes[expandKey]);
@@ -342,6 +355,7 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
                           {offer.nights_count} ночей {formatOfferDate(offer.start_date)}
                         </AppText>
                       </View>
+                      {!isHiddenSourceLabel(offer.operator_name) ? (
                       <View style={styles.offerLine}>
                         {offer.operator_name ? (
                           <TotusIconByKey name="operator" size={14} color={theme.textTertiary} />
@@ -350,6 +364,7 @@ const AllOptionsModalContent: React.FC<AllOptionsModalContentProps> = ({
                           {offer.operator_name}
                         </AppText>
                       </View>
+                      ) : null}
                     </View>
                     <View style={styles.offerRight}>
                       <AppText style={[styles.offerPrice, { color: theme.text }]}>
