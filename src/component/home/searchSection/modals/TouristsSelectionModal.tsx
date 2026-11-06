@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, AppButton, AppIcon } from '../../../UI';
 import { useTheme } from '../../../../hooks/useTheme';
 import { FONT_HEADING } from '../../../../theme/fonts';
+import { useLayout } from '../../../../hooks/useLayout';
+import { TabletSheetBackdrop, tabletSheetStyles } from './tabletSheet';
 
 type TouristsSelectionModalProps = {
   visible: boolean;
@@ -50,6 +52,8 @@ const TouristsSelectionModal: React.FC<TouristsSelectionModalProps> = ({
   );
   const insets = useSafeAreaInsets();
   const paddingBottom = insets.bottom;
+  // iPad: окно 540 по центру (tabletSheet.tsx); содержимое и логика те же.
+  const { isTablet } = useLayout();
 
   // Sync state when modal opens with new initial values
   useEffect(() => {
@@ -122,7 +126,7 @@ const TouristsSelectionModal: React.FC<TouristsSelectionModalProps> = ({
 
   return (
     <Modal
-      style={styles.modal}
+      style={[styles.modal, isTablet && tabletSheetStyles.modal]}
       isVisible={visible}
       animationIn="fadeIn"
       animationOut="fadeOut"
@@ -141,6 +145,7 @@ const TouristsSelectionModal: React.FC<TouristsSelectionModalProps> = ({
       ) : (
         <View style={[styles.blurOverlay, styles.blurOverlayAndroid, { backgroundColor: theme.overlay }]} />
       )}
+      {isTablet ? <TabletSheetBackdrop onClose={onClose} isDark={isDark} blur={false} /> : null}
       <View
         style={[
           styles.modalContent,
@@ -148,6 +153,7 @@ const TouristsSelectionModal: React.FC<TouristsSelectionModalProps> = ({
             backgroundColor: theme.background,
             paddingBottom: paddingBottom + 20,
           },
+          isTablet && tabletSheetStyles.card,
         ]}>
         {/* Header */}
         <View style={styles.header}>
