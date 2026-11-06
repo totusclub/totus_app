@@ -15,6 +15,7 @@ import TicketDetailsScreen from '../screens/home/TicketDetails';
 import { BlurView } from '@react-native-community/blur';
 import { useTheme } from '../hooks/useTheme';
 import { isOnboardingCompleted } from '../utils/onboarding';
+import { withBookingAuth } from './bookingAuthGate';
 // import CallsScreen from "../screens/calls/CallsScreen.tsx";
 import { getUserById } from "../modules/api/users";
 import TotusAiChatScreen from "../screens/ai/TotusAiChatScreen";
@@ -39,6 +40,10 @@ const TABLET_TAB_BAR_HEIGHT_LANDSCAPE = 70;
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+// Бронирование и оплата — только для вошедших; гость уходит на вход с возвратом к туру (bookingAuthGate.tsx).
+const GuardedBookingScreen = withBookingAuth(BookingScreen);
+const GuardedCheckoutScreen = withBookingAuth(CheckoutScreen);
 
 /** Nested stack screens where the bottom tab bar must be hidden. */
 const SCREENS_WITHOUT_TAB_BAR = new Set([
@@ -95,8 +100,8 @@ const HomeStackScreen = () => (
     <Stack.Screen name="hotel" component={HotelScreen} />
     <Stack.Screen name="tickets" component={TicketsScreen} />
     <Stack.Screen name="ticketDetails" component={TicketDetailsScreen} />
-    <Stack.Screen name="booking" component={BookingScreen} />
-    <Stack.Screen name="checkout" component={CheckoutScreen} />
+    <Stack.Screen name="booking" component={GuardedBookingScreen} />
+    <Stack.Screen name="checkout" component={GuardedCheckoutScreen} />
     <Stack.Screen name="pendingPayment" component={PendingPaymentScreen} />
   </Stack.Navigator>
 );
@@ -106,7 +111,7 @@ const OrdersStackScreen = () => (
   <Stack.Navigator screenOptions={nativeStackScreenOptions}>
     <Stack.Screen name="orders" component={OrdersScreen} />
     <Stack.Screen name="orderDetails" component={OrderDetailsScreen} />
-    <Stack.Screen name="checkout" component={CheckoutScreen} />
+    <Stack.Screen name="checkout" component={GuardedCheckoutScreen} />
     <Stack.Screen name="pendingPayment" component={PendingPaymentScreen} />
   </Stack.Navigator>
 );
@@ -125,8 +130,8 @@ const FavoritesStackScreen = () => (
     <Stack.Screen name="hotel" component={HotelScreen} />
     <Stack.Screen name="tickets" component={TicketsScreen} />
     <Stack.Screen name="ticketDetails" component={TicketDetailsScreen} />
-    <Stack.Screen name="booking" component={BookingScreen} />
-    <Stack.Screen name="checkout" component={CheckoutScreen} />
+    <Stack.Screen name="booking" component={GuardedBookingScreen} />
+    <Stack.Screen name="checkout" component={GuardedCheckoutScreen} />
     <Stack.Screen name="pendingPayment" component={PendingPaymentScreen} />
   </Stack.Navigator>
 );
@@ -137,8 +142,8 @@ const VoiceAssistantStackScreen = () => (
     <Stack.Screen name="hotelFromAi" component={HotelScreen} />
     <Stack.Screen name="tickets" component={TicketsScreen} />
     <Stack.Screen name="ticketDetails" component={TicketDetailsScreen} />
-    <Stack.Screen name="booking" component={BookingScreen} />
-    <Stack.Screen name="checkout" component={CheckoutScreen} />
+    <Stack.Screen name="booking" component={GuardedBookingScreen} />
+    <Stack.Screen name="checkout" component={GuardedCheckoutScreen} />
     <Stack.Screen name="pendingPayment" component={PendingPaymentScreen} />
   </Stack.Navigator>
 );
@@ -166,8 +171,8 @@ const AccountStackScreen = () => {
       <Stack.Screen name="hotel" component={HotelScreen} />
       <Stack.Screen name="tickets" component={TicketsScreen} />
       <Stack.Screen name="ticketDetails" component={TicketDetailsScreen} />
-      <Stack.Screen name="booking" component={BookingScreen} />
-      <Stack.Screen name="checkout" component={CheckoutScreen} />
+      <Stack.Screen name="booking" component={GuardedBookingScreen} />
+      <Stack.Screen name="checkout" component={GuardedCheckoutScreen} />
       <Stack.Screen name="pendingPayment" component={PendingPaymentScreen} />
       {/* «Документы» ООО «ТОТУСКЛАБ» из CMS; старый маршрут privacyPolicy открывает документ privacy-policy */}
       <Stack.Screen name={LEGAL_DOCUMENTS_ROUTE} component={LegalDocumentsScreen} />
@@ -369,8 +374,8 @@ const AuthStack = () => {
       screenOptions={nativeStackScreenOptions}>
       <Stack.Screen name="onboarding" component={OnboardingScreen} />
       <Stack.Screen name="ticketDetails" component={TicketDetailsScreen} />
-      <Stack.Screen name="booking" component={BookingScreen} />
-      <Stack.Screen name="checkout" component={CheckoutScreen} />
+      <Stack.Screen name="booking" component={GuardedBookingScreen} />
+      <Stack.Screen name="checkout" component={GuardedCheckoutScreen} />
       <Stack.Screen name="pendingPayment" component={PendingPaymentScreen} />
       <Stack.Screen name="hotelFromAi" component={HotelScreen} />
       {/* Заказ, открытый не из списка «Заказы» (чат Маши, оплата, поддержка, push): поверх вкладок,
