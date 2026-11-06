@@ -40,10 +40,16 @@ instance.interceptors.request.use(
     async function (config) {
         const method = (config.method ?? 'get').toUpperCase();
         const path = config.url ?? '';
-        console.log('[API Request]', method, path, {
-          params: config.params,
-          data: config.data,
-        });
+        // Тела запросов (логин с кодом, телефоны, токены refresh) — только в debug-сборке;
+        // в релизе лог без params/data (SECURITY_AUDIT_2026-11_RU.md, M6).
+        if (__DEV__) {
+          console.log('[API Request]', method, path, {
+            params: config.params,
+            data: config.data,
+          });
+        } else {
+          console.log('[API Request]', method, path);
+        }
         // Do not try to refresh when we are already calling the refresh endpoint
         const isRefreshCall =
             typeof config.url === 'string' &&
