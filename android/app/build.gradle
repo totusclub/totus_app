@@ -56,8 +56,11 @@ react {
 
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ * Default stays off (as before). Enable per build with -PTOTUS_ENABLE_PROGUARD=true or
+ * TOTUS_ENABLE_PROGUARD=true in ~/.gradle/gradle.properties and test the release build
+ * (proguard-rules.pro may need keep rules) — SECURITY_AUDIT_2026-11_RU.md, L2.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = (findProperty("TOTUS_ENABLE_PROGUARD") ?: "false").toString().toBoolean()
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -132,6 +135,11 @@ android {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig project.hasProperty("TOTUS_UPLOAD_STORE_FILE") ? signingConfigs.release : signingConfigs.debug
+            if (!project.hasProperty("TOTUS_UPLOAD_STORE_FILE")) {
+                // Loud instead of silent: a release signed with debug.keystore (password in Git)
+                // must not reach users. Set TOTUS_UPLOAD_* (see signingConfigs) — audit 2026-11, L2.
+                logger.warn("WARNING: release is signed with debug.keystore - set TOTUS_UPLOAD_STORE_FILE and friends for a real release")
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

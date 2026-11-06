@@ -12,7 +12,6 @@ export const loginUser = createAsyncThunk(
   async (loginData: ILoginDataApi, thunkAPI) => {
     try {
       const response = await authorizationAPI.loginUser(loginData);
-      console.log('response', response.data)
       return response.data;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data || error.message);
