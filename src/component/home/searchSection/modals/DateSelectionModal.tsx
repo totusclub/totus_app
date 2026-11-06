@@ -1,15 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   TouchableOpacity,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, AppButton } from '../../../UI';
 import { useTheme } from '../../../../hooks/useTheme';
 import { FONT_HEADING } from '../../../../theme/fonts';
+import { useLayout } from '../../../../hooks/useLayout';
+import {
+  TabletSheetBackdrop,
+  TABLET_CALENDAR_CELL_HEIGHT,
+  tabletListSheetHeight,
+  tabletSheetStyles,
+} from './tabletSheet';
 
 type DateSelectionModalProps = {
   visible: boolean;
@@ -42,7 +50,12 @@ const DateSelectionModal: React.FC<DateSelectionModalProps> = ({
   title,
   initialDate,
 }) => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
+  // iPad: окно 540 по центру, ячейки 48 pt, месяцы прокручиваются внутри окна (tabletSheet.tsx).
+  const { isTablet } = useLayout();
+  const { height: windowHeight } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
+  const monthOffsets = useRef<Record<string, number>>({});
   const today = new Date();
   // Reset time to start of day for accurate comparison
   today.setHours(0, 0, 0, 0);
@@ -103,6 +116,22 @@ const DateSelectionModal: React.FC<DateSelectionModalProps> = ({
     return days;
   };
 
+  // iPad: при открытии календарь прокручивается к месяцу выбранной даты (дата возвращения
+  // часто в следующем месяце). Позиции месяцев берутся из onLayout.
+  const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
+  const scrollToSelectedMonth = () => {
+    if (!isTablet || !selectedDate) return;
+    const y = monthOffsets.current[monthKey(selectedDate)];
+    if (y === undefined) return;
+    scrollRef.current?.scrollTo({ y, animated: false });
+  };
+  useEffect(() => {
+    if (!visible || !isTablet) return;
+    const timer = setTimeout(scrollToSelectedMonth, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, isTablet]);
+
   const handleDateSelect = (day: number, month: Date) => {
     const selected = new Date(
       month.getFullYear(),
@@ -155,7 +184,7 @@ const DateSelectionModal: React.FC<DateSelectionModalProps> = ({
         <View style={styles.calendarGrid}>
           {days.map((day, index) => {
             if (day === null) {
-              return <View key={index} style={styles.calendarCell} />;
+              return <View key={index} style={[styles.calendarCell, isTablet && styles.calendarCellTablet]} />;
             }
 
             const isPast = isDateInPast(day, month);
@@ -166,6 +195,7 @@ const DateSelectionModal: React.FC<DateSelectionModalProps> = ({
                 key={index}
                 style={[
                   styles.calendarCell,
+                  isTablet && styles.calendarCellTablet,
                   isSelected && [styles.selectedCell, { backgroundColor: theme.brand }],
                   isPast && styles.disabledCell,
                 ]}
@@ -191,15 +221,18 @@ const DateSelectionModal: React.FC<DateSelectionModalProps> = ({
 
   return (
     <Modal
-      style={styles.modal}
+      style={[styles.modal, isTablet && tabletSheetStyles.modal]}
       isVisible={visible}
       animationIn="fadeIn"
       animationOut="fadeOut"
       // onBackdropPress={onClose}
       // onSwipeComplete={onClose}
-      swipeDirection="left"
+      // iPad: без жеста смахивания — он перехватывал вертикальную прокрутку месяцев в окне.
+      swipeDirection={isTablet ? undefined : 'left'}
+      propagateSwipe={isTablet}
       backdropOpacity={0}
       hasBackdrop={false}>
+      {isTablet ? <TabletSheetBackdrop onClose={onClose} isDark={isDark} /> : null}
       <View
         style={[
           styles.modalContent,
@@ -208,6 +241,7 @@ const DateSelectionModal: React.FC<DateSelectionModalProps> = ({
             paddingTop: paddingTop + 20,
             paddingBottom: paddingBottom,
           },
+          isTablet && [tabletSheetStyles.card, { height: tabletListSheetHeight(windowHeight) }],
         ]}>
         {/* Header */}
         <View style={styles.header}>
@@ -225,17 +259,29 @@ const DateSelectionModal: React.FC<DateSelectionModalProps> = ({
 
         {/* Calendar Content - scrollable list of all months */}
         <ScrollView
+          ref={scrollRef}
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={isTablet}>
           {allMonths.map((month, index) => (
-            <React.Fragment key={`${month.getFullYear()}-${month.getMonth()}`}>
+            <View
+              key={`${month.getFullYear()}-${month.getMonth()}`}
+              onLayout={
+                isTablet
+                  ? e => {
+                      monthOffsets.current[monthKey(month)] = e.nativeEvent.layout.y;
+                      if (selectedDate && monthKey(selectedDate) === monthKey(month)) {
+                        scrollToSelectedMonth();
+                      }
+                    }
+                  : undefined
+              }>
               {index > 0 && <View style={styles.monthSpacer} />}
               {renderCalendar(
                 month,
                 generateCalendarDays(month.getFullYear(), month.getMonth()),
               )}
-            </React.Fragment>
+            </View>
           ))}
         </ScrollView>
 
@@ -329,6 +375,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
+  },
+  // iPad only: ячейка 48 pt по высоте вместо квадрата 1/7 ширины окна.
+  calendarCellTablet: {
+    aspectRatio: undefined,
+    height: TABLET_CALENDAR_CELL_HEIGHT,
+    paddingVertical: 0,
   },
   selectedCell: {
     borderRadius: 9999,
