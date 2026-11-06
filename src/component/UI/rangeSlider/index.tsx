@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, LayoutChangeEvent } from 'react-native';
 import { FontTextInput as TextInput } from '../text/FontText';
 import MultiSlider from '@ptomasroos/react-native-multi-slider';
@@ -37,6 +37,66 @@ const THIN_SPACE = String.fromCharCode(0x202f);
 const formatThousands = (value: number): string =>
   String(Math.round(Number(value) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, THIN_SPACE);
 const parseDigits = (text: string): number => Number(String(text).replace(/\D/g, '')) || 0;
+/** Только цифры, без ведущих нулей («077888» → «77888»); один «0» оставляем. */
+const cleanDigits = (text: string): string => String(text).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+const clamp = (value: number, lo: number, hi: number): number => Math.min(Math.max(value, lo), hi);
+
+/**
+ * Поле цены «от» / «до» со своим текстом (исправление 07.11.2026, видео владельца).
+ * Раньше поле показывало только число из фильтра и отбрасывало промежуточный ввод
+ * (например, «9» в поле «до», пока оно меньше «от», или пустое поле) — значение
+ * сбрасывалось. Теперь:
+ *  - пока поле в фокусе, показывается ровно то, что набрано, ничего не стирается;
+ *  - допустимое число (от ≤ до) сразу уходит в фильтр — ползунок двигается вместе с вводом;
+ *  - при выходе из поля пустое значение = граница диапазона, число приводится к диапазону
+ *    ползунка и не заходит за второе поле;
+ *  - ползунок, «Сбросить» и другие внешние изменения обновляют текст поля.
+ */
+function usePriceField(
+  value: number,
+  format: (value: number) => string,
+  accept: (value: number) => boolean,
+  commit: (text: string) => number,
+  onChange: (value: number) => void,
+) {
+  const [text, setText] = useState(() => format(value));
+  const focused = useRef(false);
+  const lastSent = useRef<number | null>(null);
+
+  // Внешнее изменение (ползунок, «Сбросить», новый поиск) — обновить текст.
+  // Своё же значение, отправленное при вводе, текст не трогает.
+  useEffect(() => {
+    if (focused.current && lastSent.current === value) return;
+    setText(format(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return {
+    value: text,
+    onFocus: () => {
+      focused.current = true;
+      lastSent.current = value;
+      setText(String(Math.round(Number(value) || 0)));
+    },
+    onChangeText: (raw: string) => {
+      const digits = cleanDigits(raw);
+      setText(digits);
+      if (digits === '') return;
+      const next = Number(digits);
+      if (accept(next)) {
+        lastSent.current = next;
+        onChange(next);
+      }
+    },
+    onBlur: () => {
+      focused.current = false;
+      const next = commit(text);
+      lastSent.current = next;
+      setText(format(next));
+      if (next !== value) onChange(next);
+    },
+  };
+}
 
 const RangeSlider: React.FC<RangeSliderProps> = ({
   label,
@@ -76,6 +136,28 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
     : {};
   const tabletSliderProps = isTablet || compact ? { sliderLength: trackWidth } : {};
 
+  // Поля ввода и ползунок — одно и то же значение фильтра (min / max); см. usePriceField.
+  const formatValue = compact ? formatThousands : (v: number) => String(Math.round(Number(v) || 0));
+  const minField = usePriceField(
+    min,
+    formatValue,
+    (v) => v <= max,
+    (t) => (t === '' ? minValue : clamp(parseDigits(t), minValue, Math.max(minValue, max))),
+    onMinChange,
+  );
+  const maxField = usePriceField(
+    max,
+    formatValue,
+    (v) => v >= min,
+    (t) => (t === '' ? maxValue : clamp(parseDigits(t), Math.min(maxValue, min), maxValue)),
+    onMaxChange,
+  );
+  // Ползунок не умеет значения вне своего диапазона — показываем ближайшую точку.
+  const sliderValues = [
+    clamp(min, minValue, maxValue),
+    clamp(Math.max(min, max), minValue, maxValue),
+  ];
+
   if (compact) {
     const inputBox = [
       styles.compactInputBox,
@@ -90,13 +172,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
             <TextInput
               allowFontScaling={false}
               style={[styles.compactInput, { color: theme.text }]}
-              value={formatThousands(min)}
-              onChangeText={(text) => {
-                const numValue = parseDigits(text);
-                if (numValue <= max) {
-                  onMinChange(numValue);
-                }
-              }}
+              {...minField}
               keyboardType="numeric"
               placeholder={minPlaceholder}
               placeholderTextColor={theme.inputPlaceholder}
@@ -107,13 +183,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
             <TextInput
               allowFontScaling={false}
               style={[styles.compactInput, { color: theme.text }]}
-              value={formatThousands(max)}
-              onChangeText={(text) => {
-                const numValue = parseDigits(text);
-                if (numValue >= min) {
-                  onMaxChange(numValue);
-                }
-              }}
+              {...maxField}
               keyboardType="numeric"
               placeholder={maxPlaceholder}
               placeholderTextColor={theme.inputPlaceholder}
@@ -123,7 +193,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
         <View style={styles.compactSliderContainer} {...tabletSliderContainerProps}>
           <MultiSlider
             {...tabletSliderProps}
-            values={[min, max]}
+            values={sliderValues}
             onValuesChange={(values) => {
               onMinChange(values[0]);
               onMaxChange(values[1]);
@@ -171,13 +241,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
               color: theme.text,
             },
           ]}
-          value={min.toString()}
-          onChangeText={(text) => {
-            const numValue = Number(text) || 0;
-            if (numValue <= max) {
-              onMinChange(numValue);
-            }
-          }}
+          {...minField}
           keyboardType="numeric"
           placeholder={minPlaceholder}
           placeholderTextColor={theme.inputPlaceholder}
@@ -195,13 +259,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
               color: theme.text,
             },
           ]}
-          value={max.toString()}
-          onChangeText={(text) => {
-            const numValue = Number(text) || 0;
-            if (numValue >= min) {
-              onMaxChange(numValue);
-            }
-          }}
+          {...maxField}
           keyboardType="numeric"
           placeholder={maxPlaceholder}
           placeholderTextColor={theme.inputPlaceholder}
@@ -210,7 +268,7 @@ const RangeSlider: React.FC<RangeSliderProps> = ({
       <View style={styles.sliderContainer} {...tabletSliderContainerProps}>
         <MultiSlider
           {...tabletSliderProps}
-          values={[min, max]}
+          values={sliderValues}
           onValuesChange={(values) => {
             onMinChange(values[0]);
             onMaxChange(values[1]);
