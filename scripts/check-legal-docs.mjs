@@ -1,11 +1,11 @@
-// Check: экран «Документы» — 12 юридических документов ООО «ТОТУСКЛАБ» из CMS.
+// Check: экран «Документы» — 16 юридических документов ООО «ТОТУСКЛАБ» из CMS.
 //
 // Run: node scripts/check-legal-docs.mjs   (Node >= 22.18, no npm install)
 //
 // Было: в приложении один документ — зашитая в код старая политика (src/content/privacyPolicy.ts).
 // Ожидается:
-//   (a) список из 12 документов (slug, название) — src/content/legalDocs.ts:
-//       7 из пачки 1 и 5 из пачки 2 (туры и размещение) перед «Реквизиты и контакты», который последний;
+//   (a) список из 16 документов (slug, название) — src/content/legalDocs.ts, порядок как на сайте:
+//       8 общих, затем 7 о турах и размещении, «Реквизиты и контакты» последний (редакция 30.10.2026);
 //   (b) ссылки внутри документа: /terms, https://totus.club/consent, /tour-offer, /payment -> документ в приложении,
 //       прочие http(s)/mailto/tel -> внешний браузер, #якорь -> остаться, javascript: -> ничего;
 //   (c) HTML-обёртка для WebView: контент CMS не портится, тёмная тема -> тёмный фон,
@@ -68,11 +68,15 @@ const EXPECTED = [
   ['terms', 'Пользовательское соглашение'],
   ['privacy-policy', 'Политика обработки персональных данных'],
   ['consent', 'Согласие на обработку персональных данных'],
+  ['personalization-consent', 'Согласие на обработку персональных данных для персональных рекомендаций'],
   ['ads-consent', 'Согласие на получение рекламы'],
+  ['marketing-data-consent', 'Согласие на обработку персональных данных для направления рекламы'],
   ['cookie-settings', 'Политика использования файлов cookie'],
   ['recommendations', 'Правила применения рекомендательных технологий'],
-  // Пачка 2 — туры и размещение (05.10.2026): перед «Реквизиты и контакты», в этом порядке.
+  // Туры и размещение: перед «Реквизиты и контакты», в этом порядке.
   ['tour-offer', 'Оферта о заключении договора о реализации туристского продукта'],
+  ['booking-application', 'Форма заявки на бронирование туристского продукта'],
+  ['operator-information', 'Форма информации о туроператоре'],
   ['hotel-booking', 'Условия бронирования размещения'],
   ['cancellation', 'Изменение, отмена и возврат'],
   ['tourist-memo', 'Памятка туристу'],
@@ -80,25 +84,29 @@ const EXPECTED = [
   ['requisites', 'Реквизиты и контакты'],
 ];
 const BATCH_2 = ['tour-offer', 'hotel-booking', 'cancellation', 'tourist-memo', 'payment'];
+// Редакция 30.10.2026: 4 новых документа.
+const PACK_3 = ['personalization-consent', 'marketing-data-consent', 'booking-application', 'operator-information'];
+const TOURS = ['tour-offer', 'booking-application', 'operator-information', 'hotel-booking', 'cancellation', 'tourist-memo', 'payment'];
+const GENERAL = ['terms', 'privacy-policy', 'consent', 'personalization-consent', 'ads-consent', 'marketing-data-consent', 'cookie-settings', 'recommendations'];
 
 // ---------------------------------------------------------------- (a) list
 console.log('legalDocs.ts');
-await check('12 documents: slugs and full titles as on the site, in order', async () => {
+await check('16 documents: slugs and full titles as on the site, in order', async () => {
   const m = await load('src/content/legalDocs.ts');
   assert.deepEqual(m.LEGAL_DOCS.map(d => [d.slug, d.title]), EXPECTED);
   for (const d of m.LEGAL_DOCS) {
     assert.ok(typeof d.short === 'string' && d.short.trim().length > 0, `short for ${d.slug}`);
   }
-  assert.equal(new Set(m.LEGAL_DOCS.map(d => d.slug)).size, 12, 'unique slugs');
+  assert.equal(new Set(m.LEGAL_DOCS.map(d => d.slug)).size, 16, 'unique slugs');
   assert.deepEqual(m.LEGAL_DOC_SLUGS, EXPECTED.map(([slug]) => slug), 'LEGAL_DOC_SLUGS follows the list');
 });
-await check('batch 2: 5 new documents right before «Реквизиты и контакты», which stays last', async () => {
+await check('tours and accommodation (7) right before «Реквизиты и контакты», which stays last; general (8) first', async () => {
   const m = await load('src/content/legalDocs.ts');
   const slugs = m.LEGAL_DOCS.map(d => d.slug);
   assert.equal(slugs[slugs.length - 1], 'requisites', '«Реквизиты и контакты» last');
-  assert.deepEqual(slugs.slice(-6, -1), BATCH_2, 'batch 2 order, right before requisites');
-  assert.deepEqual(slugs.slice(0, 6), ['terms', 'privacy-policy', 'consent', 'ads-consent', 'cookie-settings', 'recommendations'], 'batch 1 order kept');
-  for (const slug of BATCH_2) {
+  assert.deepEqual(slugs.slice(-8, -1), TOURS, 'tours order, right before requisites');
+  assert.deepEqual(slugs.slice(0, 8), GENERAL, 'general documents first');
+  for (const slug of [...BATCH_2, ...PACK_3]) {
     assert.equal(m.isLegalDocSlug(slug), true, slug);
     assert.equal(m.findLegalDoc(slug).title, EXPECTED.find(([s]) => s === slug)[1], `full title for ${slug}`);
   }
@@ -129,10 +137,10 @@ await check('links to the batch-1 documents open inside the app', async () => {
   assert.deepEqual(r(base + 'recommendations'), internal('recommendations'));
   assert.deepEqual(r('requisites'), internal('requisites'));
 });
-await check('links to the 5 batch-2 documents (/tour-offer, /payment, ...) open inside the app', async () => {
+await check('links to the tour documents and the 4 new ones (/tour-offer, /payment, /booking-application, ...) open inside the app', async () => {
   const {resolveLegalLink: r, LEGAL_HTML_BASE_URL: base} = await load('src/screens/legal/legalLinks.ts');
   const internal = slug => ({kind: 'internal', slug});
-  for (const slug of BATCH_2) {
+  for (const slug of [...BATCH_2, ...PACK_3]) {
     assert.deepEqual(r(`/${slug}`), internal(slug), `/${slug}`);
     assert.deepEqual(r(`https://totus.club/${slug}`), internal(slug), `https://totus.club/${slug}`);
     assert.deepEqual(r(`https://www.totus.club/${slug}/`), internal(slug), `www, trailing slash`);
@@ -351,9 +359,9 @@ await check('no abbreviations, former operator or «coming soon» in legal scree
   assert.ok(WORDING_FILES.length >= 11, `files scanned: ${WORDING_FILES.length}`);
   assert.deepEqual(hits, [], hits.join('; '));
 });
-await check('exactly 12 documents with full titles and captions (no abbreviations)', async () => {
+await check('exactly 16 documents with full titles and captions (no abbreviations)', async () => {
   const m = await load('src/content/legalDocs.ts');
-  assert.equal(m.LEGAL_DOCS.length, 12);
+  assert.equal(m.LEGAL_DOCS.length, 16);
   for (const d of m.LEGAL_DOCS) {
     for (const [word, re] of FORBIDDEN_WORDS) {
       assert.ok(!re.test(d.title) && !re.test(d.short), `${d.slug}: «${word}»`);
