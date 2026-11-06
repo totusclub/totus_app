@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { FontTextInput as TextInput } from '../../../UI/text/FontText';
 import Modal from 'react-native-modal';
@@ -18,6 +19,8 @@ import type { Departure } from '../../../../types/departures';
 import { highlightAllMatches } from '../../../UI/highlightText';
 import { useTheme } from '../../../../hooks/useTheme';
 import { FONT_HEADING } from '../../../../theme/fonts';
+import { useLayout } from '../../../../hooks/useLayout';
+import { TabletSheetBackdrop, tabletListSheetHeight, tabletSheetStyles } from './tabletSheet';
 
 type DepartureSelectionModalProps = {
   visible: boolean;
@@ -32,7 +35,9 @@ const DepartureSelectionModal: React.FC<DepartureSelectionModalProps> = ({
   onSelect,
   title,
 }) => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
+  const { isTablet } = useLayout();
+  const { height: windowHeight } = useWindowDimensions();
   const dispatch = useDispatch<AppDispatch>();
   const { data, loading, error } = useSelector(
     (state: RootState) => state.departures,
@@ -98,12 +103,15 @@ const DepartureSelectionModal: React.FC<DepartureSelectionModalProps> = ({
 
   return (
     <Modal
-      style={styles.modal}
+      style={[styles.modal, isTablet && tabletSheetStyles.modal]}
       isVisible={visible}
       animationIn="fadeIn"
       animationOut="fadeOut"
+      avoidKeyboard={isTablet}
       backdropOpacity={0}
       hasBackdrop={false}>
+      {/* iPad: окно 540 по центру, список прокручивается внутри (tabletSheet.tsx) */}
+      {isTablet ? <TabletSheetBackdrop onClose={onClose} isDark={isDark} /> : null}
       <View
         style={[
           styles.modalContent,
@@ -112,6 +120,7 @@ const DepartureSelectionModal: React.FC<DepartureSelectionModalProps> = ({
             paddingTop: paddingTop + 20,
             paddingBottom: paddingBottom + 20,
           },
+          isTablet && [tabletSheetStyles.card, { height: tabletListSheetHeight(windowHeight) }],
         ]}>
         {/* Header */}
         <View style={styles.header}>
