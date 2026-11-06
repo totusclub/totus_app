@@ -17,7 +17,8 @@ check('tabletSheet: ширина 540, не выше 80% экрана, списк
   assert.match(sheet, /TABLET_SHEET_MAX_HEIGHT_RATIO = 0\.8;/);
   assert.match(sheet, /TABLET_LIST_SHEET_MAX_HEIGHT = 800;/);
   assert.match(sheet, /TABLET_CALENDAR_CELL_HEIGHT = 48;/);
-  assert.match(sheet, /justifyContent: 'center',\s*alignItems: 'center'/);
+  assert.match(sheet, /modal: \{\s*margin: 0,\s*justifyContent: 'center',\s*\}/, 'у контейнера окна не должно быть alignItems (размытие полосой)');
+  assert.match(sheet, /alignSelf: 'center',\s*width: TABLET_SHEET_WIDTH/);
   assert.match(sheet, /onPress=\{onClose\}/);
 });
 
@@ -35,10 +36,9 @@ for (const m of modals) {
 }
 
 const date = read('DateSelectionModal.tsx');
-check('Календарь: 13 месяцев вперёд, прокрутка не перехватывается жестом смахивания на iPad', () => {
+check('Календарь: 13 месяцев вперёд, прокрутка не перехватывается жестом смахивания (телефон и iPad)', () => {
   assert.match(date, /const MONTHS_TO_SHOW = 13;/);
-  assert.match(date, /swipeDirection=\{isTablet \? undefined : 'left'\}/);
-  assert.match(date, /propagateSwipe=\{isTablet\}/);
+  assert.doesNotMatch(date, /swipeDirection=/);
   assert.match(date, /<ScrollView\s+ref=\{scrollRef\}/);
   assert.match(date, /showsVerticalScrollIndicator=\{isTablet\}/);
 });

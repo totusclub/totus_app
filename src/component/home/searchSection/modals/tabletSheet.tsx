@@ -25,15 +25,20 @@ export function tabletListSheetHeight(windowHeight: number): number {
 }
 
 export const tabletSheetStyles = StyleSheet.create({
-  /** Контейнер react-native-modal: карточка по центру. */
+  /**
+   * Контейнер react-native-modal: карточка по центру по вертикали.
+   * Без alignItems: 'center' — иначе обёртка окна сжимается до ширины карточки и размытие
+   * фона ложится только полосой 540 pt (скриншоты владельца 07.11). По горизонтали карточку
+   * центрирует её alignSelf, фон растягивается на весь экран.
+   */
   modal: {
     margin: 0,
     justifyContent: 'center',
-    alignItems: 'center',
   },
   /** Сама карточка: поверх «на весь экран» (position absolute) и «шторки снизу» стилей окна. */
   card: {
     position: 'relative',
+    alignSelf: 'center',
     width: TABLET_SHEET_WIDTH,
     maxHeight: '80%',
     borderRadius: 24,
