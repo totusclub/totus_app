@@ -3,7 +3,7 @@ import { StyleSheet, Platform, View, useWindowDimensions } from 'react-native';
 import { FontText as Text } from '../component/UI/text/FontText';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { CommonActions, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { AppIcon, AppText } from '../component/UI';
 import { useSelector } from 'react-redux';
 import { RootState } from '../modules/store';
@@ -148,7 +148,10 @@ const VoiceAssistantStackScreen = () => (
   </Stack.Navigator>
 );
 
-const AccountStackScreen = () => {
+/** Экраны входа в стеке «Аккаунт». */
+const ACCOUNT_AUTH_ROUTES = new Set(['login', 'signup', 'verification']);
+
+const AccountStackScreen = ({ navigation, route }: any) => {
   const { accessToken, user: userFromState, fullAuth } = useSelector(
     (state: RootState) => state.auth
   );
@@ -156,6 +159,37 @@ const AccountStackScreen = () => {
   // If user is logged in -> go to account
   // If not -> go to login
   const initialRoute = accessToken ? "account" : "login";
+
+  // initialRouteName действует только при первом показе стека. Если стек открылся гостем
+  // (login), после входа корнем остаётся login: экран кода добавляет «Аккаунт» поверх, а
+  // нажатие на иконку «Аккаунт» сбрасывает стек к корню — и снова открывался вход
+  // (жалоба владельца 07.11.2026). Поэтому по нажатию на иконку стек приводится в
+  // соответствие со входом: вошёл — только «Аккаунт» (профиль), не вошёл — только вход.
+  const isLoggedInRef = React.useRef(Boolean(accessToken));
+  isLoggedInRef.current = Boolean(accessToken);
+
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', () => {
+      const tabState = navigation.getState();
+      const accountRoute = tabState?.routes?.find((r: any) => r.key === route.key);
+      const stackState = accountRoute?.state;
+      if (!stackState?.key || !Array.isArray(stackState.routes)) return;
+      const names: string[] = stackState.routes.map((r: any) => r.name);
+      const loggedIn = isLoggedInRef.current;
+      const needsReset = loggedIn
+        ? names.some(name => ACCOUNT_AUTH_ROUTES.has(name))
+        : names.includes('account');
+      if (!needsReset) return;
+      navigation.dispatch({
+        ...CommonActions.reset({
+          index: 0,
+          routes: [{ name: loggedIn ? 'account' : 'login' }],
+        }),
+        target: stackState.key,
+      });
+    });
+    return unsubscribe;
+  }, [navigation, route.key]);
 
   return (
     <Stack.Navigator
