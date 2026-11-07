@@ -62,6 +62,11 @@ export const AuthScreen = ({ initialMode = 'login' }: { initialMode?: AuthMode }
   const [error, setError] = useState<string | null>(null);
 
   const isSignup = mode === 'signup';
+  // Куда вернуться после кода (например, к бронированию тура — bookingAuthGate.tsx):
+  // раньше returnTo / returnParams терялись здесь, и после входа всегда открывался «Аккаунт».
+  const returnAfterVerification = route.params?.returnTo
+    ? { returnTo: route.params.returnTo, returnParams: route.params.returnParams }
+    : {};
   const captchaRequired = Boolean(YANDEX_SMARTCAPTCHA_SITEKEY);
   const emailValid = EMAIL_RE.test(email.trim());
   const formReady = emailValid && (!isSignup || Boolean(name.trim()));
@@ -116,7 +121,11 @@ export const AuthScreen = ({ initialMode = 'login' }: { initialMode?: AuthMode }
         );
         return;
       }
-      navigation.navigate('verification', { email: cleanEmail, isSignup: false });
+      navigation.navigate('verification', {
+        email: cleanEmail,
+        isSignup: false,
+        ...returnAfterVerification,
+      });
     } else {
       setError((result.payload as any)?.message || 'Не удалось отправить код');
       resetCaptcha();
@@ -140,7 +149,11 @@ export const AuthScreen = ({ initialMode = 'login' }: { initialMode?: AuthMode }
         resetCaptcha();
         return;
       }
-      navigation.navigate('verification', { email: cleanEmail, isSignup: true });
+      navigation.navigate('verification', {
+        email: cleanEmail,
+        isSignup: true,
+        ...returnAfterVerification,
+      });
     } else {
       const message = (result.payload as any)?.message;
       if (message === 'Email already exists') {
