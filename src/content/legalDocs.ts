@@ -17,11 +17,15 @@ export type LegalDocSlug =
   | 'terms'
   | 'privacy-policy'
   | 'consent'
+  | 'personalization-consent'
   | 'ads-consent'
+  | 'marketing-data-consent'
   | 'cookie-settings'
   | 'recommendations'
-  // Пачка 2: туры и размещение
+  // Туры и размещение
   | 'tour-offer'
+  | 'booking-application'
+  | 'operator-information'
   | 'hotel-booking'
   | 'cancellation'
   | 'tourist-memo'
@@ -53,9 +57,19 @@ export const LEGAL_DOCS: readonly LegalDoc[] = [
     short: 'Какие данные и для чего обрабатываются',
   },
   {
+    slug: 'personalization-consent',
+    title: 'Согласие на обработку персональных данных для персональных рекомендаций',
+    short: 'Подборки с учётом ваших интересов',
+  },
+  {
     slug: 'ads-consent',
     title: 'Согласие на получение рекламы',
     short: 'Рассылки и рекламные сообщения',
+  },
+  {
+    slug: 'marketing-data-consent',
+    title: 'Согласие на обработку персональных данных для направления рекламы',
+    short: 'Какие данные нужны для рекламных писем',
   },
   {
     slug: 'cookie-settings',
@@ -72,6 +86,16 @@ export const LEGAL_DOCS: readonly LegalDoc[] = [
     slug: 'tour-offer',
     title: 'Оферта о заключении договора о реализации туристского продукта',
     short: 'Условия покупки тура',
+  },
+  {
+    slug: 'booking-application',
+    title: 'Форма заявки на бронирование туристского продукта',
+    short: 'Что указывается в заявке на тур',
+  },
+  {
+    slug: 'operator-information',
+    title: 'Форма информации о туроператоре',
+    short: 'Туроператор и финансовое обеспечение',
   },
   {
     slug: 'hotel-booking',
